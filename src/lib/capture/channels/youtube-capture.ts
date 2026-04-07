@@ -691,34 +691,37 @@ export class YouTubeCapture extends BaseChannel {
           // ═══════════════════════════════════════════════════
           const skipBtn = document.createElement('div');
           skipBtn.id = 'admate-skip-btn';
+          skipBtn.className = 'admate-ytp-skip-ad-button';
           skipBtn.setAttribute('data-injected', 'admate-youtube-preroll');
+          // 레이아웃은 실제 .ytp-skip-ad-button 과 동일: flex + 텍스트 div + 아이콘 span(24px SVG)
           skipBtn.style.cssText = [
             'position: fixed',
             'top: ' + (py + ph - 90) + 'px',
             'left: ' + (px + pw - 24) + 'px',
             'transform: translateX(-100%)',
+            'box-sizing: border-box',
             'background: rgba(28,28,28,0.8)',
             'color: #fff',
-            'font-size: 15px',
-            "font-family: 'Noto Sans KR','Roboto',Arial,Helvetica,sans-serif",
-            'font-weight: 500',
-            'padding: 10px 22px',
-            'border-radius: 24px',
+            'padding: 8px 16px',
+            'min-height: 36px',
+            'border-radius: 18px',
+            'border: none',
             'cursor: pointer',
             'display: flex',
             'align-items: center',
-            'gap: 8px',
+            'flex-direction: row',
+            'gap: 12px',
             'z-index: 2147483647',
-            'letter-spacing: 0.2px',
+            'letter-spacing: 0',
             'backdrop-filter: blur(4px)',
-            'line-height: 1',
           ].join(' !important;') + ' !important';
-          // 건너뛰기 아이콘: 원본 유튜브에 맞춰 글자(15px)와 비슷한 시각 높이 — 32×32px(24 viewBox 스케일업)
+          // SVG: 유튜브 플레이어에서 복사한 skip 아이콘(path 동일, 24×24)
           skipBtn.innerHTML =
-            "<span style=\\"font-family:'Noto Sans KR','Roboto',Arial,Helvetica,sans-serif !important;color:#fff !important;font-size:15px !important;font-weight:500 !important;line-height:1 !important\\">건너뛰기</span>" +
-            '<svg width="32" height="32" viewBox="0 0 24 24" fill="#ffffff" xmlns="http://www.w3.org/2000/svg" focusable="false" aria-hidden="true" style="display:block;flex-shrink:0">' +
-            '<path d="M5 18l10-6L5 6v12zm12-12v12h2V6h-2z"/>' +
-            '</svg>';
+            '<div class="admate-ytp-skip-ad-button__text" style="color:#fff !important;font-size:15px !important;font-weight:500 !important;line-height:1 !important;font-family: \\'Noto Sans KR\\', \\'Roboto\\', Arial, Helvetica, sans-serif !important;display:flex !important;align-items:center !important">건너뛰기</div>' +
+            '<span class="admate-ytp-skip-ad-button__icon" style="display:inline-flex !important;align-items:center !important;justify-content:center !important;line-height:0 !important;flex-shrink:0 !important">' +
+            '<svg fill="none" height="24" viewBox="0 0 24 24" width="24" xmlns="http://www.w3.org/2000/svg" focusable="false" aria-hidden="true">' +
+            '<path d="M20 20C20.26 20 20.51 19.89 20.70 19.70C20.89 19.51 21 19.26 21 19V5C21 4.73 20.89 4.48 20.70 4.29C20.51 4.10 20.26 4 20 4C19.73 4 19.48 4.10 19.29 4.29C19.10 4.48 19 4.73 19 5V19C19 19.26 19.10 19.51 19.29 19.70C19.48 19.89 19.73 20 20 20ZM5.04 19.77L18 12L5.04 4.22C4.84 4.10 4.60 4.03 4.36 4.03C4.12 4.03 3.89 4.09 3.68 4.21C3.47 4.32 3.30 4.49 3.18 4.70C3.06 4.91 2.99 5.14 3 5.38V18.61C2.99 18.85 3.06 19.08 3.18 19.29C3.30 19.50 3.47 19.67 3.68 19.79C3.89 19.90 4.12 19.96 4.36 19.96C4.60 19.96 4.84 19.89 5.04 19.77Z" fill="white"/>' +
+            '</svg></span>';
           document.body.appendChild(skipBtn);
 
           console.log('[YouTube Inject] ✅ 프리롤 인젝션 성공 (실제 YouTube 형태, ' + pw + 'x' + ph + ')');
