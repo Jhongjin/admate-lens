@@ -46,13 +46,20 @@ const VERCEL_VIEWPORT: IViewport = {
   isMobile: false,
 };
 
+/** Headless 스크린샷에서 HTML5 video가 GPU 합성 레이어로 DOM 오버레이를 덮는 현상 완화 */
+const VIDEO_CAPTURE_ARGS = [
+  "--disable-gpu",
+  "--disable-accelerated-video-decode",
+  "--disable-accelerated-video-encode",
+  "--disable-features=VizDisplayCompositor",
+];
+
 const BROWSER_ARGS = [
   "--no-sandbox",
   "--disable-setuid-sandbox",
   "--disable-dev-shm-usage",
-  "--disable-gpu",
+  ...VIDEO_CAPTURE_ARGS,
   "--disable-web-security",
-  "--disable-features=VizDisplayCompositor",
   "--single-process",
   // 추가 stealth 플래그
   "--disable-blink-features=AutomationControlled",
@@ -601,7 +608,12 @@ export class PuppeteerEngine implements IBrowserEngine {
       for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
         try {
           this.browser = await puppeteer.default.launch({
-            args: [...chromium.args, "--hide-scrollbars", "--disable-web-security"],
+            args: [
+              ...chromium.args,
+              ...VIDEO_CAPTURE_ARGS,
+              "--hide-scrollbars",
+              "--disable-web-security",
+            ],
             defaultViewport: VERCEL_VIEWPORT,
             executablePath: execPath,
             headless: chromium.headless,

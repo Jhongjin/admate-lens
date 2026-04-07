@@ -421,6 +421,23 @@ export class YouTubeCapture extends BaseChannel {
     `);
     await new Promise((r) => setTimeout(r, 1000));
 
+    // 9.5) 네이티브 video/canvas 숨김 — Headless에서 재생 레이어가 GPU로 합성되며
+    //      인젝션한 광고 이미지보다 위에 그려져 동영상 영역만 빈(흰) 화면으로 캡처되는 경우가 있음
+    await page.evaluate<void>(`
+      (() => {
+        const hide = (el) => {
+          el.style.setProperty("visibility", "hidden", "important");
+          el.style.setProperty("opacity", "0", "important");
+          el.style.setProperty("pointer-events", "none", "important");
+        };
+        document.querySelectorAll("video").forEach(hide);
+        document
+          .querySelectorAll("#movie_player canvas, .html5-video-player canvas, ytd-player canvas")
+          .forEach(hide);
+      })()
+    `);
+    await new Promise((r) => setTimeout(r, 300));
+
     // 10) 전체 페이지 스크린샷
     const screenshot = await page.screenshot({
       fullPage: false, // YouTube는 뷰포트 캡처가 더 적합
