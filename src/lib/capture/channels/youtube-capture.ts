@@ -1082,58 +1082,107 @@ export class YouTubeCapture extends BaseChannel {
 
       await page.goto(embedUrl, { waitUntil: "networkidle2", timeout: 45000 });
       await page.waitForSelector("video", { timeout: 15000 });
-      await new Promise((r) => setTimeout(r, 1000));
+      await new Promise((r) => setTimeout(r, 1200));
 
-      // Headless 환경에서 play()/requestVideoFrameCallback 대기가 불안정해 timeout이 잦으므로
-      // start 파라미터로 진입한 뒤 짧게 안정화 대기 후 바로 프레임을 캡처한다.
-      await new Promise((r) => setTimeout(r, 1800));
-
-      const info = await page.evaluate<{
+      const extracted = await page.evaluate<{
         ok: boolean;
         reason?: string;
-        x?: number;
-        y?: number;
-        width?: number;
-        height?: number;
+        frameDataUrl?: string;
         duration?: number;
       }>(`
-        (() => {
+        (() => new Promise((resolve) => {
           const v = document.querySelector("video");
-          if (!v) return { ok: false, reason: "video_not_found" };
-          const r = v.getBoundingClientRect();
-          const duration = Number.isFinite(v.duration) ? v.duration : 0;
-          if (r.width < 120 || r.height < 80) {
-            return { ok: false, reason: "invalid_rect", duration };
-          }
-          try { v.pause(); } catch {}
-          return {
-            ok: true,
-            x: Math.max(0, Math.floor(r.left)),
-            y: Math.max(0, Math.floor(r.top)),
-            width: Math.floor(r.width),
-            height: Math.floor(r.height),
-            duration,
+          if (!v) return resolve({ ok: false, reason: "video_not_found" });
+
+          const target = Math.max(0, Number(${Math.max(0, seconds).toFixed(3)}));
+          let done = false;
+          const finish = (result) => {
+            if (done) return;
+            done = true;
+            resolve(result);
           };
-        })()
+
+          const duration = Number.isFinite(v.duration) ? Number(v.duration) : 0;
+          const targetClamped = duration > 0 ? Math.min(target, Math.max(0, duration - 0.12)) : target;
+
+          const captureNow = (reason) => {
+            try {
+              const vw = Math.max(1, Math.floor(v.videoWidth || 0));
+              const vh = Math.max(1, Math.floor(v.videoHeight || 0));
+              if (vw < 32 || vh < 32) {
+                return finish({ ok: false, reason: reason || "invalid_video_size", duration });
+              }
+
+              const c = document.createElement("canvas");
+              c.width = vw;
+              c.height = vh;
+              const ctx = c.getContext("2d");
+              if (!ctx) return finish({ ok: false, reason: "canvas_ctx_missing", duration });
+              ctx.drawImage(v, 0, 0, vw, vh);
+              const frameDataUrl = c.toDataURL("image/png");
+              if (!frameDataUrl || frameDataUrl.length < 1500) {
+                return finish({ ok: false, reason: "frame_data_too_small", duration });
+              }
+              finish({ ok: true, frameDataUrl, duration });
+            } catch (e) {
+              finish({ ok: false, reason: "canvas_capture_failed", duration });
+            }
+          };
+
+          const attemptSeekAndCapture = async () => {
+            try {
+              v.muted = true;
+              const p = v.play();
+              if (p && typeof p.then === "function") {
+                try { await p; } catch {}
+              }
+            } catch {}
+
+            try { v.currentTime = targetClamped; } catch {}
+
+            const start = Date.now();
+            const poll = () => {
+              if (done) return;
+              const ready = (v.readyState || 0) >= 2;
+              const t = Number(v.currentTime || 0);
+              const nearTarget = Math.abs(t - targetClamped) <= 0.35;
+
+              if (ready && nearTarget) {
+                try { v.pause(); } catch {}
+                if (typeof v.requestVideoFrameCallback === "function") {
+                  try {
+                    v.requestVideoFrameCallback(() => captureNow("ok_vfc"));
+                    return;
+                  } catch {}
+                }
+                setTimeout(() => captureNow("ok_poll"), 120);
+                return;
+              }
+
+              if (Date.now() - start > 6000) {
+                try { v.pause(); } catch {}
+                captureNow("seek_poll_timeout");
+                return;
+              }
+              setTimeout(poll, 120);
+            };
+            poll();
+          };
+
+          attemptSeekAndCapture();
+          setTimeout(() => {
+            try { v.pause(); } catch {}
+            captureNow("overall_timeout");
+          }, 9000);
+        }))()
       `);
 
-      if (!info.ok || !info.width || !info.height) {
-        console.warn("[YouTube] timed frame extraction info failed:", info.reason || "unknown");
-        return { frameDataUrl: null, durationSec: info.duration || 0 };
-      }
-      const frame = await page.screenshot({
-        type: "png",
-        clip: { x: info.x || 0, y: info.y || 0, width: info.width, height: info.height },
-      });
-      if (!frame || frame.length < 1500) {
-        console.warn("[YouTube] timed frame extraction image too small");
-        return { frameDataUrl: null, durationSec: info.duration || 0 };
+      if (!extracted.ok || !extracted.frameDataUrl) {
+        console.warn("[YouTube] timed frame extraction info failed:", extracted.reason || "unknown");
+        return { frameDataUrl: null, durationSec: extracted.duration || 0 };
       }
 
-      return {
-        frameDataUrl: `data:image/png;base64,${frame.toString("base64")}`,
-        durationSec: info.duration || 0,
-      };
+      return { frameDataUrl: extracted.frameDataUrl, durationSec: extracted.duration || 0 };
     } catch (err) {
       console.warn("[YouTube] timed frame extraction failed:", err);
       return { frameDataUrl: null, durationSec: 0 };
