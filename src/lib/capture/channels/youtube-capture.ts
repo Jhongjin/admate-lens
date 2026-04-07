@@ -1093,8 +1093,7 @@ export class YouTubeCapture extends BaseChannel {
         height?: number;
         duration?: number;
       }>(`
-        ((secVal) => new Promise((resolve) => {
-          const sec = Math.max(0, Number(secVal) || 0);
+        (() => new Promise((resolve) => {
           const v = document.querySelector("video");
           if (!v) return resolve({ ok: false, reason: "video_not_found" });
 
@@ -1114,61 +1113,38 @@ export class YouTubeCapture extends BaseChannel {
             });
           };
 
-          const renderAndPause = () => {
-            try {
-              v.muted = true;
-              const p = v.play();
-              if (p && typeof p.then === "function") {
-                p.then(() => {
-                  if (typeof v.requestVideoFrameCallback === "function") {
-                    v.requestVideoFrameCallback(() => {
-                      try { v.pause(); } catch {}
-                      setTimeout(() => finish("ok"), 80);
-                    });
-                  } else {
-                    setTimeout(() => {
-                      try { v.pause(); } catch {}
-                      finish("ok");
-                    }, 220);
-                  }
-                }).catch(() => {
+          try {
+            v.muted = true;
+            const p = v.play();
+            const afterPlay = () => {
+              if (typeof v.requestVideoFrameCallback === "function") {
+                v.requestVideoFrameCallback(() => {
                   try { v.pause(); } catch {}
-                  finish("play_rejected");
+                  setTimeout(() => finish("ok"), 120);
                 });
               } else {
                 setTimeout(() => {
                   try { v.pause(); } catch {}
-                  finish("ok_no_promise");
-                }, 220);
+                  finish("ok_no_vfc");
+                }, 350);
               }
-            } catch {
-              try { v.pause(); } catch {}
-              finish("play_exception");
+            };
+
+            if (p && typeof p.then === "function") {
+              p.then(afterPlay).catch(() => {
+                try { v.pause(); } catch {}
+                finish("play_rejected");
+              });
+            } else {
+              afterPlay();
             }
-          };
-
-          const target =
-            Number.isFinite(v.duration) && v.duration > 0
-              ? Math.min(sec, Math.max(0, v.duration - 0.2))
-              : sec;
-
-          const onSeeked = () => {
-            v.removeEventListener("seeked", onSeeked);
-            renderAndPause();
-          };
-
-          try {
-            v.addEventListener("seeked", onSeeked, { once: true });
-            v.currentTime = target;
           } catch {
-            renderAndPause();
+            try { v.pause(); } catch {}
+            finish("play_exception");
           }
 
-          setTimeout(() => {
-            v.removeEventListener("seeked", onSeeked);
-            finish("seek_timeout");
-          }, 8000);
-        }))(${JSON.stringify(seconds)})
+          setTimeout(() => finish("frame_wait_timeout"), 4000);
+        }))()
       `);
 
       if (!info.ok || !info.width || !info.height) {
