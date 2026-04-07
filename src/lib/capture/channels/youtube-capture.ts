@@ -1085,7 +1085,7 @@ export class YouTubeCapture extends BaseChannel {
 
       const info = await page.evaluate<{ x: number; y: number; width: number; height: number; duration: number } | null>(`
         (() => {
-          const v = document.querySelector('video') as HTMLVideoElement | null;
+          const v = document.querySelector('video');
           if (!v) return null;
           try { v.pause(); } catch {}
           const r = v.getBoundingClientRect();
