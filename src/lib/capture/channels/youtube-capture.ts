@@ -702,21 +702,21 @@ export class YouTubeCapture extends BaseChannel {
             'font-size: 15px',
             "font-family: 'Noto Sans KR','Roboto',Arial,Helvetica,sans-serif",
             'font-weight: 500',
-            'padding: 10px 20px',
+            'padding: 10px 22px',
             'border-radius: 24px',
             'cursor: pointer',
             'display: flex',
             'align-items: center',
-            'gap: 10px',
+            'gap: 8px',
             'z-index: 2147483647',
             'letter-spacing: 0.2px',
             'backdrop-filter: blur(4px)',
             'line-height: 1',
           ].join(' !important;') + ' !important';
-          // 건너뛰기 아이콘: 실제 유튜브 광고 UI와 동일 계열(큰 ▶ + 세로 막대) — Material skip_next 24×24 viewBox
+          // 건너뛰기 아이콘: 원본 유튜브에 맞춰 글자(15px)와 비슷한 시각 높이 — 32×32px(24 viewBox 스케일업)
           skipBtn.innerHTML =
             "<span style=\\"font-family:'Noto Sans KR','Roboto',Arial,Helvetica,sans-serif !important;color:#fff !important;font-size:15px !important;font-weight:500 !important;line-height:1 !important\\">건너뛰기</span>" +
-            '<svg width="24" height="24" viewBox="0 0 24 24" fill="#ffffff" xmlns="http://www.w3.org/2000/svg" focusable="false" aria-hidden="true" style="display:block;flex-shrink:0">' +
+            '<svg width="32" height="32" viewBox="0 0 24 24" fill="#ffffff" xmlns="http://www.w3.org/2000/svg" focusable="false" aria-hidden="true" style="display:block;flex-shrink:0">' +
             '<path d="M5 18l10-6L5 6v12zm12-12v12h2V6h-2z"/>' +
             '</svg>';
           document.body.appendChild(skipBtn);
