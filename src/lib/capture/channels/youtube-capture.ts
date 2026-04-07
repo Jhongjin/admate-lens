@@ -292,16 +292,62 @@ export class YouTubeCapture extends BaseChannel {
     // 5) 캡처 시점 이동 (preroll)
     if (prerollCaptureSeconds !== null) {
       console.log(`[YouTube] ⏰ 인스트림 영상 ${prerollCaptureSeconds}초 시점으로 이동`);
-      await page.evaluate((secVal: unknown) => {
-        const secs = Number(secVal);
-        try {
-          const video = document.querySelector('video.html5-main-video') as HTMLVideoElement;
-          if (video) video.currentTime = secs;
-        } catch (e) {
-          console.error('[YouTube] Video seek failed', e);
-        }
-      }, prerollCaptureSeconds);
-      await new Promise((r) => setTimeout(r, 1000));
+      await page.evaluate(
+        (secVal: unknown) =>
+          new Promise<void>((resolve) => {
+            const secs = Number(secVal);
+            const video = document.querySelector('video.html5-main-video') as HTMLVideoElement | null;
+            if (!video) return resolve();
+            try {
+              video.currentTime = secs;
+            } catch (e) {
+              console.error('[YouTube] Video seek failed', e);
+              return resolve();
+            }
+
+            const done = () => resolve();
+            video.addEventListener('seeked', done, { once: true });
+            setTimeout(done, 2500);
+          }),
+        prerollCaptureSeconds
+      );
+
+      // 핵심: seek 직후 정지하면 합성 프레임이 비어있는 경우가 있어, 짧게 재생해 프레임 확정 렌더
+      await page.evaluate(
+        () =>
+          new Promise<void>((resolve) => {
+            const video = document.querySelector('video.html5-main-video') as HTMLVideoElement | null;
+            if (!video) return resolve();
+
+            const finish = () => {
+              try {
+                video.pause();
+              } catch {
+                /* ignore */
+              }
+              resolve();
+            };
+
+            try {
+              video.muted = true;
+              const p = video.play();
+              if (p && typeof p.then === 'function') {
+                p.then(() => {
+                  if (typeof (video as any).requestVideoFrameCallback === 'function') {
+                    (video as any).requestVideoFrameCallback(() => setTimeout(finish, 120));
+                  } else {
+                    setTimeout(finish, 350);
+                  }
+                }).catch(() => setTimeout(finish, 350));
+              } else {
+                setTimeout(finish, 350);
+              }
+            } catch {
+              setTimeout(finish, 350);
+            }
+          })
+      );
+      await new Promise((r) => setTimeout(r, 250));
     }
 
     // 5.5) 영상 일시정지 (깨끗한 스크린샷을 위해)
