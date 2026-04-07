@@ -1064,164 +1064,85 @@ export class YouTubeCapture extends BaseChannel {
       await page.goto(watchUrl, { waitUntil: "networkidle2", timeout: 45000 });
       await this.dismissYouTubeConsent(page);
       await page.waitForSelector("#movie_player video, video", { timeout: 20000 });
-      await new Promise((r) => setTimeout(r, 1600));
+      await new Promise((r) => setTimeout(r, 1200));
 
-      const extracted = await page.evaluate<{
+      const info = await page.evaluate<{
         ok: boolean;
         reason?: string;
-        frameDataUrl?: string;
+        x?: number;
+        y?: number;
+        width?: number;
+        height?: number;
         duration?: number;
         capturedTime?: number;
       }>(`
-        (() => new Promise((resolve) => {
-          const pickBestVideo = () => {
-            const focused = document.querySelector("#movie_player video.html5-main-video");
-            if (focused) return focused;
-            const videos = Array.from(document.querySelectorAll("video"));
-            if (!videos.length) return null;
-            let best = null;
-            let bestScore = -1;
-            for (const el of videos) {
-              const r = el.getBoundingClientRect();
-              const area = Math.max(0, r.width) * Math.max(0, r.height);
-              const vw = Number(el.videoWidth || 0);
-              const vh = Number(el.videoHeight || 0);
-              const decodedArea = Math.max(0, vw) * Math.max(0, vh);
-              const score = area * 10 + decodedArea;
-              if (score > bestScore) {
-                best = el;
-                bestScore = score;
-              }
-            }
-            return best;
-          };
-
-          let v = pickBestVideo();
-          if (!v) return resolve({ ok: false, reason: "video_not_found_best" });
-
+        (() => {
           const target = Math.max(0, Number(${Math.max(0, seconds).toFixed(3)}));
-          let done = false;
-          const finish = (result) => {
-            if (done) return;
-            done = true;
-            resolve(result);
+          const player = document.querySelector("#movie_player");
+          const v =
+            document.querySelector("#movie_player video.html5-main-video") ||
+            document.querySelector("#movie_player video") ||
+            document.querySelector("video");
+          if (!v) return { ok: false, reason: "video_not_found" };
+
+          try { v.muted = true; } catch {}
+          try {
+            if (player && typeof player.seekTo === "function") player.seekTo(target, true);
+            else v.currentTime = target;
+          } catch {}
+          try {
+            if (player && typeof player.playVideo === "function") player.playVideo();
+            else v.play?.();
+          } catch {}
+          try {
+            if (player && typeof player.pauseVideo === "function") player.pauseVideo();
+            else v.pause?.();
+          } catch {}
+
+          const container =
+            document.querySelector("#movie_player .html5-video-container") ||
+            document.querySelector("#movie_player") ||
+            v;
+          const r = container.getBoundingClientRect();
+          const duration = Number.isFinite(v.duration) ? Number(v.duration) : 0;
+          const capturedTime = Number(v.currentTime || 0);
+          if (r.width < 120 || r.height < 80) {
+            return { ok: false, reason: "invalid_clip_rect", duration, capturedTime };
+          }
+          return {
+            ok: true,
+            x: Math.max(0, Math.floor(r.left)),
+            y: Math.max(0, Math.floor(r.top)),
+            width: Math.floor(r.width),
+            height: Math.floor(r.height),
+            duration,
+            capturedTime,
           };
-
-          const getDuration = () => (Number.isFinite(v.duration) ? Number(v.duration) : 0);
-          const targetClamped = () => {
-            const d = getDuration();
-            return d > 0 ? Math.min(target, Math.max(0, d - 0.12)) : target;
-          };
-
-          const captureNow = (reason) => {
-            try {
-              const vw = Math.max(1, Math.floor(v.videoWidth || 0));
-              const vh = Math.max(1, Math.floor(v.videoHeight || 0));
-              if (vw < 32 || vh < 32) {
-                return finish({
-                  ok: false,
-                  reason: (reason || "invalid_video_size") + "_vw" + String(vw) + "_vh" + String(vh),
-                  duration: getDuration(),
-                  capturedTime: Number(v.currentTime || 0),
-                });
-              }
-
-              const c = document.createElement("canvas");
-              c.width = vw;
-              c.height = vh;
-              const ctx = c.getContext("2d");
-              if (!ctx) return finish({ ok: false, reason: "canvas_ctx_missing", duration });
-              ctx.drawImage(v, 0, 0, vw, vh);
-              const frameDataUrl = c.toDataURL("image/png");
-              if (!frameDataUrl || frameDataUrl.length < 1500) {
-                return finish({
-                  ok: false,
-                  reason: "frame_data_too_small",
-                  duration: getDuration(),
-                  capturedTime: Number(v.currentTime || 0),
-                });
-              }
-              finish({ ok: true, frameDataUrl, duration: getDuration(), capturedTime: Number(v.currentTime || 0) });
-            } catch (e) {
-              const message = (e && typeof e === "object" && "name" in e) ? String(e.name) : "canvas_capture_failed";
-              finish({
-                ok: false,
-                reason: "canvas_capture_failed_" + message,
-                duration: getDuration(),
-                capturedTime: Number(v.currentTime || 0),
-              });
-            }
-          };
-
-          const attemptSeekAndCapture = async () => {
-            if ((v.readyState || 0) < 1) {
-              await new Promise((r) => {
-                const onMeta = () => {
-                  try { v.removeEventListener("loadedmetadata", onMeta); } catch {}
-                  r(undefined);
-                };
-                try { v.addEventListener("loadedmetadata", onMeta, { once: true }); } catch {}
-                setTimeout(() => r(undefined), 2500);
-              });
-            }
-            try {
-              v.muted = true;
-              const p = v.play();
-              if (p && typeof p.then === "function") {
-                try { await p; } catch {}
-              }
-            } catch {}
-
-            try { v.currentTime = targetClamped(); } catch {}
-
-            const start = Date.now();
-            const poll = () => {
-              if (done) return;
-              const candidate = pickBestVideo();
-              if (candidate) v = candidate;
-              const ready = (v.readyState || 0) >= 2;
-              const vw = Number(v.videoWidth || 0);
-              const vh = Number(v.videoHeight || 0);
-              if (ready && vw >= 32 && vh >= 32) {
-                try { v.pause(); } catch {}
-                if (typeof v.requestVideoFrameCallback === "function") {
-                  try {
-                    v.requestVideoFrameCallback(() => captureNow("ok_vfc"));
-                    return;
-                  } catch {}
-                }
-                setTimeout(() => captureNow("ok_poll"), 120);
-                return;
-              }
-
-              if (Date.now() - start > 6000) {
-                try { v.pause(); } catch {}
-                captureNow("seek_poll_timeout");
-                return;
-              }
-              setTimeout(poll, 120);
-            };
-            poll();
-          };
-
-          attemptSeekAndCapture();
-          setTimeout(() => {
-            try { v.pause(); } catch {}
-            captureNow("overall_timeout");
-          }, 9000);
-        }))()
+        })()
       `);
 
-      if (!extracted.ok || !extracted.frameDataUrl) {
+      if (!info.ok || !info.width || !info.height) {
         console.warn(
           "[YouTube] timed frame extraction info failed:",
-          (extracted.reason || "unknown") + " @t=" + String(extracted.capturedTime || 0)
+          (info.reason || "unknown") + " @t=" + String(info.capturedTime || 0)
         );
-        return { frameDataUrl: null, durationSec: extracted.duration || 0 };
+        return { frameDataUrl: null, durationSec: info.duration || 0 };
       }
-      console.log("[YouTube] timed frame extracted @t=" + String(extracted.capturedTime || 0));
 
-      return { frameDataUrl: extracted.frameDataUrl, durationSec: extracted.duration || 0 };
+      await new Promise((r) => setTimeout(r, 900));
+      const frame = await page.screenshot({
+        type: "png",
+        clip: { x: info.x || 0, y: info.y || 0, width: info.width, height: info.height },
+      });
+      if (!frame || frame.length < 2500) {
+        console.warn("[YouTube] timed frame extraction image too small");
+        return { frameDataUrl: null, durationSec: info.duration || 0 };
+      }
+      console.log("[YouTube] timed frame extracted @t=" + String(info.capturedTime || 0));
+      return {
+        frameDataUrl: `data:image/png;base64,${frame.toString("base64")}`,
+        durationSec: info.duration || 0,
+      };
     } catch (err) {
       console.warn("[YouTube] timed frame extraction failed:", err);
       return { frameDataUrl: null, durationSec: 0 };
