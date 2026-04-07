@@ -1092,8 +1092,29 @@ export class YouTubeCapture extends BaseChannel {
         capturedTime?: number;
       }>(`
         (() => new Promise((resolve) => {
-          const v = document.querySelector("video");
-          if (!v) return resolve({ ok: false, reason: "video_not_found" });
+          const videos = Array.from(document.querySelectorAll("video"));
+          if (!videos.length) return resolve({ ok: false, reason: "video_not_found" });
+
+          const pickBestVideo = () => {
+            let best = null;
+            let bestScore = -1;
+            for (const el of videos) {
+              const r = el.getBoundingClientRect();
+              const area = Math.max(0, r.width) * Math.max(0, r.height);
+              const vw = Number(el.videoWidth || 0);
+              const vh = Number(el.videoHeight || 0);
+              const decodedArea = Math.max(0, vw) * Math.max(0, vh);
+              const score = area * 10 + decodedArea;
+              if (score > bestScore) {
+                best = el;
+                bestScore = score;
+              }
+            }
+            return best;
+          };
+
+          const v = pickBestVideo();
+          if (!v) return resolve({ ok: false, reason: "video_not_found_best" });
 
           const target = Math.max(0, Number(${Math.max(0, seconds).toFixed(3)}));
           let done = false;
@@ -1147,6 +1168,16 @@ export class YouTubeCapture extends BaseChannel {
           };
 
           const attemptSeekAndCapture = async () => {
+            if ((v.readyState || 0) < 1) {
+              await new Promise((r) => {
+                const onMeta = () => {
+                  try { v.removeEventListener("loadedmetadata", onMeta); } catch {}
+                  r(undefined);
+                };
+                try { v.addEventListener("loadedmetadata", onMeta, { once: true }); } catch {}
+                setTimeout(() => r(undefined), 2500);
+              });
+            }
             try {
               v.muted = true;
               const p = v.play();
