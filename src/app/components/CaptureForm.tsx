@@ -610,7 +610,10 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
             form.channel === "youtube" && form.youtubeAdType === "preroll"
               ? {
                   videoUrl: form.instreamVideoUrl || undefined,
-                  skipSeconds: parseInt(form.instreamSkipSeconds) || 5,
+                  skipSeconds: (() => {
+                    const n = parseInt(form.instreamSkipSeconds, 10);
+                    return Number.isFinite(n) && n >= 0 ? n : 5;
+                  })(),
                   adTitle: form.instreamAdTitle || undefined,
                   ctaText: form.instreamCtaText || undefined,
                   landingUrl: form.instreamLandingUrl || undefined,
