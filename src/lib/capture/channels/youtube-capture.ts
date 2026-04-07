@@ -1089,6 +1089,7 @@ export class YouTubeCapture extends BaseChannel {
         reason?: string;
         frameDataUrl?: string;
         duration?: number;
+        capturedTime?: number;
       }>(`
         (() => new Promise((resolve) => {
           const v = document.querySelector("video");
@@ -1110,7 +1111,12 @@ export class YouTubeCapture extends BaseChannel {
               const vw = Math.max(1, Math.floor(v.videoWidth || 0));
               const vh = Math.max(1, Math.floor(v.videoHeight || 0));
               if (vw < 32 || vh < 32) {
-                return finish({ ok: false, reason: reason || "invalid_video_size", duration });
+                return finish({
+                  ok: false,
+                  reason: (reason || "invalid_video_size") + "_vw" + String(vw) + "_vh" + String(vh),
+                  duration,
+                  capturedTime: Number(v.currentTime || 0),
+                });
               }
 
               const c = document.createElement("canvas");
@@ -1121,11 +1127,22 @@ export class YouTubeCapture extends BaseChannel {
               ctx.drawImage(v, 0, 0, vw, vh);
               const frameDataUrl = c.toDataURL("image/png");
               if (!frameDataUrl || frameDataUrl.length < 1500) {
-                return finish({ ok: false, reason: "frame_data_too_small", duration });
+                return finish({
+                  ok: false,
+                  reason: "frame_data_too_small",
+                  duration,
+                  capturedTime: Number(v.currentTime || 0),
+                });
               }
-              finish({ ok: true, frameDataUrl, duration });
+              finish({ ok: true, frameDataUrl, duration, capturedTime: Number(v.currentTime || 0) });
             } catch (e) {
-              finish({ ok: false, reason: "canvas_capture_failed", duration });
+              const message = (e && typeof e === "object" && "name" in e) ? String(e.name) : "canvas_capture_failed";
+              finish({
+                ok: false,
+                reason: "canvas_capture_failed_" + message,
+                duration,
+                capturedTime: Number(v.currentTime || 0),
+              });
             }
           };
 
@@ -1144,10 +1161,7 @@ export class YouTubeCapture extends BaseChannel {
             const poll = () => {
               if (done) return;
               const ready = (v.readyState || 0) >= 2;
-              const t = Number(v.currentTime || 0);
-              const nearTarget = Math.abs(t - targetClamped) <= 0.35;
-
-              if (ready && nearTarget) {
+              if (ready) {
                 try { v.pause(); } catch {}
                 if (typeof v.requestVideoFrameCallback === "function") {
                   try {
@@ -1178,9 +1192,13 @@ export class YouTubeCapture extends BaseChannel {
       `);
 
       if (!extracted.ok || !extracted.frameDataUrl) {
-        console.warn("[YouTube] timed frame extraction info failed:", extracted.reason || "unknown");
+        console.warn(
+          "[YouTube] timed frame extraction info failed:",
+          (extracted.reason || "unknown") + " @t=" + String(extracted.capturedTime || 0)
+        );
         return { frameDataUrl: null, durationSec: extracted.duration || 0 };
       }
+      console.log("[YouTube] timed frame extracted @t=" + String(extracted.capturedTime || 0));
 
       return { frameDataUrl: extracted.frameDataUrl, durationSec: extracted.duration || 0 };
     } catch (err) {
