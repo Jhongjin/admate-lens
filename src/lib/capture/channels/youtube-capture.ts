@@ -289,8 +289,10 @@ export class YouTubeCapture extends BaseChannel {
       await this.nukeAllBotElements(page);
     }
 
-    // 5) 캡처 시점 이동 (preroll)
-    if (prerollCaptureSeconds !== null) {
+    const shouldRunTimedSeek = prerollCaptureSeconds !== null && !botDetected;
+
+    // 5) 캡처 시점 이동 (preroll, non-bot path only)
+    if (shouldRunTimedSeek) {
       console.log(`[YouTube] ⏰ 인스트림 영상 ${prerollCaptureSeconds}초 시점으로 이동`);
       await page.evaluate(
         (secVal: unknown) =>
@@ -360,6 +362,14 @@ export class YouTubeCapture extends BaseChannel {
     let prerollProgressPercent = 33;
     let useTimedFrameOverlay = false;
     if (prerollCaptureSeconds !== null) {
+      if (botDetected) {
+        // 봇 감지 폴백에서는 플레이어가 썸네일 DOM으로 대체되므로
+        // 비디오 seek/play evaluate를 수행하지 않는다 (CDP timeout 방지).
+        prerollOverlayImageUrl = thumbnailDataUrl || creativeDataUrl;
+        useTimedFrameOverlay = true;
+      }
+
+      if (!botDetected) {
       const videoRect = await page.evaluate<{
         x: number;
         y: number;
@@ -422,6 +432,7 @@ export class YouTubeCapture extends BaseChannel {
         // 프레임 캡처 실패 시 최소한 소재 이미지로 폴백 (빈 화면 방지)
         prerollOverlayImageUrl = creativeDataUrl;
         console.warn("[YouTube] ⚠️ 시점 프레임 캡처 실패 — 소재 이미지로 폴백");
+      }
       }
 
       const videoDuration = await page.evaluate<number>(() => {

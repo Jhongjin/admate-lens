@@ -591,6 +591,7 @@ export class PuppeteerEngine implements IBrowserEngine {
         defaultViewport: DEFAULT_VIEWPORT,
         executablePath: localPath,
         headless: false,
+        protocolTimeout: 300000,
         ignoreDefaultArgs: ["--enable-automation"],
       });
     } else {
@@ -617,6 +618,7 @@ export class PuppeteerEngine implements IBrowserEngine {
             defaultViewport: VERCEL_VIEWPORT,
             executablePath: execPath,
             headless: chromium.headless,
+            protocolTimeout: 300000,
             ignoreHTTPSErrors: true,
           } as any);
           console.log(`[PuppeteerEngine] 🚀 Chromium + Built-in Stealth 시작 성공 (시도 ${attempt}/${MAX_RETRIES})`);
