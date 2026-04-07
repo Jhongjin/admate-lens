@@ -55,9 +55,12 @@
 body {
   background-color: var(--color-bg-primary);
   color: var(--color-text-primary);
+  /* YouTube 웹 UI와 동일 계열: 한글 Noto Sans KR + 라틴 Roboto (YouTube Sans는 비공개 브랜드 폰트) */
   font-family:
-    "Pretendard Variable",
-    "Inter",
+    var(--font-noto-sans-kr),
+    var(--font-roboto),
+    "Noto Sans KR",
+    "Roboto",
     -apple-system,
     system-ui,
     sans-serif;
