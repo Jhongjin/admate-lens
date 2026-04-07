@@ -1055,13 +1055,16 @@ export class YouTubeCapture extends BaseChannel {
       const adVideoId = extractVideoId(instreamVideoUrl);
       if (!adVideoId) return { frameDataUrl: null, durationSec: 0 };
 
-      const embedUrl =
-        `https://www.youtube.com/embed/${adVideoId}` +
-        `?autoplay=1&mute=1&controls=0&playsinline=1&enablejsapi=1&start=${Math.max(0, Math.floor(seconds))}`;
+      await this.applyYouTubeConsentCookies(page);
 
-      await page.goto(embedUrl, { waitUntil: "networkidle2", timeout: 45000 });
-      await page.waitForSelector("video", { timeout: 15000 });
-      await new Promise((r) => setTimeout(r, 1200));
+      const watchUrl =
+        `https://www.youtube.com/watch?v=${adVideoId}&t=${Math.max(0, Math.floor(seconds))}s` +
+        `&bpctr=9999999999&has_verified=1`;
+
+      await page.goto(watchUrl, { waitUntil: "networkidle2", timeout: 45000 });
+      await this.dismissYouTubeConsent(page);
+      await page.waitForSelector("#movie_player video, video", { timeout: 20000 });
+      await new Promise((r) => setTimeout(r, 1600));
 
       const extracted = await page.evaluate<{
         ok: boolean;
@@ -1072,6 +1075,8 @@ export class YouTubeCapture extends BaseChannel {
       }>(`
         (() => new Promise((resolve) => {
           const pickBestVideo = () => {
+            const focused = document.querySelector("#movie_player video.html5-main-video");
+            if (focused) return focused;
             const videos = Array.from(document.querySelectorAll("video"));
             if (!videos.length) return null;
             let best = null;
