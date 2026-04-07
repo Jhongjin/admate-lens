@@ -308,11 +308,54 @@ export class YouTubeCapture extends BaseChannel {
     await this.pauseVideo(page, { preserveTimeline: prerollCaptureSeconds !== null });
     await new Promise((r) => setTimeout(r, 1000));
 
-    // 캡처 시점 모드에서는 배경 오버레이를 투명 처리해 실제 정지 영상이 보이게 한다.
+    // 캡처 시점 모드: 실제 비디오 프레임을 먼저 이미지화해 오버레이 배경으로 사용
+    // (헤드리스 환경의 video/canvas 합성 불안정으로 인한 빈 화면 방지)
     let prerollOverlayImageUrl = creativeDataUrl;
     let prerollProgressPercent = 33;
+    let useTimedFrameOverlay = false;
     if (prerollCaptureSeconds !== null) {
-      prerollOverlayImageUrl = "";
+      const videoRect = await page.evaluate<{
+        x: number;
+        y: number;
+        width: number;
+        height: number;
+      } | null>(`
+        (() => {
+          const v = document.querySelector('video.html5-main-video, video');
+          if (!v) return null;
+          const r = v.getBoundingClientRect();
+          if (r.width < 40 || r.height < 40) return null;
+          return {
+            x: Math.max(0, Math.floor(r.left)),
+            y: Math.max(0, Math.floor(r.top)),
+            width: Math.floor(r.width),
+            height: Math.floor(r.height),
+          };
+        })()
+      `);
+
+      if (videoRect) {
+        try {
+          const framePng = await page.screenshot({
+            type: "png",
+            clip: videoRect,
+          });
+          if (framePng && framePng.length > 200) {
+            prerollOverlayImageUrl = `data:image/png;base64,${framePng.toString("base64")}`;
+            useTimedFrameOverlay = true;
+            console.log(`[YouTube] 🎞️ 캡처 시점 프레임 이미지화 성공 (${Math.round(framePng.length / 1024)}KB)`);
+          }
+        } catch (e) {
+          console.warn("[YouTube] timed frame capture failed:", e);
+        }
+      }
+
+      if (!useTimedFrameOverlay) {
+        // 프레임 캡처 실패 시 최소한 소재 이미지로 폴백 (빈 화면 방지)
+        prerollOverlayImageUrl = creativeDataUrl;
+        console.warn("[YouTube] ⚠️ 시점 프레임 캡처 실패 — 소재 이미지로 폴백");
+      }
+
       const videoDuration = await page.evaluate<number>(() => {
         const video = document.querySelector('video.html5-main-video') as HTMLVideoElement | null;
         if (!video || !Number.isFinite(video.duration) || video.duration <= 0) return 0;
@@ -504,8 +547,13 @@ export class YouTubeCapture extends BaseChannel {
     `);
     await new Promise((r) => setTimeout(r, 1000));
 
-    // 9.5) 캡처 시점 모드에서는 비디오 레이어를 숨기지 않는다(빈화면 방지)
-    if (!(adType === "preroll" && prerollCaptureSeconds !== null)) {
+    // 9.5) 기본 모드에서는 기존대로 video/canvas 숨김.
+    // 캡처 시점 모드에서는 "프레임 오버레이를 확보한 경우"에만 숨김 적용(합성 불안정 회피).
+    const shouldHideVideoLayers =
+      adType !== "preroll" ||
+      prerollCaptureSeconds === null ||
+      useTimedFrameOverlay;
+    if (shouldHideVideoLayers) {
       await page.evaluate<void>(`
         (() => {
           const hide = (el) => {
