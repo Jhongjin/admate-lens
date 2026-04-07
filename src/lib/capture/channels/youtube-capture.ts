@@ -183,6 +183,10 @@ export class YouTubeCapture extends BaseChannel {
       }
     }
 
+    // 1.55) timed-frame 추출 전에 동의 쿠키를 먼저 주입
+    //      (순서가 뒤면 embed에서 1x1 비디오로 남아 프레임 추출이 실패할 수 있다)
+    await this.applyYouTubeConsentCookies(page);
+
     // 1.6) 광고주 영상에서 캡처 시점 프레임을 선추출 (퍼블리셔 페이지와 분리)
     let timedFrameDataUrl: string | null = null;
     let timedFrameDurationSec = 0;
@@ -202,32 +206,7 @@ export class YouTubeCapture extends BaseChannel {
     }
 
     // 2) 🍪 쿠키 동의 사전 처리 — CONSENT 쿠키 설정
-    console.log(`[YouTube] 🍪 쿠키 동의 사전 처리 시작`);
-    try {
-      // YouTube 도메인에 CONSENT 쿠키 설정 (동의 완료 상태)
-      await page.setCookie({
-        name: "CONSENT",
-        value: "PENDING+987",
-        domain: ".youtube.com",
-        path: "/",
-      });
-      await page.setCookie({
-        name: "CONSENT",
-        value: "YES+cb.20210328-17-p0.en+FX+987",
-        domain: ".youtube.com",
-        path: "/",
-      });
-      // SOCS 쿠키도 설정 (Google 통합 동의)
-      await page.setCookie({
-        name: "SOCS",
-        value: "CAISHAgBEhJnd3NfMjAyMzA4MTUtMF9SQzIaAmVuIAEaBgiA_LyaBg",
-        domain: ".youtube.com",
-        path: "/",
-      });
-      console.log(`[YouTube] 🍪 CONSENT 쿠키 설정 완료`);
-    } catch (cookieErr) {
-      console.warn(`[YouTube] 🍪 쿠키 설정 실패 (진행 계속):`, cookieErr);
-    }
+    await this.applyYouTubeConsentCookies(page);
 
     // 3) YouTube 페이지 로드 — 🔑 embed-first 전략
     // YouTube /watch 페이지는 봇 감지가 매우 강력하므로
@@ -1241,6 +1220,33 @@ export class YouTubeCapture extends BaseChannel {
     } catch (err) {
       console.warn("[YouTube] timed frame extraction failed:", err);
       return { frameDataUrl: null, durationSec: 0 };
+    }
+  }
+
+  private async applyYouTubeConsentCookies(page: IPageHandle): Promise<void> {
+    console.log(`[YouTube] 🍪 쿠키 동의 사전 처리 시작`);
+    try {
+      await page.setCookie({
+        name: "CONSENT",
+        value: "PENDING+987",
+        domain: ".youtube.com",
+        path: "/",
+      });
+      await page.setCookie({
+        name: "CONSENT",
+        value: "YES+cb.20210328-17-p0.en+FX+987",
+        domain: ".youtube.com",
+        path: "/",
+      });
+      await page.setCookie({
+        name: "SOCS",
+        value: "CAISHAgBEhJnd3NfMjAyMzA4MTUtMF9SQzIaAmVuIAEaBgiA_LyaBg",
+        domain: ".youtube.com",
+        path: "/",
+      });
+      console.log(`[YouTube] 🍪 CONSENT 쿠키 설정 완료`);
+    } catch (cookieErr) {
+      console.warn(`[YouTube] 🍪 쿠키 설정 실패 (진행 계속):`, cookieErr);
     }
   }
 
