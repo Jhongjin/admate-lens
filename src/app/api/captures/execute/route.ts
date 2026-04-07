@@ -106,6 +106,7 @@ export async function POST(request: NextRequest) {
               adSizeMode: captureMetadata.adSizeMode ?? "auto",
               targetAdSizes: captureMetadata.targetAdSizes ?? [],
               youtubeAdType: captureMetadata.youtubeAdType ?? "preroll",
+              instreamOpts: captureMetadata.instreamOpts,
             },
           });
 

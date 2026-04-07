@@ -47,17 +47,33 @@ async function imageUrlToDataUrl(imageUrl: string): Promise<{ dataUrl: string; s
   }
 }
 
+/** 인스트림 메타데이터 (API·폼에서 options.instreamOpts 로 전달) */
+type InstreamOptsPayload = {
+  videoUrl?: string;
+  skipSeconds?: number;
+  adTitle?: string;
+  ctaText?: string;
+  landingUrl?: string;
+  companionImageUrl?: string;
+};
+
 /** YouTube URL에서 Video ID 추출 */
 function extractVideoId(url: string): string | null {
   try {
-    const u = new URL(url);
-    if (u.hostname.includes('youtube.com') && u.pathname === '/watch') return u.searchParams.get('v');
-    if (u.hostname === 'youtu.be') return u.pathname.slice(1);
-    if (u.pathname.startsWith('/embed/')) return u.pathname.split('/embed/')[1]?.split('?')[0] || null;
-    // 라이브 URL: youtube.com/live/VIDEO_ID
-    if (u.pathname.startsWith('/live/')) return u.pathname.split('/live/')[1]?.split('?')[0] || null;
+    const u = new URL(url.trim());
+    if (u.hostname.includes("youtube.com") && u.pathname === "/watch") {
+      return u.searchParams.get("v");
+    }
+    if (u.hostname === "youtu.be") {
+      const id = u.pathname.replace(/^\//, "").split("/")[0]?.split("?")[0];
+      return id || null;
+    }
+    if (u.pathname.startsWith("/embed/")) return u.pathname.split("/embed/")[1]?.split("?")[0] || null;
+    if (u.pathname.startsWith("/live/")) return u.pathname.split("/live/")[1]?.split("?")[0] || null;
     return null;
-  } catch { return null; }
+  } catch {
+    return null;
+  }
 }
 
 /** YouTube 썸네일 URL 생성 (공개 API, 인증 불필요) */
@@ -77,7 +93,12 @@ export class YouTubeCapture extends BaseChannel {
     console.log(`[YouTube] ===== 캡처 시작 =====`);
     console.log(`[YouTube] 영상 URL: ${request.publisherUrl}`);
     console.log(`[YouTube] 광고 유형: ${adType}`);
-    console.log(`[YouTube] 소재: ${request.creativeUrl}`);
+    const instreamOpts = (request.options?.instreamOpts as InstreamOptsPayload | undefined) ?? {};
+
+    console.log(`[YouTube] 소재(creative_url): ${request.creativeUrl || "(없음)"}`);
+    if (adType === "preroll" && instreamOpts.videoUrl) {
+      console.log(`[YouTube] 인스트림 광고 동영상 URL: ${instreamOpts.videoUrl}`);
+    }
 
     // 초기화
     this.diagnostics = {
@@ -90,10 +111,46 @@ export class YouTubeCapture extends BaseChannel {
       creativeBase64Size: 0,
     };
 
-    // 1) 소재 이미지 → base64 data URL 변환
-    const { dataUrl: creativeDataUrl, sizeKB, ok } = await imageUrlToDataUrl(request.creativeUrl);
+    // 1) 소재 이미지 → base64 data URL
+    // 인스트림은 폼에서 creativeUrl 없이 videoUrl만 보내는 경우가 많음 → 광고 동영상의 썸네일을 소재로 사용
+    const rawCreative = (request.creativeUrl || "").trim();
+    let creativeFetchUrl = rawCreative;
+    let prerollAdVideoId: string | null = null;
+    if (instreamOpts.videoUrl?.trim()) {
+      prerollAdVideoId = extractVideoId(instreamOpts.videoUrl.trim());
+    }
+    if (adType === "preroll") {
+      if (rawCreative && /youtube\.com|youtu\.be/i.test(rawCreative)) {
+        const id = extractVideoId(rawCreative);
+        if (id) {
+          creativeFetchUrl = getThumbnailUrl(id);
+          prerollAdVideoId = prerollAdVideoId || id;
+        }
+      } else if (!rawCreative && prerollAdVideoId) {
+        creativeFetchUrl = getThumbnailUrl(prerollAdVideoId);
+      }
+    }
+
+    let { dataUrl: creativeDataUrl, sizeKB, ok } = creativeFetchUrl
+      ? await imageUrlToDataUrl(creativeFetchUrl)
+      : { dataUrl: "", sizeKB: 0, ok: false };
+    if (adType === "preroll" && !ok && prerollAdVideoId) {
+      const fb = await imageUrlToDataUrl(
+        `https://img.youtube.com/vi/${prerollAdVideoId}/hqdefault.jpg`
+      );
+      if (fb.ok) {
+        creativeDataUrl = fb.dataUrl;
+        sizeKB = fb.sizeKB;
+        ok = true;
+      }
+    }
     this.diagnostics.creativeDownloaded = ok;
     this.diagnostics.creativeBase64Size = sizeKB;
+    if (adType === "preroll" && !ok) {
+      console.error(
+        `[YouTube] 인스트림 소재 이미지 확보 실패 — creativeUrl·videoUrl을 확인하세요 (fetch 시도: ${creativeFetchUrl || "(없음)"})`
+      );
+    }
 
     // 1.5) 🖼️ 비디오 ID 추출 + 썸네일 준비
     const videoId = extractVideoId(request.publisherUrl);
@@ -144,10 +201,10 @@ export class YouTubeCapture extends BaseChannel {
     // 3) YouTube 페이지 로드 — 🔑 embed-first 전략
     // YouTube /watch 페이지는 봇 감지가 매우 강력하므로
     // /embed/ URL로 먼저 접근하여 봇 감지를 우회
-    const instreamOpts = (request.options?.instreamOpts as { videoUrl?: string; skipSeconds?: number } | undefined) || {};
-    const targetUrl = adType === "preroll" && instreamOpts.videoUrl 
-      ? instreamOpts.videoUrl 
-      : request.publisherUrl;
+    const targetUrl =
+      adType === "preroll" && instreamOpts.videoUrl?.trim()
+        ? instreamOpts.videoUrl.trim()
+        : request.publisherUrl;
 
     // 📺 YouTube watch 페이지 로드 (레이아웃 확보 목적)
     await page.goto(targetUrl, {
@@ -374,19 +431,20 @@ export class YouTubeCapture extends BaseChannel {
 
     switch (adType) {
       case "preroll": {
-        // 🎬 인스트림 광고 옵션 추출
-        const instreamOpts = {
-          adTitle: (request.options?.adTitle as string) || '',
-          ctaText: (request.options?.ctaText as string) || '',
-          landingUrl: (request.options?.landingUrl as string) || request.clickUrl || '',
-          companionImageUrl: (request.options?.companionImageUrl as string) || '',
+        const prerollUiOpts = {
+          adTitle: instreamOpts.adTitle || "",
+          ctaText: instreamOpts.ctaText || "",
+          landingUrl: instreamOpts.landingUrl || request.clickUrl || "",
+          companionImageUrl: instreamOpts.companionImageUrl || "",
         };
-        console.log(`[YouTube] 인스트림 옵션: title="${instreamOpts.adTitle}" cta="${instreamOpts.ctaText}" landing="${instreamOpts.landingUrl}"`);
+        console.log(
+          `[YouTube] 인스트림 옵션: title="${prerollUiOpts.adTitle}" cta="${prerollUiOpts.ctaText}" landing="${prerollUiOpts.landingUrl}"`
+        );
 
-        injectionSuccess = await this.injectPrerollAd(page, creativeDataUrl, playerInfo, instreamOpts);
+        injectionSuccess = await this.injectPrerollAd(page, creativeDataUrl, playerInfo, prerollUiOpts);
         // 🎯 컴패니언 배너 동시 삽입
         if (injectionSuccess) {
-          const companionImg = instreamOpts.companionImageUrl || creativeDataUrl;
+          const companionImg = prerollUiOpts.companionImageUrl || creativeDataUrl;
           const companionResult = await this.injectDisplayAd(page, companionImg);
           console.log(`[YouTube] 컴패니언 배너: ${companionResult ? '✅ 성공' : '⚠️ 실패'}`);
         }
@@ -532,7 +590,7 @@ export class YouTubeCapture extends BaseChannel {
             const img = document.createElement('img');
             img.src = imgUrl;
             img.setAttribute('data-injected', 'admate');
-            img.style.cssText = 'width:100% !important;height:100% !important;object-fit:cover !important;display:block !important;position:absolute !important;top:0 !important;left:0 !important';
+            img.style.cssText = 'width:100% !important;height:100% !important;object-fit:cover !important;display:block !important;position:absolute !important;top:0 !important;left:0 !important;z-index:1 !important';
             overlay.appendChild(img);
           } else {
             overlay.style.background = 'transparent !important';
