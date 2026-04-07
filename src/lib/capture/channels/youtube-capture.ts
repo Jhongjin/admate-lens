@@ -183,6 +183,24 @@ export class YouTubeCapture extends BaseChannel {
       }
     }
 
+    // 1.6) 광고주 영상에서 캡처 시점 프레임을 선추출 (퍼블리셔 페이지와 분리)
+    let timedFrameDataUrl: string | null = null;
+    let timedFrameDurationSec = 0;
+    if (adType === "preroll" && instreamOpts.videoUrl?.trim() && prerollCaptureSeconds !== null) {
+      const timedFrame = await this.captureTimedFrameFromInstreamVideo(
+        page,
+        instreamOpts.videoUrl.trim(),
+        prerollCaptureSeconds
+      );
+      timedFrameDataUrl = timedFrame.frameDataUrl;
+      timedFrameDurationSec = timedFrame.durationSec;
+      if (timedFrameDataUrl) {
+        console.log(`[YouTube] 🎞️ 광고주 영상 프레임 추출 성공 (${prerollCaptureSeconds}초)`);
+      } else {
+        console.warn(`[YouTube] ⚠️ 광고주 프레임 추출 실패 — 소재 이미지 폴백`);
+      }
+    }
+
     // 2) 🍪 쿠키 동의 사전 처리 — CONSENT 쿠키 설정
     console.log(`[YouTube] 🍪 쿠키 동의 사전 처리 시작`);
     try {
@@ -214,10 +232,7 @@ export class YouTubeCapture extends BaseChannel {
     // 3) YouTube 페이지 로드 — 🔑 embed-first 전략
     // YouTube /watch 페이지는 봇 감지가 매우 강력하므로
     // /embed/ URL로 먼저 접근하여 봇 감지를 우회
-    const targetUrl =
-      adType === "preroll" && instreamOpts.videoUrl?.trim()
-        ? instreamOpts.videoUrl.trim()
-        : request.publisherUrl;
+    const targetUrl = request.publisherUrl;
 
     // 📺 YouTube watch 페이지 로드 (레이아웃 확보 목적)
     await page.goto(targetUrl, {
@@ -295,158 +310,20 @@ export class YouTubeCapture extends BaseChannel {
       await this.nukeAllBotElements(page);
     }
 
-    const shouldRunTimedSeek = prerollCaptureSeconds !== null && !botDetected;
-
-    // 5) 캡처 시점 이동 (preroll, non-bot path only)
-    if (shouldRunTimedSeek) {
-      console.log(`[YouTube] ⏰ 인스트림 영상 ${prerollCaptureSeconds}초 시점으로 이동`);
-      await page.evaluate(
-        (secVal: unknown) =>
-          new Promise<void>((resolve) => {
-            const secs = Number(secVal);
-            const video = document.querySelector('video.html5-main-video') as HTMLVideoElement | null;
-            if (!video) return resolve();
-            try {
-              video.currentTime = secs;
-            } catch (e) {
-              console.error('[YouTube] Video seek failed', e);
-              return resolve();
-            }
-
-            const done = () => resolve();
-            video.addEventListener('seeked', done, { once: true });
-            setTimeout(done, 2500);
-          }),
-        prerollCaptureSeconds
-      );
-
-      // 핵심: seek 직후 정지하면 합성 프레임이 비어있는 경우가 있어, 짧게 재생해 프레임 확정 렌더
-      await page.evaluate(
-        () =>
-          new Promise<void>((resolve) => {
-            const video = document.querySelector('video.html5-main-video') as HTMLVideoElement | null;
-            if (!video) return resolve();
-
-            const finish = () => {
-              try {
-                video.pause();
-              } catch {
-                /* ignore */
-              }
-              resolve();
-            };
-
-            try {
-              video.muted = true;
-              const p = video.play();
-              if (p && typeof p.then === 'function') {
-                p.then(() => {
-                  if (typeof (video as any).requestVideoFrameCallback === 'function') {
-                    (video as any).requestVideoFrameCallback(() => setTimeout(finish, 120));
-                  } else {
-                    setTimeout(finish, 350);
-                  }
-                }).catch(() => setTimeout(finish, 350));
-              } else {
-                setTimeout(finish, 350);
-              }
-            } catch {
-              setTimeout(finish, 350);
-            }
-          })
-      );
-      await new Promise((r) => setTimeout(r, 250));
-    }
-
-    // 5.5) 영상 일시정지 (깨끗한 스크린샷을 위해)
-    await this.pauseVideo(page, { preserveTimeline: prerollCaptureSeconds !== null });
+    // 5) 퍼블리셔 페이지에서는 영상 seek를 수행하지 않는다.
+    //    (광고주 영상 프레임은 1.6 단계에서 별도 추출 완료)
+    await this.pauseVideo(page, { preserveTimeline: true });
     await new Promise((r) => setTimeout(r, 1000));
 
-    // 캡처 시점 모드: 실제 비디오 프레임을 먼저 이미지화해 오버레이 배경으로 사용
-    // (헤드리스 환경의 video/canvas 합성 불안정으로 인한 빈 화면 방지)
-    let prerollOverlayImageUrl = creativeDataUrl;
+    // 캡처 시점 모드: 광고주 영상에서 미리 추출한 프레임을 우선 사용
+    let prerollOverlayImageUrl = timedFrameDataUrl || creativeDataUrl;
     let prerollProgressPercent = 33;
-    let useTimedFrameOverlay = false;
+    const useTimedFrameOverlay = !!timedFrameDataUrl;
     if (prerollCaptureSeconds !== null) {
-      if (botDetected) {
-        // 봇 감지 폴백에서는 플레이어가 썸네일 DOM으로 대체되므로
-        // 비디오 seek/play evaluate를 수행하지 않는다 (CDP timeout 방지).
-        prerollOverlayImageUrl = thumbnailDataUrl || creativeDataUrl;
-        useTimedFrameOverlay = true;
-      }
-
-      if (!botDetected) {
-      const videoRect = await page.evaluate<{
-        x: number;
-        y: number;
-        width: number;
-        height: number;
-      } | null>(`
-        (() => {
-          // 핵심: 프레임 캡처는 "메인 플레이어 컨테이너" 기준으로만 수행
-          // generic video 선택 시 상단 UI/사이드 썸네일 video를 잡아 이중 헤더가 생길 수 있음
-          const selectors = [
-            '#movie_player',
-            '#player-container-inner',
-            '#player-container-outer',
-            'ytd-player#ytd-player',
-            'ytd-player',
-            '.html5-video-player',
-            '#player',
-            '#ytd-player',
-            'div.ytd-watch-flexy#player',
-          ];
-          let el = null;
-          for (const sel of selectors) {
-            const cand = document.querySelector(sel);
-            if (!cand) continue;
-            const cr = cand.getBoundingClientRect();
-            if (cr.width > 200 && cr.height > 120) {
-              el = cand;
-              break;
-            }
-          }
-          if (!el) return null;
-          const r = el.getBoundingClientRect();
-          if (r.width < 200 || r.height < 120) return null;
-          return {
-            x: Math.max(0, Math.floor(r.left)),
-            y: Math.max(0, Math.floor(r.top)),
-            width: Math.floor(r.width),
-            height: Math.floor(r.height),
-          };
-        })()
-      `);
-
-      if (videoRect) {
-        try {
-          const framePng = await page.screenshot({
-            type: "png",
-            clip: videoRect,
-          });
-          if (framePng && framePng.length > 2000) {
-            prerollOverlayImageUrl = `data:image/png;base64,${framePng.toString("base64")}`;
-            useTimedFrameOverlay = true;
-            console.log(`[YouTube] 🎞️ 캡처 시점 프레임 이미지화 성공 (${Math.round(framePng.length / 1024)}KB)`);
-          }
-        } catch (e) {
-          console.warn("[YouTube] timed frame capture failed:", e);
-        }
-      }
-
-      if (!useTimedFrameOverlay) {
-        // 프레임 캡처 실패 시 최소한 소재 이미지로 폴백 (빈 화면 방지)
-        prerollOverlayImageUrl = creativeDataUrl;
-        console.warn("[YouTube] ⚠️ 시점 프레임 캡처 실패 — 소재 이미지로 폴백");
-      }
-      }
-
-      const videoDuration = await page.evaluate<number>(() => {
-        const video = document.querySelector('video.html5-main-video') as HTMLVideoElement | null;
-        if (!video || !Number.isFinite(video.duration) || video.duration <= 0) return 0;
-        return video.duration;
-      });
-      const denom = videoDuration > 0 ? videoDuration : Math.max(15, prerollCaptureSeconds + 1);
+      const denom =
+        timedFrameDurationSec > 0
+          ? timedFrameDurationSec
+          : Math.max(15, prerollCaptureSeconds + 1);
       prerollProgressPercent = Math.min(100, Math.max(0, (prerollCaptureSeconds / denom) * 100));
     }
 
@@ -1184,6 +1061,60 @@ export class YouTubeCapture extends BaseChannel {
       })()
     `);
     console.log(`[YouTube] ⏸️ 영상 일시정지`);
+  }
+
+  /**
+   * 광고주 유튜브 영상에서 특정 초수 프레임을 추출
+   * - 퍼블리셔 페이지 로직과 분리해 빈 화면/봇 분기 충돌을 줄인다.
+   */
+  private async captureTimedFrameFromInstreamVideo(
+    page: IPageHandle,
+    instreamVideoUrl: string,
+    seconds: number
+  ): Promise<{ frameDataUrl: string | null; durationSec: number }> {
+    try {
+      const adVideoId = extractVideoId(instreamVideoUrl);
+      if (!adVideoId) return { frameDataUrl: null, durationSec: 0 };
+
+      const embedUrl =
+        `https://www.youtube.com/embed/${adVideoId}` +
+        `?autoplay=1&mute=1&controls=0&playsinline=1&start=${Math.max(0, Math.floor(seconds))}`;
+
+      await page.goto(embedUrl, { waitUntil: "networkidle2", timeout: 45000 });
+      await new Promise((r) => setTimeout(r, 2200));
+
+      const info = await page.evaluate<{ x: number; y: number; width: number; height: number; duration: number } | null>(`
+        (() => {
+          const v = document.querySelector('video') as HTMLVideoElement | null;
+          if (!v) return null;
+          try { v.pause(); } catch {}
+          const r = v.getBoundingClientRect();
+          if (r.width < 120 || r.height < 80) return null;
+          return {
+            x: Math.max(0, Math.floor(r.left)),
+            y: Math.max(0, Math.floor(r.top)),
+            width: Math.floor(r.width),
+            height: Math.floor(r.height),
+            duration: Number.isFinite(v.duration) ? v.duration : 0,
+          };
+        })()
+      `);
+
+      if (!info) return { frameDataUrl: null, durationSec: 0 };
+      const frame = await page.screenshot({
+        type: "png",
+        clip: { x: info.x, y: info.y, width: info.width, height: info.height },
+      });
+      if (!frame || frame.length < 1500) return { frameDataUrl: null, durationSec: info.duration || 0 };
+
+      return {
+        frameDataUrl: `data:image/png;base64,${frame.toString("base64")}`,
+        durationSec: info.duration || 0,
+      };
+    } catch (err) {
+      console.warn("[YouTube] timed frame extraction failed:", err);
+      return { frameDataUrl: null, durationSec: 0 };
+    }
   }
 
   /** YouTube 쿠키 동의 팝업 제거 */
