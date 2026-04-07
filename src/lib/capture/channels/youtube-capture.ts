@@ -1078,34 +1078,113 @@ export class YouTubeCapture extends BaseChannel {
 
       const embedUrl =
         `https://www.youtube.com/embed/${adVideoId}` +
-        `?autoplay=1&mute=1&controls=0&playsinline=1&start=${Math.max(0, Math.floor(seconds))}`;
+        `?autoplay=1&mute=1&controls=0&playsinline=1&enablejsapi=1&start=${Math.max(0, Math.floor(seconds))}`;
 
       await page.goto(embedUrl, { waitUntil: "networkidle2", timeout: 45000 });
-      await new Promise((r) => setTimeout(r, 2200));
+      await page.waitForSelector("video", { timeout: 15000 });
+      await new Promise((r) => setTimeout(r, 1000));
 
-      const info = await page.evaluate<{ x: number; y: number; width: number; height: number; duration: number } | null>(`
-        (() => {
-          const v = document.querySelector('video');
-          if (!v) return null;
-          try { v.pause(); } catch {}
-          const r = v.getBoundingClientRect();
-          if (r.width < 120 || r.height < 80) return null;
-          return {
-            x: Math.max(0, Math.floor(r.left)),
-            y: Math.max(0, Math.floor(r.top)),
-            width: Math.floor(r.width),
-            height: Math.floor(r.height),
-            duration: Number.isFinite(v.duration) ? v.duration : 0,
-          };
-        })()
-      `);
+      const info = await page.evaluate<{
+        ok: boolean;
+        reason?: string;
+        x?: number;
+        y?: number;
+        width?: number;
+        height?: number;
+        duration?: number;
+      }>(
+        (secVal: unknown) =>
+          new Promise((resolve) => {
+            const sec = Math.max(0, Number(secVal) || 0);
+            const v = document.querySelector("video");
+            if (!v) return resolve({ ok: false, reason: "video_not_found" });
 
-      if (!info) return { frameDataUrl: null, durationSec: 0 };
+            const finish = (reason?: string) => {
+              const r = v.getBoundingClientRect();
+              const duration = Number.isFinite(v.duration) ? v.duration : 0;
+              if (r.width < 120 || r.height < 80) {
+                return resolve({ ok: false, reason: reason || "invalid_rect", duration });
+              }
+              resolve({
+                ok: true,
+                x: Math.max(0, Math.floor(r.left)),
+                y: Math.max(0, Math.floor(r.top)),
+                width: Math.floor(r.width),
+                height: Math.floor(r.height),
+                duration,
+              });
+            };
+
+            const renderAndPause = () => {
+              try {
+                v.muted = true;
+                const p = v.play();
+                if (p && typeof p.then === "function") {
+                  p.then(() => {
+                    if (typeof v.requestVideoFrameCallback === "function") {
+                      v.requestVideoFrameCallback(() => {
+                        try { v.pause(); } catch {}
+                        setTimeout(() => finish("ok"), 80);
+                      });
+                    } else {
+                      setTimeout(() => {
+                        try { v.pause(); } catch {}
+                        finish("ok");
+                      }, 220);
+                    }
+                  }).catch(() => {
+                    try { v.pause(); } catch {}
+                    finish("play_rejected");
+                  });
+                } else {
+                  setTimeout(() => {
+                    try { v.pause(); } catch {}
+                    finish("ok_no_promise");
+                  }, 220);
+                }
+              } catch {
+                try { v.pause(); } catch {}
+                finish("play_exception");
+              }
+            };
+
+            const target =
+              Number.isFinite(v.duration) && v.duration > 0
+                ? Math.min(sec, Math.max(0, v.duration - 0.2))
+                : sec;
+
+            const onSeeked = () => {
+              v.removeEventListener("seeked", onSeeked);
+              renderAndPause();
+            };
+
+            try {
+              v.addEventListener("seeked", onSeeked, { once: true });
+              v.currentTime = target;
+            } catch {
+              renderAndPause();
+            }
+
+            setTimeout(() => {
+              v.removeEventListener("seeked", onSeeked);
+              finish("seek_timeout");
+            }, 8000);
+          }),
+        seconds
+      );
+
+      if (!info.ok || !info.width || !info.height) {
+        console.warn("[YouTube] timed frame extraction info failed:", info.reason || "unknown");
+        return { frameDataUrl: null, durationSec: info.duration || 0 };
+      }
       const frame = await page.screenshot({
         type: "png",
-        clip: { x: info.x, y: info.y, width: info.width, height: info.height },
+        clip: { x: info.x || 0, y: info.y || 0, width: info.width, height: info.height },
       });
-      if (!frame || frame.length < 1500) return { frameDataUrl: null, durationSec: info.duration || 0 };
+      if (!frame || frame.length < 1500) {
+        console.warn("[YouTube] timed frame extraction image too small");
+        return { frameDataUrl: null, durationSec: info.duration || 0 };
+      }
 
       return {
         frameDataUrl: `data:image/png;base64,${frame.toString("base64")}`,
