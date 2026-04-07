@@ -1084,6 +1084,10 @@ export class YouTubeCapture extends BaseChannel {
       await page.waitForSelector("video", { timeout: 15000 });
       await new Promise((r) => setTimeout(r, 1000));
 
+      // Headless 환경에서 play()/requestVideoFrameCallback 대기가 불안정해 timeout이 잦으므로
+      // start 파라미터로 진입한 뒤 짧게 안정화 대기 후 바로 프레임을 캡처한다.
+      await new Promise((r) => setTimeout(r, 1800));
+
       const info = await page.evaluate<{
         ok: boolean;
         reason?: string;
@@ -1093,58 +1097,24 @@ export class YouTubeCapture extends BaseChannel {
         height?: number;
         duration?: number;
       }>(`
-        (() => new Promise((resolve) => {
+        (() => {
           const v = document.querySelector("video");
-          if (!v) return resolve({ ok: false, reason: "video_not_found" });
-
-          const finish = (reason) => {
-            const r = v.getBoundingClientRect();
-            const duration = Number.isFinite(v.duration) ? v.duration : 0;
-            if (r.width < 120 || r.height < 80) {
-              return resolve({ ok: false, reason: reason || "invalid_rect", duration });
-            }
-            resolve({
-              ok: true,
-              x: Math.max(0, Math.floor(r.left)),
-              y: Math.max(0, Math.floor(r.top)),
-              width: Math.floor(r.width),
-              height: Math.floor(r.height),
-              duration,
-            });
-          };
-
-          try {
-            v.muted = true;
-            const p = v.play();
-            const afterPlay = () => {
-              if (typeof v.requestVideoFrameCallback === "function") {
-                v.requestVideoFrameCallback(() => {
-                  try { v.pause(); } catch {}
-                  setTimeout(() => finish("ok"), 120);
-                });
-              } else {
-                setTimeout(() => {
-                  try { v.pause(); } catch {}
-                  finish("ok_no_vfc");
-                }, 350);
-              }
-            };
-
-            if (p && typeof p.then === "function") {
-              p.then(afterPlay).catch(() => {
-                try { v.pause(); } catch {}
-                finish("play_rejected");
-              });
-            } else {
-              afterPlay();
-            }
-          } catch {
-            try { v.pause(); } catch {}
-            finish("play_exception");
+          if (!v) return { ok: false, reason: "video_not_found" };
+          const r = v.getBoundingClientRect();
+          const duration = Number.isFinite(v.duration) ? v.duration : 0;
+          if (r.width < 120 || r.height < 80) {
+            return { ok: false, reason: "invalid_rect", duration };
           }
-
-          setTimeout(() => finish("frame_wait_timeout"), 4000);
-        }))()
+          try { v.pause(); } catch {}
+          return {
+            ok: true,
+            x: Math.max(0, Math.floor(r.left)),
+            y: Math.max(0, Math.floor(r.top)),
+            width: Math.floor(r.width),
+            height: Math.floor(r.height),
+            duration,
+          };
+        })()
       `);
 
       if (!info.ok || !info.width || !info.height) {
