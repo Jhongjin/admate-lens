@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 
 /** 캡처 레코드 타입 */
 interface CaptureRecord {
@@ -64,15 +64,21 @@ export default function CaptureList({ refreshTrigger }: CaptureListProps) {
   const [deleteConfirm, setDeleteConfirm] = useState<{ type: "single" | "all"; id?: string } | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  /** 캡처 목록 조회 */
+  // 🔑 폴링 안정화를 위한 ref — captures 변경에 의한 무한 재렌더 방지
+  const capturesRef = useRef<CaptureRecord[]>([]);
+  capturesRef.current = captures;
+
+  /** 캡처 목록 조회 (cache 비활성화로 항상 최신 데이터) */
   const fetchCaptures = useCallback(async () => {
     try {
-      const params = new URLSearchParams({ limit: "30" });
+      const params = new URLSearchParams({ limit: "30", _t: String(Date.now()) });
       if (statusFilter !== "all") {
         params.set("status", statusFilter);
       }
 
-      const res = await fetch(`/api/captures?${params.toString()}`);
+      const res = await fetch(`/api/captures?${params.toString()}`, {
+        cache: "no-store",
+      });
       const result = await res.json();
 
       if (res.ok && result.data) {
@@ -90,14 +96,28 @@ export default function CaptureList({ refreshTrigger }: CaptureListProps) {
     fetchCaptures();
   }, [fetchCaptures, refreshTrigger]);
 
-  /** 처리중인 캡처가 있으면 5초마다 폴링 */
+  /** 처리중인 캡처가 있으면 3초마다 폴링 (안정화) */
   useEffect(() => {
-    const hasActive = captures.some((c) => c.status === "pending" || c.status === "processing");
-    if (!hasActive) return;
-
-    const interval = setInterval(fetchCaptures, 5000);
+    const interval = setInterval(() => {
+      const hasActive = capturesRef.current.some(
+        (c) => c.status === "pending" || c.status === "processing"
+      );
+      if (hasActive) {
+        fetchCaptures();
+      }
+    }, 3000);
     return () => clearInterval(interval);
-  }, [captures, fetchCaptures]);
+  }, [fetchCaptures]);
+
+  /** 모달이 열린 상태에서 캡처 상태 변경 시 자동 동기화 */
+  useEffect(() => {
+    if (selectedCapture) {
+      const updated = captures.find((c) => c.id === selectedCapture.id);
+      if (updated && updated.status !== selectedCapture.status) {
+        setSelectedCapture(updated);
+      }
+    }
+  }, [captures, selectedCapture]);
 
   /** 필터링된 캡처 목록 */
   const filteredCaptures = captures;
