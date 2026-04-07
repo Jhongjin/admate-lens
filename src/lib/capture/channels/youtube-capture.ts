@@ -1,4 +1,4 @@
-/**
+﻿/**
  * YouTube Capture v1 — YouTube 광고 캡처 모듈
  *
  * 지원 광고 유형:
@@ -94,6 +94,13 @@ export class YouTubeCapture extends BaseChannel {
     console.log(`[YouTube] 영상 URL: ${request.publisherUrl}`);
     console.log(`[YouTube] 광고 유형: ${adType}`);
     const instreamOpts = (request.options?.instreamOpts as InstreamOptsPayload | undefined) ?? {};
+    const prerollCaptureSeconds =
+      adType === "preroll"
+        ? (() => {
+            const sec = instreamOpts.skipSeconds;
+            return typeof sec === "number" && Number.isFinite(sec) && sec >= 0 ? sec : 5;
+          })()
+        : null;
 
     console.log(`[YouTube] 소재(creative_url): ${request.creativeUrl || "(없음)"}`);
     if (adType === "preroll" && instreamOpts.videoUrl) {
@@ -282,25 +289,38 @@ export class YouTubeCapture extends BaseChannel {
       await this.nukeAllBotElements(page);
     }
 
-    // 5) 비디오 시간 스킵 (preroll 중 videoUrl 모드일 때만)
-    if (adType === "preroll" && instreamOpts.skipSeconds !== undefined) {
-      const skipSecs = instreamOpts.skipSeconds as number;
-      console.log(`[YouTube] ⏰ 인스트림 영상 ${skipSecs}초 스킵 중...`);
+    // 5) 캡처 시점 이동 (preroll)
+    if (prerollCaptureSeconds !== null) {
+      console.log(`[YouTube] ⏰ 인스트림 영상 ${prerollCaptureSeconds}초 시점으로 이동`);
       await page.evaluate((secVal: unknown) => {
-        const secs = secVal as number;
+        const secs = Number(secVal);
         try {
           const video = document.querySelector('video.html5-main-video') as HTMLVideoElement;
           if (video) video.currentTime = secs;
         } catch (e) {
           console.error('[YouTube] Video seek failed', e);
         }
-      }, skipSecs);
+      }, prerollCaptureSeconds);
       await new Promise((r) => setTimeout(r, 1000));
     }
 
     // 5.5) 영상 일시정지 (깨끗한 스크린샷을 위해)
-    await this.pauseVideo(page);
+    await this.pauseVideo(page, { preserveTimeline: prerollCaptureSeconds !== null });
     await new Promise((r) => setTimeout(r, 1000));
+
+    // 캡처 시점 모드에서는 배경 오버레이를 투명 처리해 실제 정지 영상이 보이게 한다.
+    let prerollOverlayImageUrl = creativeDataUrl;
+    let prerollProgressPercent = 33;
+    if (prerollCaptureSeconds !== null) {
+      prerollOverlayImageUrl = "";
+      const videoDuration = await page.evaluate<number>(() => {
+        const video = document.querySelector('video.html5-main-video') as HTMLVideoElement | null;
+        if (!video || !Number.isFinite(video.duration) || video.duration <= 0) return 0;
+        return video.duration;
+      });
+      const denom = videoDuration > 0 ? videoDuration : Math.max(15, prerollCaptureSeconds + 1);
+      prerollProgressPercent = Math.min(100, Math.max(0, (prerollCaptureSeconds / denom) * 100));
+    }
 
     // 6) 플레이어 정보 수집 (확장된 셀렉터)
     const playerInfo = await page.evaluate<{ found: boolean; width: number; height: number; top: number; left: number; sidebarFound: boolean }>(`
@@ -436,12 +456,14 @@ export class YouTubeCapture extends BaseChannel {
           ctaText: instreamOpts.ctaText || "",
           landingUrl: instreamOpts.landingUrl || request.clickUrl || "",
           companionImageUrl: instreamOpts.companionImageUrl || "",
+          avatarImageUrl: creativeDataUrl,
+          progressFillPercent: prerollProgressPercent,
         };
         console.log(
           `[YouTube] 인스트림 옵션: title="${prerollUiOpts.adTitle}" cta="${prerollUiOpts.ctaText}" landing="${prerollUiOpts.landingUrl}"`
         );
 
-        injectionSuccess = await this.injectPrerollAd(page, creativeDataUrl, playerInfo, prerollUiOpts);
+        injectionSuccess = await this.injectPrerollAd(page, prerollOverlayImageUrl, playerInfo, prerollUiOpts);
         // 🎯 컴패니언 배너 동시 삽입
         if (injectionSuccess) {
           const companionImg = prerollUiOpts.companionImageUrl || creativeDataUrl;
@@ -462,7 +484,10 @@ export class YouTubeCapture extends BaseChannel {
 
     if (!injectionSuccess) {
       console.warn(`[YouTube] ⚠️ 기본 인젝션 실패 — 폴백: 프리롤 강제 오버레이`);
-      await this.injectPrerollAd(page, creativeDataUrl, playerInfo);
+      await this.injectPrerollAd(page, prerollOverlayImageUrl, playerInfo, {
+        avatarImageUrl: creativeDataUrl,
+        progressFillPercent: prerollProgressPercent,
+      });
     }
 
     // 8) 렌더링 안정화
@@ -479,22 +504,23 @@ export class YouTubeCapture extends BaseChannel {
     `);
     await new Promise((r) => setTimeout(r, 1000));
 
-    // 9.5) 네이티브 video/canvas 숨김 — Headless에서 재생 레이어가 GPU로 합성되며
-    //      인젝션한 광고 이미지보다 위에 그려져 동영상 영역만 빈(흰) 화면으로 캡처되는 경우가 있음
-    await page.evaluate<void>(`
-      (() => {
-        const hide = (el) => {
-          el.style.setProperty("visibility", "hidden", "important");
-          el.style.setProperty("opacity", "0", "important");
-          el.style.setProperty("pointer-events", "none", "important");
-        };
-        document.querySelectorAll("video").forEach(hide);
-        document
-          .querySelectorAll("#movie_player canvas, .html5-video-player canvas, ytd-player canvas")
-          .forEach(hide);
-      })()
-    `);
-    await new Promise((r) => setTimeout(r, 300));
+    // 9.5) 캡처 시점 모드에서는 비디오 레이어를 숨기지 않는다(빈화면 방지)
+    if (!(adType === "preroll" && prerollCaptureSeconds !== null)) {
+      await page.evaluate<void>(`
+        (() => {
+          const hide = (el) => {
+            el.style.setProperty("visibility", "hidden", "important");
+            el.style.setProperty("opacity", "0", "important");
+            el.style.setProperty("pointer-events", "none", "important");
+          };
+          document.querySelectorAll("video").forEach(hide);
+          document
+            .querySelectorAll("#movie_player canvas, .html5-video-player canvas, ytd-player canvas")
+            .forEach(hide);
+        })()
+      `);
+      await new Promise((r) => setTimeout(r, 300));
+    }
 
     // 10) 전체 페이지 스크린샷
     const screenshot = await page.screenshot({
@@ -518,7 +544,15 @@ export class YouTubeCapture extends BaseChannel {
     page: IPageHandle,
     imgDataUrl: string,
     playerInfo: { found: boolean; width: number; height: number; top: number; left: number },
-    instreamOpts: { adTitle?: string; ctaText?: string; landingUrl?: string; skipSeconds?: number; companionImageUrl?: string } = {}
+    instreamOpts: {
+      adTitle?: string;
+      ctaText?: string;
+      landingUrl?: string;
+      skipSeconds?: number;
+      companionImageUrl?: string;
+      avatarImageUrl?: string;
+      progressFillPercent?: number;
+    } = {}
   ): Promise<boolean> {
     console.log(`[YouTube] 🎬 프리롤 광고 인젝션 시작`);
 
@@ -537,9 +571,13 @@ export class YouTubeCapture extends BaseChannel {
       (() => {
         try {
           const imgUrl = ${JSON.stringify(imgDataUrl)};
+          const avatarImgUrl = ${JSON.stringify(instreamOpts.avatarImageUrl || imgDataUrl)};
           const domainText = ${JSON.stringify(landingDomain)};
           const titleText = ${JSON.stringify(adTitle)};
           const ctaBtnText = ${JSON.stringify(ctaText)};
+          const progressFillPct = ${JSON.stringify(
+            Math.min(100, Math.max(0, instreamOpts.progressFillPercent ?? 33))
+          )};
 
           // 플레이어 좌표 수집
           const playerSelectors = [
@@ -625,9 +663,9 @@ export class YouTubeCapture extends BaseChannel {
           ].join(' !important;') + ' !important';
 
           // 원형 아이콘 (ytp-ad-avatar--size-m = 40px)
-          if (imgUrl) {
+          if (avatarImgUrl) {
             const ctaIcon = document.createElement('img');
-            ctaIcon.src = imgUrl;
+            ctaIcon.src = avatarImgUrl;
             ctaIcon.style.cssText = 'width:40px !important;height:40px !important;border-radius:50% !important;object-fit:cover !important;flex-shrink:0 !important;margin-right:12px !important';
             ctaCard.appendChild(ctaIcon);
           } else {
@@ -679,7 +717,8 @@ export class YouTubeCapture extends BaseChannel {
           overlay.appendChild(timerBg);
 
           const timerBar = document.createElement('div');
-          timerBar.style.cssText = 'position:absolute;bottom:0;left:0;width:33%;height:3px;background:#f2bc42;z-index:11;border-radius:0 0 0 12px';
+          const barRadius = progressFillPct >= 99.5 ? '0 0 12px 12px' : '0 0 0 12px';
+          timerBar.style.cssText = 'position:absolute;bottom:0;left:0;width:' + progressFillPct + '%;height:3px;background:#f2bc42;z-index:11;border-radius:' + barRadius;
           overlay.appendChild(timerBar);
 
           // body에 오버레이 추가
@@ -988,15 +1027,17 @@ export class YouTubeCapture extends BaseChannel {
   }
 
   /** YouTube 동영상 일시정지 */
-  private async pauseVideo(page: IPageHandle): Promise<void> {
+  private async pauseVideo(page: IPageHandle, opts?: { preserveTimeline?: boolean }): Promise<void> {
+    const preserveTimeline = opts?.preserveTimeline === true;
     await page.evaluate<void>(`
       (() => {
+        const preserveTimeline = ${preserveTimeline ? "true" : "false"};
         // 방법 1: video 요소 직접 제어
         const video = document.querySelector('video');
         if (video) {
           video.pause();
           // 첫 프레임 표시를 위해 currentTime 설정
-          if (video.currentTime === 0) video.currentTime = 2;
+          if (!preserveTimeline && video.currentTime === 0) video.currentTime = 2;
         }
 
         // 방법 2: YouTube Player API
