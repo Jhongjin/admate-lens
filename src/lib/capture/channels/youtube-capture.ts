@@ -321,10 +321,32 @@ export class YouTubeCapture extends BaseChannel {
         height: number;
       } | null>(`
         (() => {
-          const v = document.querySelector('video.html5-main-video, video');
-          if (!v) return null;
-          const r = v.getBoundingClientRect();
-          if (r.width < 40 || r.height < 40) return null;
+          // 핵심: 프레임 캡처는 "메인 플레이어 컨테이너" 기준으로만 수행
+          // generic video 선택 시 상단 UI/사이드 썸네일 video를 잡아 이중 헤더가 생길 수 있음
+          const selectors = [
+            '#movie_player',
+            '#player-container-inner',
+            '#player-container-outer',
+            'ytd-player#ytd-player',
+            'ytd-player',
+            '.html5-video-player',
+            '#player',
+            '#ytd-player',
+            'div.ytd-watch-flexy#player',
+          ];
+          let el = null;
+          for (const sel of selectors) {
+            const cand = document.querySelector(sel);
+            if (!cand) continue;
+            const cr = cand.getBoundingClientRect();
+            if (cr.width > 200 && cr.height > 120) {
+              el = cand;
+              break;
+            }
+          }
+          if (!el) return null;
+          const r = el.getBoundingClientRect();
+          if (r.width < 200 || r.height < 120) return null;
           return {
             x: Math.max(0, Math.floor(r.left)),
             y: Math.max(0, Math.floor(r.top)),
@@ -340,7 +362,7 @@ export class YouTubeCapture extends BaseChannel {
             type: "png",
             clip: videoRect,
           });
-          if (framePng && framePng.length > 200) {
+          if (framePng && framePng.length > 2000) {
             prerollOverlayImageUrl = `data:image/png;base64,${framePng.toString("base64")}`;
             useTimedFrameOverlay = true;
             console.log(`[YouTube] 🎞️ 캡처 시점 프레임 이미지화 성공 (${Math.round(framePng.length / 1024)}KB)`);
