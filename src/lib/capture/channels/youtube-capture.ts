@@ -320,7 +320,7 @@ export class YouTubeCapture extends BaseChannel {
     await this.pauseVideo(page, { preserveTimeline: prerollCaptureSeconds !== null });
     await new Promise((r) => setTimeout(r, 800));
 
-    // 5.6) preroll: use actual frame image at seeked second
+    // 5.6) preroll: keep actual paused video visible (do not cover with full-frame image)
     let prerollOverlayDataUrl = creativeDataUrl;
     let prerollVideoDurationSec = 0;
     if (prerollCaptureSeconds !== null) {
@@ -329,15 +329,8 @@ export class YouTubeCapture extends BaseChannel {
         if (!video || !Number.isFinite(video.duration) || video.duration <= 0) return 0;
         return video.duration;
       });
-      const frameShot = await page.screenshotElement?.("video.html5-main-video", {
-        type: "jpeg",
-        quality: 82,
-      });
-      if (frameShot && frameShot.length > 200) {
-        prerollOverlayDataUrl = "data:image/jpeg;base64," + frameShot.toString("base64");
-      } else {
-        console.warn("[YouTube] Video frame capture failed; using creative image");
-      }
+      // 핵심: 배경 이미지를 비워 실제 영상 프레임(일시정지된 상태)이 그대로 보이게 한다.
+      prerollOverlayDataUrl = "";
     }
 
     const prerollProgressPercent =
@@ -486,6 +479,7 @@ export class YouTubeCapture extends BaseChannel {
           landingUrl: instreamOpts.landingUrl || request.clickUrl || "",
           companionImageUrl: instreamOpts.companionImageUrl || "",
           progressFillPercent: prerollProgressPercent,
+          avatarImageUrl: creativeDataUrl,
         };
         console.log(
           `[YouTube] 인스트림 옵션: title="${prerollUiOpts.adTitle}" cta="${prerollUiOpts.ctaText}" landing="${prerollUiOpts.landingUrl}"`
@@ -577,6 +571,7 @@ export class YouTubeCapture extends BaseChannel {
       skipSeconds?: number;
       companionImageUrl?: string;
       progressFillPercent?: number;
+      avatarImageUrl?: string;
     } = {}
   ): Promise<boolean> {
     console.log(`[YouTube] 🎬 프리롤 광고 인젝션 시작`);
@@ -596,6 +591,7 @@ export class YouTubeCapture extends BaseChannel {
       (() => {
         try {
           const imgUrl = ${JSON.stringify(imgDataUrl)};
+          const avatarImgUrl = ${JSON.stringify(instreamOpts.avatarImageUrl ?? imgDataUrl)};
           const domainText = ${JSON.stringify(landingDomain)};
           const titleText = ${JSON.stringify(adTitle)};
           const ctaBtnText = ${JSON.stringify(ctaText)};
@@ -687,9 +683,9 @@ export class YouTubeCapture extends BaseChannel {
           ].join(' !important;') + ' !important';
 
           // 원형 아이콘 (ytp-ad-avatar--size-m = 40px)
-          if (imgUrl) {
+          if (avatarImgUrl) {
             const ctaIcon = document.createElement('img');
-            ctaIcon.src = imgUrl;
+            ctaIcon.src = avatarImgUrl;
             ctaIcon.style.cssText = 'width:40px !important;height:40px !important;border-radius:50% !important;object-fit:cover !important;flex-shrink:0 !important;margin-right:12px !important';
             ctaCard.appendChild(ctaIcon);
           } else {
