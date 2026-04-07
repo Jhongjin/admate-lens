@@ -202,15 +202,37 @@ export class YouTubeCapture extends BaseChannel {
       await new Promise((r) => setTimeout(r, 3000));
     }
 
-    // 🔑 4.7) 봇 감지 메시지 확인 + 썸네일 폴백
+    // 🔑 4.7) 봇 감지 메시지 확인 + 다단계 폴백
     const botDetected = await this.checkBotDetection(page);
 
-    if (botDetected && thumbnailDataUrl) {
-      console.log(`[YouTube] 🤖 봇 감지 탐지됨 — 썸네일 이미지로 비디오 영역 교체`);
-      await this.replacePlayerWithThumbnail(page, thumbnailDataUrl);
-      await new Promise((r) => setTimeout(r, 1000));
-    } else if (botDetected) {
-      console.warn(`[YouTube] 🤖 봇 감지 + 썸네일 없음 — 봇 메시지만 숨김 처리`);
+    if (botDetected) {
+      console.log(`[YouTube] 🤖 봇 감지됨 — 다단계 폴백 시작`);
+
+      // 폴백 1: embed URL로 플레이어 교체 (봇 감지가 훨씬 느슨)
+      const embedUrl = this.convertToEmbedUrl(targetUrl);
+      if (embedUrl) {
+        console.log(`[YouTube] 📺 폴백 1: embed iframe으로 교체 — ${embedUrl}`);
+        await this.replacePlayerWithEmbed(page, embedUrl);
+        await new Promise((r) => setTimeout(r, 4000));
+        
+        // embed 후 다시 봇 감지 확인
+        const stillBotDetected = await this.checkBotDetection(page);
+        if (!stillBotDetected) {
+          console.log(`[YouTube] ✅ embed 폴백 성공 — 정상 재생 중`);
+        } else if (thumbnailDataUrl) {
+          // 폴백 2: embed도 실패하면 썸네일로 교체
+          console.log(`[YouTube] 🖼️ 폴백 2: 썸네일 이미지로 교체`);
+          await this.replacePlayerWithThumbnail(page, thumbnailDataUrl);
+          await new Promise((r) => setTimeout(r, 1000));
+        }
+      } else if (thumbnailDataUrl) {
+        // embed URL 생성 불가 시 바로 썸네일
+        console.log(`[YouTube] 🖼️ 폴백: 썸네일 이미지로 교체`);
+        await this.replacePlayerWithThumbnail(page, thumbnailDataUrl);
+        await new Promise((r) => setTimeout(r, 1000));
+      } else {
+        console.warn(`[YouTube] 🤖 봇 감지 + 모든 폴백 불가 — 봇 메시지만 숨김 처리`);
+      }
     }
 
     // 5) 비디오 시간 스킵 (preroll 중 videoUrl 모드일 때만)

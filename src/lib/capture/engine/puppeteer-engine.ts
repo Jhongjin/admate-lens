@@ -54,6 +54,17 @@ const BROWSER_ARGS = [
   "--disable-web-security",
   "--disable-features=VizDisplayCompositor",
   "--single-process",
+  // 추가 stealth 플래그
+  "--disable-blink-features=AutomationControlled",
+  "--disable-infobars",
+  "--window-size=2560,1440",
+  "--start-maximized",
+  "--no-first-run",
+  "--no-default-browser-check",
+  "--disable-background-networking",
+  "--disable-component-update",
+  "--disable-domain-reliability",
+  "--disable-sync",
 ];
 
 /**
@@ -314,24 +325,7 @@ const STEALTH_EVASION_SCRIPT = `
   } catch(e) { /* 실패해도 무시 */ }
 
   // ═══════════════════════════════════════════════════
-  // 11. Error stack sourceURL 감지 방지
-  //     페이지가 Error.stack을 검사하여 puppeteer의 evaluate 호출을 감지
-  // ═══════════════════════════════════════════════════
-  const origError = Error;
-  Object.defineProperty(Error.prototype, 'stack', {
-    configurable: true,
-    get: function() {
-      const stack = origError.prototype.stack;
-      if (typeof stack === 'string') {
-        // pptr:// 프로토콜 참조 제거
-        return stack.replace(/pptr:\\/\\/[^\\s]+/g, '');
-      }
-      return stack;
-    }
-  });
-
-  // ═══════════════════════════════════════════════════
-  // 12. canvas fingerprint 노이즈
+  // 11. canvas fingerprint 노이즈
   // ═══════════════════════════════════════════════════
   const origToDataURL = HTMLCanvasElement.prototype.toDataURL;
   HTMLCanvasElement.prototype.toDataURL = function(type) {
@@ -348,7 +342,7 @@ const STEALTH_EVASION_SCRIPT = `
   };
 
   // ═══════════════════════════════════════════════════
-  // 13. connection / network 정보 위장
+  // 12. connection / network 정보 위장
   // ═══════════════════════════════════════════════════
   if (navigator.connection) {
     Object.defineProperty(navigator.connection, 'rtt', { get: () => 50 });
@@ -357,26 +351,25 @@ const STEALTH_EVASION_SCRIPT = `
   }
 
   // ═══════════════════════════════════════════════════
-  // 14. hardwareConcurrency & deviceMemory 위장
+  // 13. hardwareConcurrency & deviceMemory 위장
   // ═══════════════════════════════════════════════════
   Object.defineProperty(navigator, 'hardwareConcurrency', { get: () => 8 });
   Object.defineProperty(navigator, 'deviceMemory', { get: () => 8 });
 
   // ═══════════════════════════════════════════════════
-  // 15. Notification 위장 (headless에서 undefined인 경우)
+  // 14. Notification 위장 (headless에서 undefined인 경우)
   // ═══════════════════════════════════════════════════
   if (typeof Notification === 'undefined') {
     window.Notification = { permission: 'default', requestPermission: () => Promise.resolve('default') };
   }
 
   // ═══════════════════════════════════════════════════
-  // 16. 콘솔 함수 toString 위장
+  // 15. 콘솔 함수 toString 위장
   //     봇 감지가 함수를 toString()해서 native code인지 확인
   // ═══════════════════════════════════════════════════
   const nativeToString = Function.prototype.toString;
   const fakeNative = new Map();
 
-  // 위장한 함수들의 toString을 native처럼 보이게
   const patchToString = (fn, name) => {
     fakeNative.set(fn, \`function \${name || fn.name || ''}() { [native code] }\`);
   };
@@ -386,12 +379,96 @@ const STEALTH_EVASION_SCRIPT = `
     return nativeToString.call(this);
   };
 
-  // 주요 위장 함수들 등록
   patchToString(Function.prototype.toString, 'toString');
   patchToString(navigator.permissions.query, 'query');
   patchToString(HTMLMediaElement.prototype.canPlayType, 'canPlayType');
 
-  console.log('[Stealth] ✅ All evasion modules loaded');
+  // ═══════════════════════════════════════════════════
+  // 16. 🎵 AudioContext fingerprint 노이즈 (YouTube 봇 감지 핵심 2026)
+  //     Headless에서 AudioContext의 결과가 완벽히 동일 → 봇 판정
+  // ═══════════════════════════════════════════════════
+  try {
+    const origGetChannelData = AudioBuffer.prototype.getChannelData;
+    AudioBuffer.prototype.getChannelData = function(channel) {
+      const data = origGetChannelData.call(this, channel);
+      if (data.length > 0) {
+        for (let i = 0; i < Math.min(10, data.length); i++) {
+          data[i] = data[i] + (Math.random() * 0.0001 - 0.00005);
+        }
+      }
+      return data;
+    };
+    patchToString(AudioBuffer.prototype.getChannelData, 'getChannelData');
+  } catch(e) { /* AudioBuffer 없으면 무시 */ }
+
+  // ═══════════════════════════════════════════════════
+  // 17. navigator.getAutoplayPolicy 위장
+  //     정상 브라우저는 이 메서드가 있지만 headless에선 없을 수 있음
+  // ═══════════════════════════════════════════════════
+  if (!navigator.getAutoplayPolicy) {
+    navigator.getAutoplayPolicy = function(type) {
+      return 'allowed';
+    };
+    patchToString(navigator.getAutoplayPolicy, 'getAutoplayPolicy');
+  }
+
+  // ═══════════════════════════════════════════════════
+  // 18. Error.stack에서 CDP/Puppeteer 흔적 제거 (강화)
+  // ═══════════════════════════════════════════════════
+  try {
+    const origStackDesc = Object.getOwnPropertyDescriptor(Error.prototype, 'stack');
+    if (origStackDesc) {
+      Object.defineProperty(Error.prototype, 'stack', {
+        configurable: true,
+        enumerable: false,
+        get: function() {
+          const val = origStackDesc.get ? origStackDesc.get.call(this) : this._stack;
+          if (typeof val === 'string') {
+            return val
+              .replace(/pptr:\\/\\/[^\\s]+/g, '')
+              .replace(/__puppeteer_evaluation_script__/g, '')
+              .replace(/CDP\\.Runtime/g, '')
+              .replace(/DevTools/g, '');
+          }
+          return val;
+        },
+        set: function(v) {
+          if (origStackDesc.set) origStackDesc.set.call(this, v);
+          else this._stack = v;
+        }
+      });
+    }
+  } catch(e) { /* 무시 */ }
+
+  // ═══════════════════════════════════════════════════
+  // 19. screen 객체 완벽 위장
+  // ═══════════════════════════════════════════════════
+  Object.defineProperty(screen, 'colorDepth', { get: () => 24 });
+  Object.defineProperty(screen, 'pixelDepth', { get: () => 24 });
+  if (screen.width === 0 || screen.height === 0) {
+    Object.defineProperty(screen, 'width', { get: () => 2560 });
+    Object.defineProperty(screen, 'height', { get: () => 1440 });
+    Object.defineProperty(screen, 'availWidth', { get: () => 2560 });
+    Object.defineProperty(screen, 'availHeight', { get: () => 1400 });
+  }
+
+  // ═══════════════════════════════════════════════════
+  // 20. CDP $cdc_ / document 정리
+  // ═══════════════════════════════════════════════════
+  try {
+    for (const key of Object.keys(document)) {
+      if (/\\$[a-z]dc_/.test(key) || /cdc_/.test(key)) {
+        delete document[key];
+      }
+    }
+    for (const key of Object.keys(window)) {
+      if (/cdc_/.test(key) || /domAutomation/.test(key)) {
+        delete window[key];
+      }
+    }
+  } catch(e) { /* 무시 */ }
+
+  console.log('[Stealth] ✅ All 20 evasion modules loaded');
 })();
 `;
 
@@ -503,10 +580,11 @@ export class PuppeteerEngine implements IBrowserEngine {
     if (isLocal) {
       const localPath = await this.findLocalChrome();
       this.browser = await puppeteer.default.launch({
-        args: BROWSER_ARGS,
+        args: [...BROWSER_ARGS, "--headless=new"],
         defaultViewport: DEFAULT_VIEWPORT,
         executablePath: localPath,
         headless: false,
+        ignoreDefaultArgs: ["--enable-automation"],
       });
     } else {
       await this.cleanupStaleChromium();
@@ -565,25 +643,42 @@ export class PuppeteerEngine implements IBrowserEngine {
     const client = (page as any)._client?.();
     if (client) {
       try {
+        // webdriver 플래그 제거
         await client.send('Page.addScriptToEvaluateOnNewDocument', {
           source: 'Object.defineProperty(navigator, "webdriver", {get: () => undefined})',
         });
+        // 🔑 CDP Runtime.enable 자동호출 방지 — 일부 봇 감지는 이걸 체크함
+        await client.send('Page.addScriptToEvaluateOnNewDocument', {
+          source: `
+            // CDP 감지 방지: 빈 함수로 감지용 콜백 무력화
+            if (window.cdc_adoQpoasnfa76pfcZLmcfl_Array) delete window.cdc_adoQpoasnfa76pfcZLmcfl_Array;
+            if (window.cdc_adoQpoasnfa76pfcZLmcfl_Promise) delete window.cdc_adoQpoasnfa76pfcZLmcfl_Promise;
+            if (window.cdc_adoQpoasnfa76pfcZLmcfl_Symbol) delete window.cdc_adoQpoasnfa76pfcZLmcfl_Symbol;
+            // document.$cdc_ 프로퍼티 제거
+            for (const key of Object.keys(document)) {
+              if (key.match(/\$[a-z]dc_/)) delete document[key];
+            }
+          `
+        });
+        // UA + Client Hints 설정 (Chrome 135)
         await client.send('Network.setUserAgentOverride', {
-          userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+          userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36',
           acceptLanguage: 'ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7',
           platform: 'Win32',
           userAgentMetadata: {
             brands: [
-              { brand: 'Google Chrome', version: '131' },
-              { brand: 'Chromium', version: '131' },
+              { brand: 'Google Chrome', version: '135' },
+              { brand: 'Chromium', version: '135' },
               { brand: 'Not_A Brand', version: '24' },
             ],
-            fullVersion: '131.0.6778.109',
+            fullVersion: '135.0.7049.85',
             platform: 'Windows',
             platformVersion: '15.0.0',
             architecture: 'x86',
             model: '',
             mobile: false,
+            bitness: '64',
+            wow64: false,
           },
         });
       } catch (cdpErr) {
@@ -591,9 +686,9 @@ export class PuppeteerEngine implements IBrowserEngine {
       }
     }
 
-    // 🔑 1) User-Agent 설정
+    // 🔑 1) User-Agent 설정 (Chrome 135)
     await page.setUserAgent(
-      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36"
     );
 
     // 🔑 2) 통합 Stealth 회피 스크립트 주입 (16개 모듈)
@@ -607,7 +702,7 @@ export class PuppeteerEngine implements IBrowserEngine {
       'Accept-Language': 'ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7',
       'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
       'Accept-Encoding': 'gzip, deflate, br',
-      'sec-ch-ua': '"Google Chrome";v="131", "Chromium";v="131", "Not_A Brand";v="24"',
+      'sec-ch-ua': '"Google Chrome";v="135", "Chromium";v="135", "Not_A Brand";v="24"',
       'sec-ch-ua-mobile': '?0',
       'sec-ch-ua-platform': '"Windows"',
       'sec-fetch-dest': 'document',
