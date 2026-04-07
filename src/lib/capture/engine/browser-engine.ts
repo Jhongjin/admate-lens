@@ -22,11 +22,6 @@ export interface IViewport {
 export interface IPageHandle {
   goto(url: string, options?: { waitUntil?: "load" | "domcontentloaded" | "networkidle0" | "networkidle2"; timeout?: number }): Promise<void>;
   screenshot(options?: IScreenshotOptions): Promise<Buffer>;
-  /** 요소가 없거나 캡처 실패 시 null (Puppeteer 전용) */
-  screenshotElement?(
-    selector: string,
-    options?: { type?: "png" | "jpeg"; quality?: number }
-  ): Promise<Buffer | null>;
   evaluate<T>(fn: string | ((...args: unknown[]) => T), ...args: unknown[]): Promise<T>;
   evaluateOnNewDocument(fn: string | ((...args: unknown[]) => void)): Promise<void>;
   click(selector: string): Promise<void>;
