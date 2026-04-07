@@ -1092,86 +1092,84 @@ export class YouTubeCapture extends BaseChannel {
         width?: number;
         height?: number;
         duration?: number;
-      }>(
-        (secVal: unknown) =>
-          new Promise((resolve) => {
-            const sec = Math.max(0, Number(secVal) || 0);
-            const v = document.querySelector("video");
-            if (!v) return resolve({ ok: false, reason: "video_not_found" });
+      }>(`
+        ((secVal) => new Promise((resolve) => {
+          const sec = Math.max(0, Number(secVal) || 0);
+          const v = document.querySelector("video");
+          if (!v) return resolve({ ok: false, reason: "video_not_found" });
 
-            const finish = (reason?: string) => {
-              const r = v.getBoundingClientRect();
-              const duration = Number.isFinite(v.duration) ? v.duration : 0;
-              if (r.width < 120 || r.height < 80) {
-                return resolve({ ok: false, reason: reason || "invalid_rect", duration });
-              }
-              resolve({
-                ok: true,
-                x: Math.max(0, Math.floor(r.left)),
-                y: Math.max(0, Math.floor(r.top)),
-                width: Math.floor(r.width),
-                height: Math.floor(r.height),
-                duration,
-              });
-            };
-
-            const renderAndPause = () => {
-              try {
-                v.muted = true;
-                const p = v.play();
-                if (p && typeof p.then === "function") {
-                  p.then(() => {
-                    if (typeof v.requestVideoFrameCallback === "function") {
-                      v.requestVideoFrameCallback(() => {
-                        try { v.pause(); } catch {}
-                        setTimeout(() => finish("ok"), 80);
-                      });
-                    } else {
-                      setTimeout(() => {
-                        try { v.pause(); } catch {}
-                        finish("ok");
-                      }, 220);
-                    }
-                  }).catch(() => {
-                    try { v.pause(); } catch {}
-                    finish("play_rejected");
-                  });
-                } else {
-                  setTimeout(() => {
-                    try { v.pause(); } catch {}
-                    finish("ok_no_promise");
-                  }, 220);
-                }
-              } catch {
-                try { v.pause(); } catch {}
-                finish("play_exception");
-              }
-            };
-
-            const target =
-              Number.isFinite(v.duration) && v.duration > 0
-                ? Math.min(sec, Math.max(0, v.duration - 0.2))
-                : sec;
-
-            const onSeeked = () => {
-              v.removeEventListener("seeked", onSeeked);
-              renderAndPause();
-            };
-
-            try {
-              v.addEventListener("seeked", onSeeked, { once: true });
-              v.currentTime = target;
-            } catch {
-              renderAndPause();
+          const finish = (reason) => {
+            const r = v.getBoundingClientRect();
+            const duration = Number.isFinite(v.duration) ? v.duration : 0;
+            if (r.width < 120 || r.height < 80) {
+              return resolve({ ok: false, reason: reason || "invalid_rect", duration });
             }
+            resolve({
+              ok: true,
+              x: Math.max(0, Math.floor(r.left)),
+              y: Math.max(0, Math.floor(r.top)),
+              width: Math.floor(r.width),
+              height: Math.floor(r.height),
+              duration,
+            });
+          };
 
-            setTimeout(() => {
-              v.removeEventListener("seeked", onSeeked);
-              finish("seek_timeout");
-            }, 8000);
-          }),
-        seconds
-      );
+          const renderAndPause = () => {
+            try {
+              v.muted = true;
+              const p = v.play();
+              if (p && typeof p.then === "function") {
+                p.then(() => {
+                  if (typeof v.requestVideoFrameCallback === "function") {
+                    v.requestVideoFrameCallback(() => {
+                      try { v.pause(); } catch {}
+                      setTimeout(() => finish("ok"), 80);
+                    });
+                  } else {
+                    setTimeout(() => {
+                      try { v.pause(); } catch {}
+                      finish("ok");
+                    }, 220);
+                  }
+                }).catch(() => {
+                  try { v.pause(); } catch {}
+                  finish("play_rejected");
+                });
+              } else {
+                setTimeout(() => {
+                  try { v.pause(); } catch {}
+                  finish("ok_no_promise");
+                }, 220);
+              }
+            } catch {
+              try { v.pause(); } catch {}
+              finish("play_exception");
+            }
+          };
+
+          const target =
+            Number.isFinite(v.duration) && v.duration > 0
+              ? Math.min(sec, Math.max(0, v.duration - 0.2))
+              : sec;
+
+          const onSeeked = () => {
+            v.removeEventListener("seeked", onSeeked);
+            renderAndPause();
+          };
+
+          try {
+            v.addEventListener("seeked", onSeeked, { once: true });
+            v.currentTime = target;
+          } catch {
+            renderAndPause();
+          }
+
+          setTimeout(() => {
+            v.removeEventListener("seeked", onSeeked);
+            finish("seek_timeout");
+          }, 8000);
+        }))(${JSON.stringify(seconds)})
+      `);
 
       if (!info.ok || !info.width || !info.height) {
         console.warn("[YouTube] timed frame extraction info failed:", info.reason || "unknown");
