@@ -160,7 +160,13 @@ export class YouTubeCapture extends BaseChannel {
     }
 
     // 1.5) 🖼️ 비디오 ID 추출 + 썸네일 준비
-    const videoId = extractVideoId(request.publisherUrl);
+    // 프리롤은 "광고주 영상(instreamVideoUrl)"을 기준으로 해야 함.
+    const videoId =
+      adType === "preroll"
+        ? prerollAdVideoId ||
+          (instreamOpts.videoUrl ? extractVideoId(instreamOpts.videoUrl) : null) ||
+          extractVideoId(request.publisherUrl)
+        : extractVideoId(request.publisherUrl);
     let thumbnailDataUrl: string | null = null;
     if (videoId) {
       const thumbResult = await imageUrlToDataUrl(getThumbnailUrl(videoId));
