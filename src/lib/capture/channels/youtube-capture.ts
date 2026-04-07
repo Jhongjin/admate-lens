@@ -1092,10 +1092,9 @@ export class YouTubeCapture extends BaseChannel {
         capturedTime?: number;
       }>(`
         (() => new Promise((resolve) => {
-          const videos = Array.from(document.querySelectorAll("video"));
-          if (!videos.length) return resolve({ ok: false, reason: "video_not_found" });
-
           const pickBestVideo = () => {
+            const videos = Array.from(document.querySelectorAll("video"));
+            if (!videos.length) return null;
             let best = null;
             let bestScore = -1;
             for (const el of videos) {
@@ -1113,7 +1112,7 @@ export class YouTubeCapture extends BaseChannel {
             return best;
           };
 
-          const v = pickBestVideo();
+          let v = pickBestVideo();
           if (!v) return resolve({ ok: false, reason: "video_not_found_best" });
 
           const target = Math.max(0, Number(${Math.max(0, seconds).toFixed(3)}));
@@ -1124,8 +1123,11 @@ export class YouTubeCapture extends BaseChannel {
             resolve(result);
           };
 
-          const duration = Number.isFinite(v.duration) ? Number(v.duration) : 0;
-          const targetClamped = duration > 0 ? Math.min(target, Math.max(0, duration - 0.12)) : target;
+          const getDuration = () => (Number.isFinite(v.duration) ? Number(v.duration) : 0);
+          const targetClamped = () => {
+            const d = getDuration();
+            return d > 0 ? Math.min(target, Math.max(0, d - 0.12)) : target;
+          };
 
           const captureNow = (reason) => {
             try {
@@ -1135,7 +1137,7 @@ export class YouTubeCapture extends BaseChannel {
                 return finish({
                   ok: false,
                   reason: (reason || "invalid_video_size") + "_vw" + String(vw) + "_vh" + String(vh),
-                  duration,
+                  duration: getDuration(),
                   capturedTime: Number(v.currentTime || 0),
                 });
               }
@@ -1151,17 +1153,17 @@ export class YouTubeCapture extends BaseChannel {
                 return finish({
                   ok: false,
                   reason: "frame_data_too_small",
-                  duration,
+                  duration: getDuration(),
                   capturedTime: Number(v.currentTime || 0),
                 });
               }
-              finish({ ok: true, frameDataUrl, duration, capturedTime: Number(v.currentTime || 0) });
+              finish({ ok: true, frameDataUrl, duration: getDuration(), capturedTime: Number(v.currentTime || 0) });
             } catch (e) {
               const message = (e && typeof e === "object" && "name" in e) ? String(e.name) : "canvas_capture_failed";
               finish({
                 ok: false,
                 reason: "canvas_capture_failed_" + message,
-                duration,
+                duration: getDuration(),
                 capturedTime: Number(v.currentTime || 0),
               });
             }
@@ -1186,13 +1188,17 @@ export class YouTubeCapture extends BaseChannel {
               }
             } catch {}
 
-            try { v.currentTime = targetClamped; } catch {}
+            try { v.currentTime = targetClamped(); } catch {}
 
             const start = Date.now();
             const poll = () => {
               if (done) return;
+              const candidate = pickBestVideo();
+              if (candidate) v = candidate;
               const ready = (v.readyState || 0) >= 2;
-              if (ready) {
+              const vw = Number(v.videoWidth || 0);
+              const vh = Number(v.videoHeight || 0);
+              if (ready && vw >= 32 && vh >= 32) {
                 try { v.pause(); } catch {}
                 if (typeof v.requestVideoFrameCallback === "function") {
                   try {
