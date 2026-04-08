@@ -7,6 +7,8 @@ const API_SECRET = process.env.API_SECRET || "";
 
 const cache = new Map();
 const CACHE_TTL = 3600 * 1000;
+const frameCache = new Map();
+const FRAME_CACHE_TTL = 10 * 60 * 1000;
 
 function getStoryboard(videoId) {
   const cached = cache.get(videoId);
@@ -72,6 +74,72 @@ function getStoryboard(videoId) {
   return result;
 }
 
+function getVideoStreamUrl(videoId) {
+  const cmd = [
+    "yt-dlp",
+    `--cookies "${COOKIES_PATH}"`,
+    "--remote-components ejs:github",
+    '-f "bv*[height<=1080][ext=mp4]/bv*[ext=mp4]/bv*"',
+    "-g",
+    `"https://www.youtube.com/watch?v=${videoId}"`,
+  ].join(" ");
+
+  const out = execSync(cmd, {
+    maxBuffer: 5 * 1024 * 1024,
+    timeout: 30000,
+    stdio: ["pipe", "pipe", "pipe"],
+  }).toString().trim();
+
+  const firstLine = out.split("\n").map((s) => s.trim()).find(Boolean);
+  if (!firstLine) throw new Error("no stream url");
+  return firstLine;
+}
+
+function getFrameAtSecond(videoId, second) {
+  const key = `${videoId}:${Math.max(0, Math.floor(second))}`;
+  const cached = frameCache.get(key);
+  if (cached && Date.now() - cached.ts < FRAME_CACHE_TTL) {
+    console.log(`[frame cache hit] ${key}`);
+    return cached.data;
+  }
+
+  const streamUrl = getVideoStreamUrl(videoId);
+  const safeSecond = Math.max(0, Number.isFinite(second) ? second : 0);
+
+  const ffCmd = [
+    "ffmpeg",
+    "-hide_banner",
+    "-loglevel error",
+    `-ss ${safeSecond}`,
+    `-i "${streamUrl}"`,
+    "-frames:v 1",
+    "-q:v 2",
+    "-f image2pipe",
+    "-vcodec mjpeg",
+    "pipe:1",
+  ].join(" ");
+
+  const jpgBuf = execSync(ffCmd, {
+    maxBuffer: 25 * 1024 * 1024,
+    timeout: 45000,
+    stdio: ["pipe", "pipe", "pipe"],
+  });
+
+  if (!jpgBuf || jpgBuf.length < 1000) {
+    throw new Error("ffmpeg frame output too small");
+  }
+
+  const data = {
+    videoId,
+    second: safeSecond,
+    mime: "image/jpeg",
+    bytes: jpgBuf.length,
+    frameDataUrl: "data:image/jpeg;base64," + jpgBuf.toString("base64"),
+  };
+  frameCache.set(key, { data, ts: Date.now() });
+  return data;
+}
+
 function handleRequest(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
@@ -82,11 +150,11 @@ function handleRequest(req, res) {
   const url = new URL(req.url, `http://localhost:${PORT}`);
 
   if (url.pathname === "/health") {
-    res.end(JSON.stringify({ ok: true, uptime: process.uptime(), cached: cache.size }));
+    res.end(JSON.stringify({ ok: true, uptime: process.uptime(), cached: cache.size, frameCached: frameCache.size }));
     return;
   }
 
-  if (url.pathname !== "/yt-storyboard") {
+  if (url.pathname !== "/yt-storyboard" && url.pathname !== "/yt-frame") {
     res.writeHead(404);
     res.end(JSON.stringify({ error: "not found" }));
     return;
@@ -106,6 +174,20 @@ function handleRequest(req, res) {
   }
 
   try {
+    if (url.pathname === "/yt-frame") {
+      const t = parseFloat(url.searchParams.get("t") || "0");
+      const frame = getFrameAtSecond(videoId, t);
+      try {
+        const sb = getStoryboard(videoId);
+        frame.duration = sb.duration || 0;
+      } catch {
+        frame.duration = 0;
+      }
+      res.setHeader("Cache-Control", "public, max-age=300");
+      res.end(JSON.stringify(frame));
+      return;
+    }
+
     const result = getStoryboard(videoId);
     res.setHeader("Cache-Control", result.storyboard ? "public, max-age=1800" : "no-store");
     res.end(JSON.stringify(result));

@@ -608,7 +608,7 @@ export class YouTubeCapture extends BaseChannel {
             'align-items: center',
             'justify-content: center',
             'overflow: hidden',
-            'border-radius: 0',
+            'border-radius: 12px',
           ].join(' !important;') + ' !important';
 
           // ─── 광고 소재 이미지 (존재할 경우 화면 꽉 채움) ───
@@ -702,11 +702,11 @@ export class YouTubeCapture extends BaseChannel {
 
           // ─── 하단: 노란색 프로그레스 바 ───
           const timerBg = document.createElement('div');
-          timerBg.style.cssText = 'position:absolute;bottom:0;left:0;width:100%;height:3px;background:rgba(255,255,255,0.15);z-index:10;border-radius:0';
+          timerBg.style.cssText = 'position:absolute;bottom:0;left:0;width:100%;height:3px;background:rgba(255,255,255,0.15);z-index:10;border-radius:0 0 12px 12px';
           overlay.appendChild(timerBg);
 
           const timerBar = document.createElement('div');
-          const barRadius = '0';
+          const barRadius = progressFillPct >= 99.5 ? '0 0 12px 12px' : '0 0 0 12px';
           timerBar.style.cssText = 'position:absolute;bottom:0;left:0;width:' + progressFillPct + '%;height:3px;background:#f2bc42;z-index:11;border-radius:' + barRadius;
           overlay.appendChild(timerBar);
 
@@ -1067,6 +1067,28 @@ export class YouTubeCapture extends BaseChannel {
       const proxyUrl = process.env.STORYBOARD_PROXY_URL;
       if (proxyUrl) {
         try {
+          // Prefer high-quality exact frame extraction from VPS ffmpeg endpoint
+          const frameUrl = `${proxyUrl.replace(/\/$/, "")}/yt-frame?v=${adVideoId}&t=${seconds}&_t=${Date.now()}`;
+          const frameResp = await fetch(frameUrl, {
+            headers: { Accept: "application/json" },
+            signal: AbortSignal.timeout(20000),
+          });
+          if (frameResp.ok) {
+            const frameData = await frameResp.json() as {
+              frameDataUrl?: string; bytes?: number; duration?: number;
+            };
+            if (frameData.frameDataUrl && frameData.frameDataUrl.length > 2000) {
+              if (frameData.duration && frameData.duration > 0) {
+                videoDuration = frameData.duration;
+              }
+              console.log(
+                "[YouTube] ✅ high-quality frame from VPS ffmpeg (" +
+                (frameData.bytes || 0) + " bytes, t=" + seconds + "s)"
+              );
+              return { frameDataUrl: frameData.frameDataUrl, durationSec: videoDuration };
+            }
+          }
+
           const sbUrl = `${proxyUrl.replace(/\/$/, "")}/yt-storyboard?v=${adVideoId}&_t=${Date.now()}`;
           console.log("[YouTube] storyboard proxy: " + proxyUrl.substring(0, 60));
           const sbResp = await fetch(sbUrl, {
