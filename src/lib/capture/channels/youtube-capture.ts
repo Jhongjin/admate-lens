@@ -595,6 +595,9 @@ export class YouTubeCapture extends BaseChannel {
           const py = playerRect ? playerRect.top : 56;
           const pw = playerRect ? playerRect.width : window.innerWidth * 0.7;
           const ph = playerRect ? playerRect.height : window.innerHeight * 0.6;
+          // Some player containers report 0 radius even though visible video is rounded.
+          const hasNonZeroRadius = /[1-9]/.test(String(playerRadius));
+          if (!hasNonZeroRadius) playerRadius = '12px';
 
           // ═══════════════════════════════════════════════════
           // 메인 오버레이 (플레이어 전체를 덮음 + 라운딩)
@@ -614,6 +617,7 @@ export class YouTubeCapture extends BaseChannel {
             'justify-content: center',
             'overflow: hidden',
             'border-radius: ' + playerRadius,
+            'clip-path: inset(0 round ' + playerRadius + ')',
             'transform: translateZ(0)',
           ].join(' !important;') + ' !important';
 
