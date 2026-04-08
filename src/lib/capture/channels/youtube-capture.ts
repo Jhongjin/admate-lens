@@ -1361,7 +1361,13 @@ export class YouTubeCapture extends BaseChannel {
       }
 
       // 3) Storyboard 레벨 파싱
+      // Decode possible unicode escapes from JSON
+      spec = spec.replace(/\\u0026/g, "&").replace(/\\u007c/g, "|");
+
+      console.log("[YouTube] storyboard raw spec (" + spec.length + "): " + spec.substring(0, 300));
+
       const segments = spec.split("|");
+      console.log("[YouTube] storyboard segments: " + segments.length);
       const baseUrl = segments[0];
 
       const levels: {
@@ -1370,6 +1376,7 @@ export class YouTubeCapture extends BaseChannel {
       }[] = [];
       for (let i = 1; i < segments.length; i++) {
         const parts = segments[i].split("#");
+        console.log("[YouTube] storyboard seg[" + i + "] parts=" + parts.length + ": " + segments[i].substring(0, 80));
         if (parts.length < 6) continue;
         levels.push({
           w: parseInt(parts[0], 10),
