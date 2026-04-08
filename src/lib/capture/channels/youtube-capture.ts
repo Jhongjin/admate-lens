@@ -1059,72 +1059,95 @@ export class YouTubeCapture extends BaseChannel {
       const adVideoId = extractVideoId(instreamVideoUrl);
       if (!adVideoId) return { frameDataUrl: null, durationSec: 0 };
 
-      // 1) YouTube 페이지 HTML 을 서버 사이드 fetch (브라우저 불필요)
-      const ytResp = await fetch(
-        "https://www.youtube.com/watch?v=" + adVideoId + "&hl=en",
-        {
-          headers: {
-            "User-Agent":
-              "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-            "Accept-Language": "en-US,en;q=0.9",
-            Cookie: "CONSENT=YES+cb.20210328-17-p0.en+FX+987",
-          },
-        }
-      );
-      if (!ytResp.ok) {
-        console.warn("[YouTube] storyboard: page fetch " + ytResp.status);
-        return { frameDataUrl: null, durationSec: 0 };
-      }
-      const html = await ytResp.text();
+      // 1) Storyboard spec 획득 — InnerTube API → 브라우저 폴백
+      let spec = "";
+      let videoDuration = 0;
 
-      // 2) ytInitialPlayerResponse JSON 추출 (bracket counting)
-      const marker = "ytInitialPlayerResponse";
-      const mIdx = html.indexOf(marker);
-      if (mIdx === -1) {
-        console.warn("[YouTube] storyboard: marker not found");
-        return { frameDataUrl: null, durationSec: 0 };
-      }
-      const braceIdx = html.indexOf("{", mIdx + marker.length);
-      if (braceIdx === -1) {
-        console.warn("[YouTube] storyboard: brace not found");
-        return { frameDataUrl: null, durationSec: 0 };
-      }
-
-      let depth = 0;
-      let inStr = false;
-      let esc = false;
-      let endIdx = braceIdx;
-      for (let i = braceIdx; i < html.length && i < braceIdx + 600000; i++) {
-        const ch = html[i];
-        if (esc) { esc = false; continue; }
-        if (ch === "\\" && inStr) { esc = true; continue; }
-        if (ch === '"') { inStr = !inStr; continue; }
-        if (inStr) continue;
-        if (ch === "{") depth++;
-        else if (ch === "}") {
-          depth--;
-          if (depth === 0) { endIdx = i + 1; break; }
-        }
-      }
-
-      let jsonStr = html.substring(braceIdx, endIdx);
-      jsonStr = jsonStr.replace(/\\x([0-9a-fA-F]{2})/g, "\\u00$1");
-
-      let pr: Record<string, any>;
+      // 1-a) InnerTube API (consent/cookie 무관, 가장 빠름)
       try {
-        pr = JSON.parse(jsonStr);
-      } catch {
-        console.warn("[YouTube] storyboard: JSON parse failed");
-        return { frameDataUrl: null, durationSec: 0 };
+        const apiResp = await fetch(
+          "https://www.youtube.com/youtubei/v1/player?prettyPrint=false",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "User-Agent":
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+              "X-YouTube-Client-Name": "1",
+              "X-YouTube-Client-Version": "2.20240101.00.00",
+            },
+            body: JSON.stringify({
+              videoId: adVideoId,
+              context: {
+                client: {
+                  clientName: "WEB",
+                  clientVersion: "2.20240101.00.00",
+                  hl: "en",
+                  gl: "US",
+                },
+              },
+            }),
+          }
+        );
+        if (apiResp.ok) {
+          const pr = await apiResp.json();
+          videoDuration = parseFloat(pr?.videoDetails?.lengthSeconds || "0");
+          spec = pr?.storyboards?.playerStoryboardSpecRenderer?.spec || "";
+          if (spec) {
+            console.log("[YouTube] storyboard spec from InnerTube API");
+          } else {
+            console.warn("[YouTube] storyboard: InnerTube returned no spec");
+          }
+        }
+      } catch (apiErr) {
+        console.warn("[YouTube] storyboard: InnerTube API failed:", apiErr);
       }
 
-      const videoDuration = parseFloat(
-        pr?.videoDetails?.lengthSeconds || "0"
-      );
-      const spec: string =
-        pr?.storyboards?.playerStoryboardSpecRenderer?.spec || "";
+      // 1-b) 브라우저 폴백 — 실제 페이지 로드 후 JS 전역변수에서 추출
       if (!spec) {
-        console.warn("[YouTube] storyboard: no spec");
+        try {
+          await this.applyYouTubeConsentCookies(page);
+          await page.goto(
+            "https://www.youtube.com/watch?v=" + adVideoId,
+            { waitUntil: "networkidle2", timeout: 45000 }
+          );
+          await this.dismissYouTubeConsent(page);
+          await new Promise((r) => setTimeout(r, 1200));
+
+          const sbInfo = await page.evaluate<{
+            ok: boolean;
+            reason?: string;
+            spec?: string;
+            duration?: number;
+          }>(`
+            (() => {
+              try {
+                const pr = window.ytInitialPlayerResponse;
+                if (!pr) return { ok: false, reason: "no_ytInitialPlayerResponse" };
+                const d = parseFloat(pr.videoDetails?.lengthSeconds || "0");
+                const s = (pr.storyboards?.playerStoryboardSpecRenderer?.spec) || "";
+                if (!s) return { ok: false, reason: "no_spec_in_page", duration: d };
+                return { ok: true, spec: s, duration: d };
+              } catch (e) {
+                return { ok: false, reason: "eval_error" };
+              }
+            })()
+          `);
+
+          if (sbInfo.ok && sbInfo.spec) {
+            spec = sbInfo.spec;
+            videoDuration = sbInfo.duration || 0;
+            console.log("[YouTube] storyboard spec from browser page");
+          } else {
+            console.warn("[YouTube] storyboard browser fallback:", sbInfo.reason);
+          }
+        } catch (browserErr) {
+          console.warn("[YouTube] storyboard browser fallback error:", browserErr);
+        }
+      }
+
+      if (!spec) {
+        console.warn("[YouTube] storyboard: all spec sources failed");
         return { frameDataUrl: null, durationSec: videoDuration };
       }
 
