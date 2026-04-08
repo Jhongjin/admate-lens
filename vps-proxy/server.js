@@ -1,43 +1,67 @@
 const http = require("http");
-const https = require("https");
+const { execSync } = require("child_process");
 
 const PORT = process.env.PORT || 3200;
+const COOKIES_PATH = process.env.COOKIES_PATH || "/home/ubuntu/cookies.txt";
 const API_SECRET = process.env.API_SECRET || "";
 
-function fetchUrl(url, headers = {}) {
-  return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error("timeout")), 10000);
-    const req = https.get(url, { headers }, (res) => {
-      let data = "";
-      res.on("data", (chunk) => (data += chunk));
-      res.on("end", () => { clearTimeout(timer); resolve({ status: res.statusCode, body: data }); });
-    });
-    req.on("error", (e) => { clearTimeout(timer); reject(e); });
-  });
-}
+const cache = new Map();
+const CACHE_TTL = 3600 * 1000;
 
-function extractPlayerResponse(html) {
-  const marker = "ytInitialPlayerResponse";
-  const mIdx = html.indexOf(marker);
-  if (mIdx === -1) return null;
-
-  const braceStart = html.indexOf("{", mIdx);
-  if (braceStart === -1) return null;
-
-  let depth = 0, end = braceStart;
-  for (; end < html.length; end++) {
-    if (html[end] === "{") depth++;
-    else if (html[end] === "}") { depth--; if (depth === 0) break; }
+function getStoryboard(videoId) {
+  const cached = cache.get(videoId);
+  if (cached && Date.now() - cached.ts < CACHE_TTL) {
+    console.log(`[cache hit] ${videoId}`);
+    return cached.data;
   }
 
-  try {
-    return JSON.parse(html.substring(braceStart, end + 1));
-  } catch {
-    return null;
-  }
+  console.log(`[yt-dlp] fetching ${videoId}...`);
+  const cmd = [
+    "yt-dlp",
+    `--cookies "${COOKIES_PATH}"`,
+    "--remote-components ejs:github",
+    "--dump-single-json",
+    "--skip-download",
+    `"https://www.youtube.com/watch?v=${videoId}"`,
+  ].join(" ");
+
+  const output = execSync(cmd, {
+    maxBuffer: 10 * 1024 * 1024,
+    timeout: 30000,
+    stdio: ["pipe", "pipe", "pipe"],
+  }).toString();
+
+  const data = JSON.parse(output);
+  const duration = data.duration || 0;
+  const sb = data.formats?.find((f) => f.format_id === "sb0");
+
+  const result = {
+    videoId,
+    duration,
+    title: data.title || "",
+    storyboard: sb
+      ? {
+          width: sb.width,
+          height: sb.height,
+          rows: sb.rows,
+          columns: sb.columns,
+          fps: sb.fps,
+          fragments: (sb.fragments || []).map((f) => ({
+            url: f.url,
+            duration: f.duration,
+          })),
+        }
+      : null,
+  };
+
+  cache.set(videoId, { data: result, ts: Date.now() });
+  console.log(
+    `[yt-dlp] ${videoId}: dur=${duration} storyboard=${result.storyboard ? "yes" : "no"} fragments=${result.storyboard?.fragments.length || 0}`
+  );
+  return result;
 }
 
-async function handleRequest(req, res) {
+function handleRequest(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
   res.setHeader("Content-Type", "application/json");
@@ -47,7 +71,7 @@ async function handleRequest(req, res) {
   const url = new URL(req.url, `http://localhost:${PORT}`);
 
   if (url.pathname === "/health") {
-    res.end(JSON.stringify({ ok: true, uptime: process.uptime() }));
+    res.end(JSON.stringify({ ok: true, uptime: process.uptime(), cached: cache.size }));
     return;
   }
 
@@ -71,34 +95,15 @@ async function handleRequest(req, res) {
   }
 
   try {
-    const ytUrl = `https://www.youtube.com/watch?v=${videoId}&hl=en&bpctr=9999999999&has_verified=1`;
-    const { body: html, status: httpStatus } = await fetchUrl(ytUrl, {
-      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
-      "Accept-Language": "en-US,en;q=0.9",
-      Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-      Cookie: "CONSENT=PENDING+987; GPS=1",
-    });
-
-    const pr = extractPlayerResponse(html);
-    if (!pr) {
-      res.end(JSON.stringify({
-        spec: "", duration: 0, videoId,
-        status: "PARSE_ERROR", httpStatus, htmlLen: html.length,
-      }));
-      return;
-    }
-
-    const playStatus = pr?.playabilityStatus?.status || "unknown";
-    const duration = parseFloat(pr?.videoDetails?.lengthSeconds || "0");
-    const spec = pr?.storyboards?.playerStoryboardSpecRenderer?.spec || "";
-
-    res.setHeader("Cache-Control", spec ? "public, max-age=1800" : "no-store");
-    res.end(JSON.stringify({ spec, duration, videoId, status: playStatus }));
+    const result = getStoryboard(videoId);
+    res.setHeader("Cache-Control", result.storyboard ? "public, max-age=1800" : "no-store");
+    res.end(JSON.stringify(result));
   } catch (e) {
+    console.error(`[error] ${videoId}:`, e.message);
     res.writeHead(500);
-    res.end(JSON.stringify({ error: e.message }));
+    res.end(JSON.stringify({ error: e.message?.substring(0, 200) }));
   }
 }
 
 const server = http.createServer(handleRequest);
-server.listen(PORT, () => console.log(`yt-storyboard proxy listening on :${PORT}`));
+server.listen(PORT, () => console.log(`yt-storyboard proxy (yt-dlp) listening on :${PORT}`));

@@ -1063,34 +1063,7 @@ export class YouTubeCapture extends BaseChannel {
       let spec = "";
       let videoDuration = 0;
 
-      // 1) YouTube Data API v3 — get exact duration (official API, no bot detection)
-      const ytApiKey = process.env.YOUTUBE_API_KEY;
-      if (ytApiKey) {
-        try {
-          const apiUrl = `https://www.googleapis.com/youtube/v3/videos?id=${adVideoId}&part=contentDetails&key=${ytApiKey}`;
-          const apiResp = await fetch(apiUrl, { signal: AbortSignal.timeout(5000) });
-          if (apiResp.ok) {
-            const apiData = await apiResp.json() as {
-              items?: { contentDetails?: { duration?: string } }[];
-            };
-            const iso = apiData.items?.[0]?.contentDetails?.duration || "";
-            if (iso) {
-              const hMatch = iso.match(/(\d+)H/);
-              const mMatch = iso.match(/(\d+)M/);
-              const sMatch = iso.match(/(\d+)S/);
-              videoDuration =
-                (hMatch ? parseInt(hMatch[1]) * 3600 : 0) +
-                (mMatch ? parseInt(mMatch[1]) * 60 : 0) +
-                (sMatch ? parseInt(sMatch[1]) : 0);
-              console.log("[YouTube] ✅ Data API duration: " + videoDuration + "s (from " + iso + ")");
-            }
-          }
-        } catch (apiErr) {
-          console.warn("[YouTube] Data API error:", apiErr);
-        }
-      }
-
-      // 2) Storyboard proxy (optional — set STORYBOARD_PROXY_URL env var)
+      // 1) VPS storyboard proxy (yt-dlp based — set STORYBOARD_PROXY_URL env var)
       const proxyUrl = process.env.STORYBOARD_PROXY_URL;
       if (proxyUrl) {
         try {
@@ -1098,16 +1071,90 @@ export class YouTubeCapture extends BaseChannel {
           console.log("[YouTube] storyboard proxy: " + proxyUrl.substring(0, 60));
           const sbResp = await fetch(sbUrl, {
             headers: { Accept: "application/json" },
-            signal: AbortSignal.timeout(8000),
+            signal: AbortSignal.timeout(15000),
           });
           if (sbResp.ok) {
             const sbData = await sbResp.json() as {
-              spec?: string; duration?: number; status?: string;
+              duration?: number;
+              storyboard?: {
+                width: number; height: number;
+                rows: number; columns: number;
+                fps: number;
+                fragments: { url: string; duration: number }[];
+              } | null;
             };
-            if (sbData.spec && sbData.spec.includes("|")) {
-              spec = sbData.spec;
-              if (!videoDuration) videoDuration = sbData.duration || 0;
-              console.log("[YouTube] ✅ storyboard spec from proxy (dur=" + videoDuration + ")");
+            videoDuration = sbData.duration || 0;
+
+            if (sbData.storyboard && sbData.storyboard.fragments?.length > 0) {
+              const sb = sbData.storyboard;
+              const tilesPerSheet = sb.rows * sb.columns;
+              const totalFrames = sb.fragments.reduce(
+                (acc, frag) => acc + Math.round(frag.duration * (sb.fps || 1)),
+                0
+              );
+              const interval = videoDuration > 0 && totalFrames > 0 ? videoDuration / totalFrames : 1;
+              const frameIdx = Math.min(Math.floor(seconds / interval), Math.max(0, totalFrames - 1));
+              const sheetIdx = Math.floor(frameIdx / tilesPerSheet);
+              const tileInSheet = frameIdx % tilesPerSheet;
+              const tileCol = tileInSheet % sb.columns;
+              const tileRow = Math.floor(tileInSheet / sb.columns);
+
+              console.log(
+                "[YouTube] storyboard: " + totalFrames + " frames, interval=" +
+                interval.toFixed(2) + "s, target=" + seconds + "s → frame " +
+                frameIdx + " (sheet " + sheetIdx + " tile " + tileCol + "," + tileRow + ")"
+              );
+
+              const fragmentUrl = sb.fragments[Math.min(sheetIdx, sb.fragments.length - 1)]?.url;
+              if (fragmentUrl) {
+                const sheetResp = await fetch(fragmentUrl, {
+                  headers: {
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+                  },
+                });
+                if (sheetResp.ok) {
+                  const sheetBuf = Buffer.from(await sheetResp.arrayBuffer());
+                  if (sheetBuf.length > 500) {
+                    const sheetMime = sheetResp.headers.get("content-type") || "image/jpeg";
+                    const sheetB64 = "data:" + sheetMime + ";base64," + sheetBuf.toString("base64");
+                    const outW = 1280;
+                    const outH = 720;
+                    const cropX = tileCol * sb.width;
+                    const cropY = tileRow * sb.height;
+
+                    await page.goto("about:blank", { waitUntil: "load", timeout: 5000 });
+                    const frameDataUrl = await page.evaluate<string>(`
+                      (() => new Promise((resolve) => {
+                        const img = new Image();
+                        img.onload = () => {
+                          try {
+                            const c = document.createElement("canvas");
+                            c.width = ${outW}; c.height = ${outH};
+                            const ctx = c.getContext("2d");
+                            if (!ctx) { resolve(""); return; }
+                            ctx.imageSmoothingEnabled = true;
+                            ctx.imageSmoothingQuality = "high";
+                            ctx.drawImage(img, ${cropX}, ${cropY}, ${sb.width}, ${sb.height}, 0, 0, ${outW}, ${outH});
+                            resolve(c.toDataURL("image/png"));
+                          } catch { resolve(""); }
+                        };
+                        img.onerror = () => resolve("");
+                        img.src = ${JSON.stringify(sheetB64)};
+                      }))()
+                    `);
+
+                    if (frameDataUrl && frameDataUrl.length > 2000) {
+                      console.log(
+                        "[YouTube] ✅ storyboard frame at " + seconds + "s (" +
+                        sb.width + "x" + sb.height + " → " + outW + "x" + outH + ", " +
+                        sheetBuf.length + " bytes)"
+                      );
+                      return { frameDataUrl, durationSec: videoDuration };
+                    }
+                  }
+                }
+                console.warn("[YouTube] storyboard sheet fetch/crop failed");
+              }
             }
           }
         } catch (proxyErr) {
@@ -1115,7 +1162,36 @@ export class YouTubeCapture extends BaseChannel {
         }
       }
 
-      // 3) Numbered thumbnails — YouTube provides frames at ~25%, ~50%, ~75%
+      // 2) YouTube Data API v3 for duration (fallback)
+      if (!videoDuration) {
+        const ytApiKey = process.env.YOUTUBE_API_KEY;
+        if (ytApiKey) {
+          try {
+            const apiUrl = `https://www.googleapis.com/youtube/v3/videos?id=${adVideoId}&part=contentDetails&key=${ytApiKey}`;
+            const apiResp = await fetch(apiUrl, { signal: AbortSignal.timeout(5000) });
+            if (apiResp.ok) {
+              const apiData = await apiResp.json() as {
+                items?: { contentDetails?: { duration?: string } }[];
+              };
+              const iso = apiData.items?.[0]?.contentDetails?.duration || "";
+              if (iso) {
+                const hMatch = iso.match(/(\d+)H/);
+                const mMatch = iso.match(/(\d+)M/);
+                const sMatch = iso.match(/(\d+)S/);
+                videoDuration =
+                  (hMatch ? parseInt(hMatch[1]) * 3600 : 0) +
+                  (mMatch ? parseInt(mMatch[1]) * 60 : 0) +
+                  (sMatch ? parseInt(sMatch[1]) : 0);
+                console.log("[YouTube] ✅ Data API duration: " + videoDuration + "s");
+              }
+            }
+          } catch (apiErr) {
+            console.warn("[YouTube] Data API error:", apiErr);
+          }
+        }
+      }
+
+      // 3) Numbered thumbnails — fallback (25%, 50%, 75%)
       if (!spec) {
         console.log("[YouTube] using numbered thumbnails (duration=" + videoDuration + "s, target=" + seconds + "s)");
 
@@ -1129,9 +1205,6 @@ export class YouTubeCapture extends BaseChannel {
           else if (seconds > 10) thumbIdx = 2;
         }
 
-        const approxSec = videoDuration > 0 ? Math.round(videoDuration * thumbIdx * 0.25) : thumbIdx * 10;
-        console.log("[YouTube] thumbnail " + thumbIdx + ".jpg → ~" + approxSec + "s (~" + (thumbIdx * 25) + "%)");
-
         for (const prefix of ["maxres", "sd", "hq"]) {
           try {
             const thumbUrl = `https://i.ytimg.com/vi/${adVideoId}/${prefix}${thumbIdx}.jpg`;
@@ -1139,15 +1212,10 @@ export class YouTubeCapture extends BaseChannel {
             if (!thumbResp.ok) continue;
             const thumbBuf = Buffer.from(await thumbResp.arrayBuffer());
             if (thumbBuf.length < 1000) continue;
-
             const thumbB64 = "data:image/jpeg;base64," + thumbBuf.toString("base64");
-            console.log(
-              "[YouTube] ✅ frame from " + prefix + thumbIdx + ".jpg (" + thumbBuf.length + " bytes)"
-            );
+            console.log("[YouTube] ✅ frame from " + prefix + thumbIdx + ".jpg (" + thumbBuf.length + " bytes)");
             return { frameDataUrl: thumbB64, durationSec: videoDuration };
-          } catch {
-            /* try next prefix */
-          }
+          } catch { /* try next */ }
         }
 
         console.warn("[YouTube] numbered thumbnails also failed");
