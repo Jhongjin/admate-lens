@@ -1,0 +1,10 @@
+services:
+  yt-storyboard:
+    build: .
+    container_name: yt-storyboard
+    restart: unless-stopped
+    ports:
+      - "3200:3200"
+    environment:
+      - PORT=3200
+      - API_SECRET=${API_SECRET:-}
