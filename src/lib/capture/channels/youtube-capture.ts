@@ -1063,61 +1063,104 @@ export class YouTubeCapture extends BaseChannel {
       let spec = "";
       let videoDuration = 0;
 
-      // 1-a) InnerTube API (consent/cookie 무관, 가장 빠름)
-      try {
-        const apiResp = await fetch(
-          "https://www.youtube.com/youtubei/v1/player?prettyPrint=false",
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "User-Agent":
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-              "X-YouTube-Client-Name": "1",
-              "X-YouTube-Client-Version": "2.20240101.00.00",
-            },
-            body: JSON.stringify({
-              videoId: adVideoId,
-              context: {
-                client: {
-                  clientName: "WEB",
-                  clientVersion: "2.20240101.00.00",
-                  hl: "en",
-                  gl: "US",
-                },
+      const innerTubeClients: {
+        name: string;
+        clientName: string;
+        clientVersion: string;
+        userAgent: string;
+        extraBody?: Record<string, unknown>;
+        extraHeaders?: Record<string, string>;
+      }[] = [
+        {
+          name: "WEB",
+          clientName: "WEB",
+          clientVersion: "2.20240101.00.00",
+          userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+          extraHeaders: { "X-YouTube-Client-Name": "1", "X-YouTube-Client-Version": "2.20240101.00.00" },
+        },
+        {
+          name: "MWEB",
+          clientName: "MWEB",
+          clientVersion: "2.20240101.00.00",
+          userAgent: "Mozilla/5.0 (Linux; Android 12) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36",
+        },
+        {
+          name: "ANDROID",
+          clientName: "ANDROID",
+          clientVersion: "19.02.39",
+          userAgent: "com.google.android.youtube/19.02.39 (Linux; U; Android 12) gzip",
+        },
+        {
+          name: "TVHTML5_EMBEDDED",
+          clientName: "TVHTML5_SIMPLY_EMBEDDED_PLAYER",
+          clientVersion: "2.0",
+          userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+          extraBody: { thirdParty: { embedUrl: "https://www.youtube.com/" } },
+        },
+      ];
+
+      // 1-a) InnerTube API — try multiple clients
+      for (const client of innerTubeClients) {
+        if (spec) break;
+        try {
+          const body: Record<string, unknown> = {
+            videoId: adVideoId,
+            context: {
+              client: {
+                clientName: client.clientName,
+                clientVersion: client.clientVersion,
+                hl: "en",
+                gl: "US",
               },
-            }),
+            },
+            ...(client.extraBody || {}),
+          };
+          const headers: Record<string, string> = {
+            "Content-Type": "application/json",
+            "User-Agent": client.userAgent,
+            ...(client.extraHeaders || {}),
+          };
+          const apiResp = await fetch(
+            "https://www.youtube.com/youtubei/v1/player?prettyPrint=false",
+            { method: "POST", headers, body: JSON.stringify(body) }
+          );
+          if (apiResp.ok) {
+            const pr = await apiResp.json();
+            const d = parseFloat(pr?.videoDetails?.lengthSeconds || "0");
+            const s = pr?.storyboards?.playerStoryboardSpecRenderer?.spec || "";
+            const sbKeys = Object.keys(pr?.storyboards || {}).join(",") || "(empty)";
+            const status = pr?.playabilityStatus?.status || "unknown";
+            if (s) {
+              spec = s;
+              videoDuration = d;
+              console.log("[YouTube] storyboard spec from InnerTube " + client.name);
+              break;
+            } else {
+              console.warn("[YouTube] storyboard: InnerTube " + client.name + " no spec (status=" + status + " sb=" + sbKeys + " dur=" + d + ")");
+            }
           }
-        );
-        if (apiResp.ok) {
-          const pr = await apiResp.json();
-          videoDuration = parseFloat(pr?.videoDetails?.lengthSeconds || "0");
-          spec = pr?.storyboards?.playerStoryboardSpecRenderer?.spec || "";
-          if (spec) {
-            console.log("[YouTube] storyboard spec from InnerTube API");
-          } else {
-            console.warn("[YouTube] storyboard: InnerTube returned no spec");
-          }
+        } catch (e) {
+          console.warn("[YouTube] storyboard: InnerTube " + client.name + " error");
         }
-      } catch (apiErr) {
-        console.warn("[YouTube] storyboard: InnerTube API failed:", apiErr);
       }
 
-      // 1-b) Server-side HTML fetch — raw HTML에서 ytInitialPlayerResponse JSON 파싱
+      // 1-b) Server-side HTML fetch
       if (!spec) {
         try {
           const htmlResp = await fetch(
-            "https://www.youtube.com/watch?v=" + adVideoId + "&hl=en",
+            "https://www.youtube.com/watch?v=" + adVideoId + "&hl=en&bpctr=9999999999&has_verified=1",
             {
               headers: {
                 "User-Agent":
                   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
                 "Accept-Language": "en-US,en;q=0.9",
-                Cookie: "CONSENT=YES+cb.20210328-17-p0.en+FX+987",
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+                Cookie: "CONSENT=YES+cb.20210328-17-p0.en+FX+987; SOCS=CAISNQgDEitib3FfaWRlbnRpdHlmcm9udGVuZHVpc2VydmVyXzIwMjMwODI5LjA3X3AxGgJlbiACGgYIgJnsBhAB",
               },
             }
           );
           const html = await htmlResp.text();
+          console.log("[YouTube] storyboard HTML fetch: status=" + htmlResp.status + " len=" + html.length);
           const marker = "ytInitialPlayerResponse";
           const mIdx = html.indexOf(marker);
           if (mIdx !== -1) {
@@ -1143,24 +1186,64 @@ export class YouTubeCapture extends BaseChannel {
               jsonStr = jsonStr.replace(/\\x([0-9a-fA-F]{2})/g, "\\u00$1");
               const pr = JSON.parse(jsonStr);
               const d = parseFloat(pr?.videoDetails?.lengthSeconds || "0");
+              const status = pr?.playabilityStatus?.status || "unknown";
+              const sbKeys = Object.keys(pr?.storyboards || {}).join(",") || "(none)";
+              const topKeys = Object.keys(pr).slice(0, 10).join(",");
+              console.log("[YouTube] storyboard HTML parsed: status=" + status + " dur=" + d + " sb=" + sbKeys + " keys=" + topKeys);
               const s = pr?.storyboards?.playerStoryboardSpecRenderer?.spec || "";
               if (s) {
                 spec = s;
                 videoDuration = d;
                 console.log("[YouTube] storyboard spec from HTML fetch");
               } else {
-                console.warn("[YouTube] storyboard HTML fetch: no spec in parsed JSON");
+                console.warn("[YouTube] storyboard HTML fetch: no spec in JSON (status=" + status + ")");
               }
             }
           } else {
-            console.warn("[YouTube] storyboard HTML fetch: marker not found");
+            console.warn("[YouTube] storyboard HTML fetch: marker not found in " + html.length + " bytes");
           }
         } catch (htmlErr) {
           console.warn("[YouTube] storyboard HTML fetch error:", htmlErr);
         }
       }
 
-      // 1-c) Puppeteer browser fallback
+      // 1-c) Server-side embed page fetch
+      if (!spec) {
+        try {
+          const embedResp = await fetch(
+            "https://www.youtube.com/embed/" + adVideoId,
+            {
+              headers: {
+                "User-Agent":
+                  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                Cookie: "CONSENT=YES+cb.20210328-17-p0.en+FX+987",
+              },
+            }
+          );
+          const embedHtml = await embedResp.text();
+          console.log("[YouTube] storyboard embed fetch: status=" + embedResp.status + " len=" + embedHtml.length);
+          const marker = "ytInitialPlayerResponse";
+          let mIdx = embedHtml.indexOf(marker);
+          if (mIdx === -1) {
+            mIdx = embedHtml.indexOf("ytcfg.set");
+          }
+          const sbSpecRx = /"spec":"(https:\/\/i\.ytimg\.com\/sb\/[^"]+)"/;
+          const sbMatch = embedHtml.match(sbSpecRx);
+          if (sbMatch) {
+            spec = sbMatch[1].replace(/\\u0026/g, "&");
+            const durRx = /"lengthSeconds":"(\d+)"/;
+            const durMatch = embedHtml.match(durRx);
+            videoDuration = durMatch ? parseInt(durMatch[1], 10) : 0;
+            console.log("[YouTube] storyboard spec from embed page");
+          } else {
+            console.warn("[YouTube] storyboard embed: no spec pattern found");
+          }
+        } catch (embedErr) {
+          console.warn("[YouTube] storyboard embed fetch error:", embedErr);
+        }
+      }
+
+      // 1-d) Puppeteer browser fallback
       if (!spec) {
         try {
           await this.applyYouTubeConsentCookies(page);
