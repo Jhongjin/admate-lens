@@ -591,8 +591,6 @@ export class YouTubeCapture extends BaseChannel {
           const pw = playerRect ? playerRect.width : window.innerWidth * 0.7;
           const ph = playerRect ? playerRect.height : window.innerHeight * 0.6;
           const playerRadius = '12px';
-          const insetPx = 1;
-
           // ═══════════════════════════════════════════════════
           // 메인 오버레이 (플레이어 전체를 덮음 + 라운딩)
           // ═══════════════════════════════════════════════════
@@ -601,19 +599,17 @@ export class YouTubeCapture extends BaseChannel {
           overlay.setAttribute('data-injected', 'admate-youtube-preroll');
           overlay.style.cssText = [
             'position: fixed',
-            'top: ' + (py + insetPx) + 'px',
-            'left: ' + (px + insetPx) + 'px',
-            'width: ' + Math.max(0, pw - insetPx * 2) + 'px',
-            'height: ' + Math.max(0, ph - insetPx * 2) + 'px',
+            'top: ' + py + 'px',
+            'left: ' + px + 'px',
+            'width: ' + pw + 'px',
+            'height: ' + ph + 'px',
             'z-index: 2147483647',
             'display: flex',
             'align-items: center',
             'justify-content: center',
             'overflow: hidden',
             'border-radius: ' + playerRadius,
-            'clip-path: inset(0 round ' + playerRadius + ')',
             'transform: translateZ(0)',
-            'outline: 1px solid rgba(255,255,255,0.08)',
           ].join(' !important;') + ' !important';
 
           // ─── 광고 소재 이미지 (존재할 경우 화면 꽉 채움) ───
