@@ -1071,15 +1071,12 @@ export class YouTubeCapture extends BaseChannel {
           "https://vid.puffyan.us",
           "https://inv.tux.pizza",
           "https://iv.ggtyler.dev",
-          "https://invidious.nerdvpn.de",
-          "https://inv.nadeko.net",
-          "https://yewtu.be",
         ];
 
         const invResults = await Promise.allSettled(
           invInstances.map((inst) => {
             const ctrl = new AbortController();
-            const timer = setTimeout(() => ctrl.abort(), 6000);
+            const timer = setTimeout(() => ctrl.abort(), 3000);
             return fetch(
               `${inst}/api/v1/videos/${adVideoId}?fields=storyboards,lengthSeconds`,
               { signal: ctrl.signal, headers: { Accept: "application/json" } }
@@ -1429,14 +1426,13 @@ export class YouTubeCapture extends BaseChannel {
           );
 
           let intercepted = false;
-          for (let w = 0; w < 6; w++) {
+          for (let w = 0; w < 3; w++) {
             await new Promise((r) => setTimeout(r, 1000));
             const result = await page.evaluate<{
               spec: string; duration: number; src: string; vid: string; sbJson?: string;
             } | null>("window.__ytSbSpec");
             if (result && result.vid === targetVid) {
               console.log("[YouTube] storyboard embed XHR: vid=" + result.vid + " specLen=" + (result.spec || "").length + " dur=" + result.duration);
-              if (result.sbJson) console.log("[YouTube] storyboard embed sbJson: " + result.sbJson.substring(0, 500));
               if (result.spec) {
                 spec = result.spec;
                 videoDuration = result.duration;
@@ -1447,22 +1443,20 @@ export class YouTubeCapture extends BaseChannel {
             }
           }
 
-          // If embed didn't work, try watch page
           if (!intercepted) {
             console.log("[YouTube] storyboard: embed failed, trying watch page");
             await page.goto(
               "https://www.youtube.com/watch?v=" + adVideoId,
-              { waitUntil: "networkidle2", timeout: 30000 }
+              { waitUntil: "networkidle2", timeout: 20000 }
             );
             await this.dismissYouTubeConsent(page);
-            for (let w = 0; w < 6; w++) {
+            for (let w = 0; w < 3; w++) {
               await new Promise((r) => setTimeout(r, 1000));
               const result = await page.evaluate<{
                 spec: string; duration: number; src: string; vid: string; sbJson?: string;
               } | null>("window.__ytSbSpec");
               if (result && result.vid === targetVid) {
                 console.log("[YouTube] storyboard watch XHR: vid=" + result.vid + " specLen=" + (result.spec || "").length + " dur=" + result.duration);
-                if (result.sbJson) console.log("[YouTube] storyboard watch sbJson: " + result.sbJson.substring(0, 500));
                 if (result.spec) {
                   spec = result.spec;
                   videoDuration = result.duration;
@@ -1485,7 +1479,40 @@ export class YouTubeCapture extends BaseChannel {
       }
 
       if (!spec) {
-        console.warn("[YouTube] storyboard: all spec sources failed");
+        console.warn("[YouTube] storyboard: all spec sources failed — trying numbered thumbnails");
+
+        // YouTube auto-generates high-res frames at 25%, 50%, 75% of each video.
+        // These are publicly accessible on i.ytimg.com without any auth tokens.
+        let thumbIdx = 1;
+        if (videoDuration > 0) {
+          const pct = seconds / videoDuration;
+          if (pct >= 0.625) thumbIdx = 3;
+          else if (pct >= 0.375) thumbIdx = 2;
+        } else {
+          if (seconds > 20) thumbIdx = 3;
+          else if (seconds > 10) thumbIdx = 2;
+        }
+
+        for (const prefix of ["maxres", "sd", "hq"]) {
+          try {
+            const thumbUrl = `https://i.ytimg.com/vi/${adVideoId}/${prefix}${thumbIdx}.jpg`;
+            const thumbResp = await fetch(thumbUrl);
+            if (!thumbResp.ok) continue;
+            const thumbBuf = Buffer.from(await thumbResp.arrayBuffer());
+            if (thumbBuf.length < 1000) continue;
+
+            const thumbB64 = "data:image/jpeg;base64," + thumbBuf.toString("base64");
+            console.log(
+              "[YouTube] ✅ frame from " + prefix + thumbIdx + ".jpg (~" +
+              (thumbIdx * 25) + "% pos, " + thumbBuf.length + " bytes)"
+            );
+            return { frameDataUrl: thumbB64, durationSec: videoDuration };
+          } catch {
+            /* try next prefix */
+          }
+        }
+
+        console.warn("[YouTube] numbered thumbnails also failed");
         return { frameDataUrl: null, durationSec: videoDuration };
       }
 
