@@ -1153,16 +1153,14 @@ export class YouTubeCapture extends BaseChannel {
 
       // 3) Storyboard 레벨 파싱
       const segments = spec.split("|");
-      const firstParts = segments[0].split("#");
-      const baseUrl = firstParts[0];
+      const baseUrl = segments[0];
 
       const levels: {
         w: number; h: number; count: number;
-        cols: number; rows: number; sigh: string; idx: number;
+        cols: number; rows: number; name: string; sigh: string; idx: number;
       }[] = [];
-      for (let i = 0; i < segments.length; i++) {
-        const parts =
-          i === 0 ? firstParts.slice(1) : segments[i].split("#");
+      for (let i = 1; i < segments.length; i++) {
+        const parts = segments[i].split("#");
         if (parts.length < 6) continue;
         levels.push({
           w: parseInt(parts[0], 10),
@@ -1170,8 +1168,9 @@ export class YouTubeCapture extends BaseChannel {
           count: parseInt(parts[2], 10),
           cols: parseInt(parts[3], 10),
           rows: parseInt(parts[4], 10),
+          name: parts[6] || "default",
           sigh: parts[parts.length - 1] || "",
-          idx: i,
+          idx: i - 1,
         });
       }
       if (levels.length === 0) {
@@ -1194,9 +1193,13 @@ export class YouTubeCapture extends BaseChannel {
       const col = tile % lv.cols;
       const row = Math.floor(tile / lv.cols);
 
+      const sheetName = lv.name === "default"
+        ? String(sheet)
+        : lv.name.replace("$M", String(sheet));
+
       let sheetUrl = baseUrl
         .replace("$L", String(lv.idx))
-        .replace("$N", String(sheet));
+        .replace("$N", sheetName);
       if (sheetUrl.includes("sigh=")) {
         sheetUrl = sheetUrl.replace(/sigh=[^&#]+/, "sigh=" + lv.sigh);
       } else {
@@ -1227,8 +1230,9 @@ export class YouTubeCapture extends BaseChannel {
         console.warn("[YouTube] storyboard: sheet too small");
         return { frameDataUrl: null, durationSec: videoDuration };
       }
+      const sheetMime = sheetResp.headers.get("content-type") || "image/jpeg";
       const sheetB64 =
-        "data:image/jpeg;base64," + sheetBuf.toString("base64");
+        "data:" + sheetMime + ";base64," + sheetBuf.toString("base64");
 
       // 5) 브라우저 canvas 로 타일 crop + 1280×720 scale
       const cropX = col * lv.w;
