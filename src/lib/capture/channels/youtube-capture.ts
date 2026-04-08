@@ -1068,7 +1068,7 @@ export class YouTubeCapture extends BaseChannel {
       const cfWorkerUrl = process.env.CLOUDFLARE_WORKER_URL;
       if (!spec && cfWorkerUrl) {
         try {
-          const cfUrl = `${cfWorkerUrl}?v=${adVideoId}`;
+          const cfUrl = `${cfWorkerUrl}?v=${adVideoId}&_t=${Date.now()}`;
           console.log("[YouTube] cloudflare worker: trying " + cfWorkerUrl.substring(0, 60));
           const cfResp = await fetch(cfUrl, {
             headers: { Accept: "application/json" },
