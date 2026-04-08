@@ -1063,8 +1063,35 @@ export class YouTubeCapture extends BaseChannel {
       let spec = "";
       let videoDuration = 0;
 
-      // Storyboard proxy (VPS or Cloudflare Worker — set via CLOUDFLARE_WORKER_URL env var)
-      const proxyUrl = process.env.CLOUDFLARE_WORKER_URL;
+      // 1) YouTube Data API v3 — get exact duration (official API, no bot detection)
+      const ytApiKey = process.env.YOUTUBE_API_KEY;
+      if (ytApiKey) {
+        try {
+          const apiUrl = `https://www.googleapis.com/youtube/v3/videos?id=${adVideoId}&part=contentDetails&key=${ytApiKey}`;
+          const apiResp = await fetch(apiUrl, { signal: AbortSignal.timeout(5000) });
+          if (apiResp.ok) {
+            const apiData = await apiResp.json() as {
+              items?: { contentDetails?: { duration?: string } }[];
+            };
+            const iso = apiData.items?.[0]?.contentDetails?.duration || "";
+            if (iso) {
+              const hMatch = iso.match(/(\d+)H/);
+              const mMatch = iso.match(/(\d+)M/);
+              const sMatch = iso.match(/(\d+)S/);
+              videoDuration =
+                (hMatch ? parseInt(hMatch[1]) * 3600 : 0) +
+                (mMatch ? parseInt(mMatch[1]) * 60 : 0) +
+                (sMatch ? parseInt(sMatch[1]) : 0);
+              console.log("[YouTube] ✅ Data API duration: " + videoDuration + "s (from " + iso + ")");
+            }
+          }
+        } catch (apiErr) {
+          console.warn("[YouTube] Data API error:", apiErr);
+        }
+      }
+
+      // 2) Storyboard proxy (optional — set STORYBOARD_PROXY_URL env var)
+      const proxyUrl = process.env.STORYBOARD_PROXY_URL;
       if (proxyUrl) {
         try {
           const sbUrl = `${proxyUrl.replace(/\/$/, "")}/yt-storyboard?v=${adVideoId}&_t=${Date.now()}`;
@@ -1077,32 +1104,21 @@ export class YouTubeCapture extends BaseChannel {
             const sbData = await sbResp.json() as {
               spec?: string; duration?: number; status?: string;
             };
-            console.log(
-              "[YouTube] storyboard proxy: status=" + (sbData.status || "?") +
-              " dur=" + (sbData.duration || 0) +
-              " specLen=" + (sbData.spec || "").length
-            );
             if (sbData.spec && sbData.spec.includes("|")) {
               spec = sbData.spec;
-              videoDuration = sbData.duration || 0;
+              if (!videoDuration) videoDuration = sbData.duration || 0;
               console.log("[YouTube] ✅ storyboard spec from proxy (dur=" + videoDuration + ")");
             }
-          } else {
-            console.warn("[YouTube] storyboard proxy: HTTP " + sbResp.status);
           }
         } catch (proxyErr) {
           console.warn("[YouTube] storyboard proxy error:", proxyErr);
         }
       }
 
-      // All Vercel/Cloudflare server-side YouTube attempts are blocked (LOGIN_REQUIRED).
-      // The VPS proxy above is the only reliable path to storyboard data.
-
+      // 3) Numbered thumbnails — YouTube provides frames at ~25%, ~50%, ~75%
       if (!spec) {
-        console.warn("[YouTube] storyboard: all spec sources failed — trying numbered thumbnails");
+        console.log("[YouTube] using numbered thumbnails (duration=" + videoDuration + "s, target=" + seconds + "s)");
 
-        // YouTube auto-generates high-res frames at 25%, 50%, 75% of each video.
-        // These are publicly accessible on i.ytimg.com without any auth tokens.
         let thumbIdx = 1;
         if (videoDuration > 0) {
           const pct = seconds / videoDuration;
@@ -1112,6 +1128,9 @@ export class YouTubeCapture extends BaseChannel {
           if (seconds > 20) thumbIdx = 3;
           else if (seconds > 10) thumbIdx = 2;
         }
+
+        const approxSec = videoDuration > 0 ? Math.round(videoDuration * thumbIdx * 0.25) : thumbIdx * 10;
+        console.log("[YouTube] thumbnail " + thumbIdx + ".jpg → ~" + approxSec + "s (~" + (thumbIdx * 25) + "%)");
 
         for (const prefix of ["maxres", "sd", "hq"]) {
           try {
@@ -1123,8 +1142,7 @@ export class YouTubeCapture extends BaseChannel {
 
             const thumbB64 = "data:image/jpeg;base64," + thumbBuf.toString("base64");
             console.log(
-              "[YouTube] ✅ frame from " + prefix + thumbIdx + ".jpg (~" +
-              (thumbIdx * 25) + "% pos, " + thumbBuf.length + " bytes)"
+              "[YouTube] ✅ frame from " + prefix + thumbIdx + ".jpg (" + thumbBuf.length + " bytes)"
             );
             return { frameDataUrl: thumbB64, durationSec: videoDuration };
           } catch {
