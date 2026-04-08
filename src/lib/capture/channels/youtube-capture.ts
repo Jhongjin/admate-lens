@@ -1103,7 +1103,64 @@ export class YouTubeCapture extends BaseChannel {
         console.warn("[YouTube] storyboard: InnerTube API failed:", apiErr);
       }
 
-      // 1-b) 브라우저 폴백 — 실제 페이지 로드 후 JS 전역변수에서 추출
+      // 1-b) Server-side HTML fetch — raw HTML에서 ytInitialPlayerResponse JSON 파싱
+      if (!spec) {
+        try {
+          const htmlResp = await fetch(
+            "https://www.youtube.com/watch?v=" + adVideoId + "&hl=en",
+            {
+              headers: {
+                "User-Agent":
+                  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                "Accept-Language": "en-US,en;q=0.9",
+                Cookie: "CONSENT=YES+cb.20210328-17-p0.en+FX+987",
+              },
+            }
+          );
+          const html = await htmlResp.text();
+          const marker = "ytInitialPlayerResponse";
+          const mIdx = html.indexOf(marker);
+          if (mIdx !== -1) {
+            const braceIdx = html.indexOf("{", mIdx + marker.length);
+            if (braceIdx !== -1) {
+              let depth = 0;
+              let inStr = false;
+              let esc = false;
+              let endIdx = braceIdx;
+              for (let ci = braceIdx; ci < html.length && ci < braceIdx + 600000; ci++) {
+                const ch = html[ci];
+                if (esc) { esc = false; continue; }
+                if (ch === "\\" && inStr) { esc = true; continue; }
+                if (ch === '"') { inStr = !inStr; continue; }
+                if (inStr) continue;
+                if (ch === "{") depth++;
+                else if (ch === "}") {
+                  depth--;
+                  if (depth === 0) { endIdx = ci + 1; break; }
+                }
+              }
+              let jsonStr = html.substring(braceIdx, endIdx);
+              jsonStr = jsonStr.replace(/\\x([0-9a-fA-F]{2})/g, "\\u00$1");
+              const pr = JSON.parse(jsonStr);
+              const d = parseFloat(pr?.videoDetails?.lengthSeconds || "0");
+              const s = pr?.storyboards?.playerStoryboardSpecRenderer?.spec || "";
+              if (s) {
+                spec = s;
+                videoDuration = d;
+                console.log("[YouTube] storyboard spec from HTML fetch");
+              } else {
+                console.warn("[YouTube] storyboard HTML fetch: no spec in parsed JSON");
+              }
+            }
+          } else {
+            console.warn("[YouTube] storyboard HTML fetch: marker not found");
+          }
+        } catch (htmlErr) {
+          console.warn("[YouTube] storyboard HTML fetch error:", htmlErr);
+        }
+      }
+
+      // 1-c) Puppeteer browser fallback
       if (!spec) {
         try {
           await this.applyYouTubeConsentCookies(page);
