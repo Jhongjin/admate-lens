@@ -34,6 +34,17 @@ function getStoryboard(videoId) {
   const data = JSON.parse(output);
   const duration = data.duration || 0;
   const sb = data.formats?.find((f) => f.format_id === "sb0");
+  const storyboardFormats = (data.formats || []).filter(
+    (f) => String(f.format_note || "").toLowerCase() === "storyboard"
+  );
+  const hasDefaultStoryboardSheet = storyboardFormats.some((f) =>
+    String(f.url || "").includes("/default.jpg")
+  );
+  const fragments = (sb?.fragments || []).map((f) => ({
+    url: f.url,
+    duration: f.duration,
+  }));
+  const firstFragmentLooksIndexed = fragments.length > 0 && /\/M0\.jpg/i.test(String(fragments[0].url || ""));
 
   const result = {
     videoId,
@@ -46,10 +57,10 @@ function getStoryboard(videoId) {
           rows: sb.rows,
           columns: sb.columns,
           fps: sb.fps,
-          fragments: (sb.fragments || []).map((f) => ({
-            url: f.url,
-            duration: f.duration,
-          })),
+          fragments,
+          // Some videos expose a default storyboard sheet outside M0..MN.
+          // In that case, frame indexing from M0 can be shifted by one sheet.
+          sheetOffset: hasDefaultStoryboardSheet && firstFragmentLooksIndexed ? 1 : 0,
         }
       : null,
   };

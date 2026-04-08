@@ -1080,6 +1080,7 @@ export class YouTubeCapture extends BaseChannel {
                 width: number; height: number;
                 rows: number; columns: number;
                 fps: number;
+                sheetOffset?: number;
                 fragments: { url: string; duration: number }[];
               } | null;
             };
@@ -1093,7 +1094,9 @@ export class YouTubeCapture extends BaseChannel {
                 0
               );
               const interval = videoDuration > 0 && totalFrames > 0 ? videoDuration / totalFrames : 1;
-              const frameIdx = Math.min(Math.floor(seconds / interval), Math.max(0, totalFrames - 1));
+              const rawFrameIdx = Math.min(Math.floor(seconds / interval), Math.max(0, totalFrames - 1));
+              const sheetOffsetFrames = Math.max(0, sb.sheetOffset || 0) * tilesPerSheet;
+              const frameIdx = Math.max(0, rawFrameIdx - sheetOffsetFrames);
               const sheetIdx = Math.floor(frameIdx / tilesPerSheet);
               const tileInSheet = frameIdx % tilesPerSheet;
               const tileCol = tileInSheet % sb.columns;
@@ -1101,8 +1104,9 @@ export class YouTubeCapture extends BaseChannel {
 
               console.log(
                 "[YouTube] storyboard: " + totalFrames + " frames, interval=" +
-                interval.toFixed(2) + "s, target=" + seconds + "s → frame " +
-                frameIdx + " (sheet " + sheetIdx + " tile " + tileCol + "," + tileRow + ")"
+                interval.toFixed(2) + "s, target=" + seconds + "s → rawFrame " +
+                rawFrameIdx + " correctedFrame " + frameIdx + " (sheet " + sheetIdx +
+                " tile " + tileCol + "," + tileRow + ", sheetOffset=" + (sb.sheetOffset || 0) + ")"
               );
 
               const fragmentUrl = sb.fragments[Math.min(sheetIdx, sb.fragments.length - 1)]?.url;
