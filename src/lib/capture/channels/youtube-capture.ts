@@ -1243,43 +1243,112 @@ export class YouTubeCapture extends BaseChannel {
         }
       }
 
-      // 1-d) Puppeteer browser fallback
+      // 1-d) Puppeteer browser — intercept YouTube JS's own /player XHR
       if (!spec) {
         try {
+          await page.evaluateOnNewDocument(`
+            (function() {
+              window.__ytSbSpec = null;
+              var origFetch = window.fetch;
+              window.fetch = function() {
+                var url = typeof arguments[0] === 'string' ? arguments[0] : (arguments[0] && arguments[0].url ? arguments[0].url : '');
+                var p = origFetch.apply(this, arguments);
+                if (url.indexOf('/youtubei/v1/player') !== -1) {
+                  p.then(function(resp) {
+                    var clone = resp.clone();
+                    clone.json().then(function(j) {
+                      var s = j && j.storyboards && j.storyboards.playerStoryboardSpecRenderer && j.storyboards.playerStoryboardSpecRenderer.spec;
+                      var d = j && j.videoDetails && j.videoDetails.lengthSeconds;
+                      if (s) window.__ytSbSpec = { spec: s, duration: parseFloat(d || '0'), src: 'fetch' };
+                    }).catch(function(){});
+                  }).catch(function(){});
+                }
+                return p;
+              };
+              var origXhrOpen = XMLHttpRequest.prototype.open;
+              var origXhrSend = XMLHttpRequest.prototype.send;
+              XMLHttpRequest.prototype.open = function(m, u) {
+                this.__u = u;
+                return origXhrOpen.apply(this, arguments);
+              };
+              XMLHttpRequest.prototype.send = function() {
+                var self = this;
+                this.addEventListener('load', function() {
+                  if (self.__u && self.__u.indexOf('/youtubei/v1/player') !== -1) {
+                    try {
+                      var j = JSON.parse(self.responseText);
+                      var s = j && j.storyboards && j.storyboards.playerStoryboardSpecRenderer && j.storyboards.playerStoryboardSpecRenderer.spec;
+                      var d = j && j.videoDetails && j.videoDetails.lengthSeconds;
+                      if (s) window.__ytSbSpec = { spec: s, duration: parseFloat(d || '0'), src: 'xhr' };
+                    } catch(e) {}
+                  }
+                });
+                return origXhrSend.apply(this, arguments);
+              };
+            })()
+          `);
+
           await this.applyYouTubeConsentCookies(page);
           await page.goto(
             "https://www.youtube.com/watch?v=" + adVideoId,
             { waitUntil: "networkidle2", timeout: 45000 }
           );
           await this.dismissYouTubeConsent(page);
-          await new Promise((r) => setTimeout(r, 1200));
 
-          const sbInfo = await page.evaluate<{
-            ok: boolean;
-            reason?: string;
-            spec?: string;
-            duration?: number;
-          }>(`
-            (() => {
-              try {
-                const pr = window.ytInitialPlayerResponse;
-                if (!pr) return { ok: false, reason: "no_ytInitialPlayerResponse" };
-                const d = parseFloat(pr.videoDetails?.lengthSeconds || "0");
-                const s = (pr.storyboards?.playerStoryboardSpecRenderer?.spec) || "";
-                if (!s) return { ok: false, reason: "no_spec_in_page", duration: d };
-                return { ok: true, spec: s, duration: d };
-              } catch (e) {
-                return { ok: false, reason: "eval_error" };
-              }
-            })()
-          `);
+          // Wait for YouTube's JS to make player API calls (up to 8s)
+          let intercepted = false;
+          for (let w = 0; w < 8; w++) {
+            await new Promise((r) => setTimeout(r, 1000));
+            const result = await page.evaluate<{ spec: string; duration: number; src: string } | null>(
+              "window.__ytSbSpec"
+            );
+            if (result && result.spec) {
+              spec = result.spec;
+              videoDuration = result.duration;
+              intercepted = true;
+              console.log("[YouTube] storyboard spec from browser XHR intercept (" + result.src + ")");
+              break;
+            }
+          }
 
-          if (sbInfo.ok && sbInfo.spec) {
-            spec = sbInfo.spec;
-            videoDuration = sbInfo.duration || 0;
-            console.log("[YouTube] storyboard spec from browser page");
-          } else {
-            console.warn("[YouTube] storyboard browser fallback:", sbInfo.reason);
+          if (!intercepted) {
+            // Try reading all possible globals
+            const globalCheck = await page.evaluate<{
+              hasInitialPR: boolean;
+              prStatus: string;
+              prDuration: number;
+              prSbKeys: string;
+              hasYtcfg: boolean;
+              specFromPage: string;
+            }>(`
+              (() => {
+                try {
+                  var pr = window.ytInitialPlayerResponse || {};
+                  var status = (pr.playabilityStatus && pr.playabilityStatus.status) || 'none';
+                  var dur = parseFloat((pr.videoDetails && pr.videoDetails.lengthSeconds) || '0');
+                  var sbKeys = Object.keys(pr.storyboards || {}).join(',') || 'none';
+                  var spec = '';
+                  if (pr.storyboards && pr.storyboards.playerStoryboardSpecRenderer) {
+                    spec = pr.storyboards.playerStoryboardSpecRenderer.spec || '';
+                  }
+                  return {
+                    hasInitialPR: !!window.ytInitialPlayerResponse,
+                    prStatus: status,
+                    prDuration: dur,
+                    prSbKeys: sbKeys,
+                    hasYtcfg: !!window.ytcfg,
+                    specFromPage: spec
+                  };
+                } catch(e) { return { hasInitialPR: false, prStatus: 'error', prDuration: 0, prSbKeys: 'error', hasYtcfg: false, specFromPage: '' }; }
+              })()
+            `);
+            console.warn("[YouTube] storyboard browser intercept: no XHR caught. globals: pr=" + globalCheck.hasInitialPR + " status=" + globalCheck.prStatus + " dur=" + globalCheck.prDuration + " sb=" + globalCheck.prSbKeys + " ytcfg=" + globalCheck.hasYtcfg);
+
+            if (globalCheck.specFromPage) {
+              spec = globalCheck.specFromPage;
+              videoDuration = globalCheck.prDuration;
+              console.log("[YouTube] storyboard spec from browser global");
+            }
           }
         } catch (browserErr) {
           console.warn("[YouTube] storyboard browser fallback error:", browserErr);
