@@ -1063,10 +1063,38 @@ export class YouTubeCapture extends BaseChannel {
       let spec = "";
       let videoDuration = 0;
 
-      // 0) Invidious proxy API — bypasses YouTube datacenter IP blocking
-      //    Invidious instances proxy requests through their own (non-datacenter) IPs,
-      //    and the returned storyboard URLs include valid sqp/sigh tokens.
+      // 0-a) Edge Function proxy — runs on Vercel Edge (non-datacenter IPs)
       try {
+        const baseUrl = process.env.VERCEL_URL
+          ? `https://${process.env.VERCEL_URL}`
+          : process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+        const edgeResp = await fetch(
+          `${baseUrl}/api/yt-storyboard?v=${adVideoId}`,
+          { headers: { Accept: "application/json" } }
+        );
+        if (edgeResp.ok) {
+          const edgeData = await edgeResp.json() as {
+            spec?: string; duration?: number; status?: string; videoId?: string;
+          };
+          console.log(
+            "[YouTube] edge storyboard: status=" + (edgeData.status || "?") +
+            " dur=" + (edgeData.duration || 0) +
+            " specLen=" + (edgeData.spec || "").length
+          );
+          if (edgeData.spec && edgeData.spec.includes("|")) {
+            spec = edgeData.spec;
+            videoDuration = edgeData.duration || 0;
+            console.log("[YouTube] ✅ storyboard spec from Edge Function");
+          }
+        } else {
+          console.warn("[YouTube] edge storyboard: HTTP " + edgeResp.status);
+        }
+      } catch (edgeErr) {
+        console.warn("[YouTube] edge storyboard error:", edgeErr);
+      }
+
+      // 0-b) Invidious proxy API (fallback)
+      if (!spec) try {
         const invInstances = [
           "https://vid.puffyan.us",
           "https://inv.tux.pizza",
