@@ -1065,29 +1065,45 @@ export class YouTubeCapture extends BaseChannel {
 
       // 0-a) Edge Function proxy — runs on Vercel Edge (non-datacenter IPs)
       try {
-        const baseUrl = process.env.VERCEL_URL
-          ? `https://${process.env.VERCEL_URL}`
-          : process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-        const edgeResp = await fetch(
-          `${baseUrl}/api/yt-storyboard?v=${adVideoId}`,
-          { headers: { Accept: "application/json" } }
-        );
-        if (edgeResp.ok) {
-          const edgeData = await edgeResp.json() as {
-            spec?: string; duration?: number; status?: string; videoId?: string;
-          };
-          console.log(
-            "[YouTube] edge storyboard: status=" + (edgeData.status || "?") +
-            " dur=" + (edgeData.duration || 0) +
-            " specLen=" + (edgeData.spec || "").length
-          );
-          if (edgeData.spec && edgeData.spec.includes("|")) {
-            spec = edgeData.spec;
-            videoDuration = edgeData.duration || 0;
-            console.log("[YouTube] ✅ storyboard spec from Edge Function");
+        // Prefer production URL (no deployment protection), fall back to deployment URL
+        const prodUrl = process.env.VERCEL_PROJECT_PRODUCTION_URL;
+        const deployUrl = process.env.VERCEL_URL;
+        const candidates: string[] = [];
+        if (prodUrl) candidates.push(`https://${prodUrl}`);
+        if (deployUrl && deployUrl !== prodUrl) candidates.push(`https://${deployUrl}`);
+        if (candidates.length === 0) candidates.push("http://localhost:3000");
+
+        for (const baseUrl of candidates) {
+          try {
+            const edgeUrl = `${baseUrl}/api/yt-storyboard?v=${adVideoId}`;
+            console.log("[YouTube] edge storyboard: trying " + baseUrl.substring(0, 60));
+            const headers: Record<string, string> = { Accept: "application/json" };
+            const bypassSecret = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
+            if (bypassSecret) {
+              headers["x-vercel-protection-bypass"] = bypassSecret;
+            }
+            const edgeResp = await fetch(edgeUrl, { headers });
+            if (edgeResp.ok) {
+              const edgeData = await edgeResp.json() as {
+                spec?: string; duration?: number; status?: string;
+              };
+              console.log(
+                "[YouTube] edge storyboard: status=" + (edgeData.status || "?") +
+                " dur=" + (edgeData.duration || 0) +
+                " specLen=" + (edgeData.spec || "").length
+              );
+              if (edgeData.spec && edgeData.spec.includes("|")) {
+                spec = edgeData.spec;
+                videoDuration = edgeData.duration || 0;
+                console.log("[YouTube] ✅ storyboard spec from Edge Function");
+                break;
+              }
+            } else {
+              console.warn("[YouTube] edge storyboard " + baseUrl.substring(0, 40) + ": HTTP " + edgeResp.status);
+            }
+          } catch {
+            // try next candidate
           }
-        } else {
-          console.warn("[YouTube] edge storyboard: HTTP " + edgeResp.status);
         }
       } catch (edgeErr) {
         console.warn("[YouTube] edge storyboard error:", edgeErr);
