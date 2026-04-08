@@ -575,21 +575,26 @@ export class YouTubeCapture extends BaseChannel {
           ];
 
           let playerRect = null;
+          let playerRadius = '12px';
           for (const sel of playerSelectors) {
             const el = document.querySelector(sel);
             if (el) {
               const r = el.getBoundingClientRect();
               if (r.width > 100 && r.height > 100) {
                 playerRect = r;
+                const cs = window.getComputedStyle(el);
+                if (cs && cs.borderRadius) {
+                  playerRadius = cs.borderRadius;
+                }
                 break;
               }
             }
           }
 
-          const px = playerRect ? Math.round(playerRect.left) : 0;
-          const py = playerRect ? Math.round(playerRect.top) : 56;
-          const pw = playerRect ? Math.round(playerRect.width) : Math.round(window.innerWidth * 0.7);
-          const ph = playerRect ? Math.round(playerRect.height) : Math.round(window.innerHeight * 0.6);
+          const px = playerRect ? playerRect.left : 0;
+          const py = playerRect ? playerRect.top : 56;
+          const pw = playerRect ? playerRect.width : window.innerWidth * 0.7;
+          const ph = playerRect ? playerRect.height : window.innerHeight * 0.6;
 
           // ═══════════════════════════════════════════════════
           // 메인 오버레이 (플레이어 전체를 덮음 + 라운딩)
@@ -608,7 +613,8 @@ export class YouTubeCapture extends BaseChannel {
             'align-items: center',
             'justify-content: center',
             'overflow: hidden',
-            'border-radius: 12px',
+            'border-radius: ' + playerRadius,
+            'transform: translateZ(0)',
           ].join(' !important;') + ' !important';
 
           // ─── 광고 소재 이미지 (존재할 경우 화면 꽉 채움) ───
@@ -617,7 +623,7 @@ export class YouTubeCapture extends BaseChannel {
             const img = document.createElement('img');
             img.src = imgUrl;
             img.setAttribute('data-injected', 'admate');
-            img.style.cssText = 'width:100% !important;height:100% !important;object-fit:cover !important;display:block !important;position:absolute !important;top:0 !important;left:0 !important;z-index:1 !important';
+            img.style.cssText = 'width:100% !important;height:100% !important;object-fit:cover !important;display:block !important;position:absolute !important;top:0 !important;left:0 !important;z-index:1 !important;border-radius:inherit !important;transform:translateZ(0) !important';
             overlay.appendChild(img);
           } else {
             overlay.style.background = 'transparent !important';
