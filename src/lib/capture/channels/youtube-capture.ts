@@ -1044,7 +1044,11 @@ export class YouTubeCapture extends BaseChannel {
 
   /**
    * 광고주 유튜브 영상에서 특정 초수 프레임을 추출
-   * - 퍼블리셔 페이지 로직과 분리해 빈 화면/봇 분기 충돌을 줄인다.
+   *
+   * Vercel chromium-min 에는 비디오 코덱이 없어 headless 에서 YouTube 영상이
+   * 디코딩되지 않는다(videoWidth=1). 따라서 브라우저 내 재생/canvas 추출 대신
+   * YouTube Storyboard API(프리뷰 스프라이트)를 서버 사이드 fetch 로 가져와
+   * 해당 초수 타일을 잘라내고 1280×720 으로 확대해 반환한다.
    */
   private async captureTimedFrameFromInstreamVideo(
     page: IPageHandle,
@@ -1055,94 +1059,197 @@ export class YouTubeCapture extends BaseChannel {
       const adVideoId = extractVideoId(instreamVideoUrl);
       if (!adVideoId) return { frameDataUrl: null, durationSec: 0 };
 
-      await this.applyYouTubeConsentCookies(page);
+      // 1) YouTube 페이지 HTML 을 서버 사이드 fetch (브라우저 불필요)
+      const ytResp = await fetch(
+        "https://www.youtube.com/watch?v=" + adVideoId + "&hl=en",
+        {
+          headers: {
+            "User-Agent":
+              "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Accept-Language": "en-US,en;q=0.9",
+            Cookie: "CONSENT=YES+cb.20210328-17-p0.en+FX+987",
+          },
+        }
+      );
+      if (!ytResp.ok) {
+        console.warn("[YouTube] storyboard: page fetch " + ytResp.status);
+        return { frameDataUrl: null, durationSec: 0 };
+      }
+      const html = await ytResp.text();
 
-      const watchUrl =
-        `https://www.youtube.com/watch?v=${adVideoId}&t=${Math.max(0, Math.floor(seconds))}s` +
-        `&bpctr=9999999999&has_verified=1`;
+      // 2) ytInitialPlayerResponse JSON 추출 (bracket counting)
+      const marker = "ytInitialPlayerResponse";
+      const mIdx = html.indexOf(marker);
+      if (mIdx === -1) {
+        console.warn("[YouTube] storyboard: marker not found");
+        return { frameDataUrl: null, durationSec: 0 };
+      }
+      const braceIdx = html.indexOf("{", mIdx + marker.length);
+      if (braceIdx === -1) {
+        console.warn("[YouTube] storyboard: brace not found");
+        return { frameDataUrl: null, durationSec: 0 };
+      }
 
-      await page.goto(watchUrl, { waitUntil: "networkidle2", timeout: 45000 });
-      await this.dismissYouTubeConsent(page);
-      await page.waitForSelector("#movie_player video, video", { timeout: 20000 });
-      await new Promise((r) => setTimeout(r, 1200));
+      let depth = 0;
+      let inStr = false;
+      let esc = false;
+      let endIdx = braceIdx;
+      for (let i = braceIdx; i < html.length && i < braceIdx + 600000; i++) {
+        const ch = html[i];
+        if (esc) { esc = false; continue; }
+        if (ch === "\\" && inStr) { esc = true; continue; }
+        if (ch === '"') { inStr = !inStr; continue; }
+        if (inStr) continue;
+        if (ch === "{") depth++;
+        else if (ch === "}") {
+          depth--;
+          if (depth === 0) { endIdx = i + 1; break; }
+        }
+      }
 
-      const info = await page.evaluate<{
-        ok: boolean;
-        reason?: string;
-        x?: number;
-        y?: number;
-        width?: number;
-        height?: number;
-        duration?: number;
-        capturedTime?: number;
-      }>(`
-        (() => {
-          const target = Math.max(0, Number(${Math.max(0, seconds).toFixed(3)}));
-          const player = document.querySelector("#movie_player");
-          const v =
-            document.querySelector("#movie_player video.html5-main-video") ||
-            document.querySelector("#movie_player video") ||
-            document.querySelector("video");
-          if (!v) return { ok: false, reason: "video_not_found" };
+      let jsonStr = html.substring(braceIdx, endIdx);
+      jsonStr = jsonStr.replace(/\\x([0-9a-fA-F]{2})/g, "\\u00$1");
 
-          try { v.muted = true; } catch {}
-          try {
-            if (player && typeof player.seekTo === "function") player.seekTo(target, true);
-            else v.currentTime = target;
-          } catch {}
-          try {
-            if (player && typeof player.playVideo === "function") player.playVideo();
-            else v.play?.();
-          } catch {}
-          try {
-            if (player && typeof player.pauseVideo === "function") player.pauseVideo();
-            else v.pause?.();
-          } catch {}
+      let pr: Record<string, any>;
+      try {
+        pr = JSON.parse(jsonStr);
+      } catch {
+        console.warn("[YouTube] storyboard: JSON parse failed");
+        return { frameDataUrl: null, durationSec: 0 };
+      }
 
-          const container =
-            document.querySelector("#movie_player .html5-video-container") ||
-            document.querySelector("#movie_player") ||
-            v;
-          const r = container.getBoundingClientRect();
-          const duration = Number.isFinite(v.duration) ? Number(v.duration) : 0;
-          const capturedTime = Number(v.currentTime || 0);
-          if (r.width < 120 || r.height < 80) {
-            return { ok: false, reason: "invalid_clip_rect", duration, capturedTime };
-          }
-          return {
-            ok: true,
-            x: Math.max(0, Math.floor(r.left)),
-            y: Math.max(0, Math.floor(r.top)),
-            width: Math.floor(r.width),
-            height: Math.floor(r.height),
-            duration,
-            capturedTime,
+      const videoDuration = parseFloat(
+        pr?.videoDetails?.lengthSeconds || "0"
+      );
+      const spec: string =
+        pr?.storyboards?.playerStoryboardSpecRenderer?.spec || "";
+      if (!spec) {
+        console.warn("[YouTube] storyboard: no spec");
+        return { frameDataUrl: null, durationSec: videoDuration };
+      }
+
+      // 3) Storyboard 레벨 파싱
+      const segments = spec.split("|");
+      const firstParts = segments[0].split("#");
+      const baseUrl = firstParts[0];
+
+      const levels: {
+        w: number; h: number; count: number;
+        cols: number; rows: number; sigh: string; idx: number;
+      }[] = [];
+      for (let i = 0; i < segments.length; i++) {
+        const parts =
+          i === 0 ? firstParts.slice(1) : segments[i].split("#");
+        if (parts.length < 6) continue;
+        levels.push({
+          w: parseInt(parts[0], 10),
+          h: parseInt(parts[1], 10),
+          count: parseInt(parts[2], 10),
+          cols: parseInt(parts[3], 10),
+          rows: parseInt(parts[4], 10),
+          sigh: parts[parts.length - 1] || "",
+          idx: i,
+        });
+      }
+      if (levels.length === 0) {
+        console.warn("[YouTube] storyboard: 0 levels");
+        return { frameDataUrl: null, durationSec: videoDuration };
+      }
+
+      const lv = levels[levels.length - 1];
+      const interval =
+        videoDuration > 0 && lv.count > 0
+          ? videoDuration / lv.count
+          : 1;
+      const fIdx = Math.min(
+        Math.floor(seconds / interval),
+        Math.max(0, lv.count - 1)
+      );
+      const perSheet = lv.cols * lv.rows;
+      const sheet = Math.floor(fIdx / perSheet);
+      const tile = fIdx % perSheet;
+      const col = tile % lv.cols;
+      const row = Math.floor(tile / lv.cols);
+
+      let sheetUrl = baseUrl
+        .replace("$L", String(lv.idx))
+        .replace("$N", String(sheet));
+      if (sheetUrl.includes("sigh=")) {
+        sheetUrl = sheetUrl.replace(/sigh=[^&#]+/, "sigh=" + lv.sigh);
+      } else {
+        sheetUrl +=
+          (sheetUrl.includes("?") ? "&" : "?") + "sigh=" + lv.sigh;
+      }
+
+      console.log(
+        "[YouTube] storyboard: lv" + lv.idx +
+        " " + lv.w + "x" + lv.h +
+        " frame " + fIdx + "/" + lv.count +
+        " sheet" + sheet + " (" + col + "," + row + ")"
+      );
+
+      // 4) 스프라이트 시트 fetch
+      const sheetResp = await fetch(sheetUrl, {
+        headers: {
+          "User-Agent":
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        },
+      });
+      if (!sheetResp.ok) {
+        console.warn("[YouTube] storyboard: sheet " + sheetResp.status);
+        return { frameDataUrl: null, durationSec: videoDuration };
+      }
+      const sheetBuf = Buffer.from(await sheetResp.arrayBuffer());
+      if (sheetBuf.length < 500) {
+        console.warn("[YouTube] storyboard: sheet too small");
+        return { frameDataUrl: null, durationSec: videoDuration };
+      }
+      const sheetB64 =
+        "data:image/jpeg;base64," + sheetBuf.toString("base64");
+
+      // 5) 브라우저 canvas 로 타일 crop + 1280×720 scale
+      const cropX = col * lv.w;
+      const cropY = row * lv.h;
+      const outW = 1280;
+      const outH = 720;
+
+      await page.goto("about:blank", { waitUntil: "load", timeout: 5000 });
+
+      const frameDataUrl = await page.evaluate<string>(`
+        (() => new Promise((resolve) => {
+          const img = new Image();
+          img.onload = () => {
+            try {
+              const c = document.createElement("canvas");
+              c.width = ${outW};
+              c.height = ${outH};
+              const ctx = c.getContext("2d");
+              if (!ctx) { resolve(""); return; }
+              ctx.imageSmoothingEnabled = true;
+              ctx.imageSmoothingQuality = "high";
+              ctx.drawImage(
+                img,
+                ${cropX}, ${cropY}, ${lv.w}, ${lv.h},
+                0, 0, ${outW}, ${outH}
+              );
+              resolve(c.toDataURL("image/png"));
+            } catch { resolve(""); }
           };
-        })()
+          img.onerror = () => resolve("");
+          img.src = ${JSON.stringify(sheetB64)};
+        }))()
       `);
 
-      if (!info.ok || !info.width || !info.height) {
-        console.warn(
-          "[YouTube] timed frame extraction info failed:",
-          (info.reason || "unknown") + " @t=" + String(info.capturedTime || 0)
-        );
-        return { frameDataUrl: null, durationSec: info.duration || 0 };
+      if (!frameDataUrl || frameDataUrl.length < 2000) {
+        console.warn("[YouTube] storyboard: canvas crop empty");
+        return { frameDataUrl: null, durationSec: videoDuration };
       }
 
-      await new Promise((r) => setTimeout(r, 900));
-      const frame = await page.screenshot({
-        type: "png",
-        clip: { x: info.x || 0, y: info.y || 0, width: info.width, height: info.height },
-      });
-      if (!frame || frame.length < 2500) {
-        console.warn("[YouTube] timed frame extraction image too small");
-        return { frameDataUrl: null, durationSec: info.duration || 0 };
-      }
-      console.log("[YouTube] timed frame extracted @t=" + String(info.capturedTime || 0));
-      return {
-        frameDataUrl: `data:image/png;base64,${frame.toString("base64")}`,
-        durationSec: info.duration || 0,
-      };
+      console.log(
+        "[YouTube] storyboard frame OK at " + seconds + "s" +
+        " (lv" + lv.idx + " " + lv.w + "x" + lv.h + ")"
+      );
+      return { frameDataUrl, durationSec: videoDuration };
     } catch (err) {
       console.warn("[YouTube] timed frame extraction failed:", err);
       return { frameDataUrl: null, durationSec: 0 };
