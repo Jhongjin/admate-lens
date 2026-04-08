@@ -22,6 +22,7 @@ export interface IViewport {
 export interface IPageHandle {
   goto(url: string, options?: { waitUntil?: "load" | "domcontentloaded" | "networkidle0" | "networkidle2"; timeout?: number }): Promise<void>;
   screenshot(options?: IScreenshotOptions): Promise<Buffer>;
+  screenshotElement?(selector: string, options?: { type?: "png" | "jpeg" | "webp"; quality?: number }): Promise<Buffer>;
   evaluate<T>(fn: string | ((...args: unknown[]) => T), ...args: unknown[]): Promise<T>;
   evaluateOnNewDocument(fn: string | ((...args: unknown[]) => void)): Promise<void>;
   click(selector: string): Promise<void>;

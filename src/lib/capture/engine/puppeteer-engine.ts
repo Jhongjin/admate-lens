@@ -504,6 +504,22 @@ class PuppeteerPageHandle implements IPageHandle {
     return Buffer.from(result);
   }
 
+  async screenshotElement(
+    selector: string,
+    options?: { type?: "png" | "jpeg" | "webp"; quality?: number }
+  ): Promise<Buffer> {
+    const handle = await this.page.$(selector);
+    if (!handle) {
+      throw new Error(`Element not found for screenshot: ${selector}`);
+    }
+    const result = await handle.screenshot({
+      type: options?.type ?? "png",
+      quality: options?.type === "png" ? undefined : (options?.quality ?? 90),
+      encoding: "binary",
+    });
+    return Buffer.from(result);
+  }
+
   async evaluate<T>(fn: string | ((...args: unknown[]) => T), ...args: unknown[]): Promise<T> {
     return await this.page.evaluate(fn as never, ...args);
   }

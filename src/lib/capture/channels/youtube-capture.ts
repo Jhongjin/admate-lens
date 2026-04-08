@@ -1243,125 +1243,106 @@ export class YouTubeCapture extends BaseChannel {
         }
       }
 
-      // 1-d) Puppeteer browser — intercept YouTube JS's own /player XHR
+      // 1-d) Puppeteer embed page — intercept YouTube player XHR (filter by videoId)
       if (!spec) {
         try {
+          const targetVid = adVideoId;
           await page.evaluateOnNewDocument(`
             (function() {
               window.__ytSbSpec = null;
+              window.__ytSbAll = [];
+              var targetVid = ${JSON.stringify(targetVid)};
               var origFetch = window.fetch;
               window.fetch = function() {
                 var url = typeof arguments[0] === 'string' ? arguments[0] : (arguments[0] && arguments[0].url ? arguments[0].url : '');
                 var p = origFetch.apply(this, arguments);
-                if (url.indexOf('/youtubei/v1/player') !== -1) {
+                if (url.indexOf('/youtubei/v1/player') !== -1 || url.indexOf('/player') !== -1) {
                   p.then(function(resp) {
                     var clone = resp.clone();
-                    clone.json().then(function(j) {
-                      var sb = j && j.storyboards;
-                      var s = sb && sb.playerStoryboardSpecRenderer && sb.playerStoryboardSpecRenderer.spec;
-                      var d = j && j.videoDetails && j.videoDetails.lengthSeconds;
-                      var sbDump = '';
-                      try { sbDump = JSON.stringify(sb).substring(0, 2000); } catch(e2) {}
-                      if (s) window.__ytSbSpec = { spec: s, duration: parseFloat(d || '0'), src: 'fetch', sbJson: sbDump };
-                      else if (sb) window.__ytSbSpec = { spec: '', duration: parseFloat(d || '0'), src: 'fetch_nospc', sbJson: sbDump };
+                    clone.text().then(function(txt) {
+                      try {
+                        var j = JSON.parse(txt);
+                        var vid = j && j.videoDetails && j.videoDetails.videoId;
+                        var d = j && j.videoDetails && j.videoDetails.lengthSeconds;
+                        var sb = j && j.storyboards;
+                        var sbDump = '';
+                        try { sbDump = JSON.stringify(sb).substring(0, 2000); } catch(e2) {}
+                        window.__ytSbAll.push({ vid: vid, dur: d, sb: sbDump });
+                        if (vid === targetVid && sb) {
+                          var s = sb.playerStoryboardSpecRenderer && sb.playerStoryboardSpecRenderer.spec;
+                          window.__ytSbSpec = { spec: s || '', duration: parseFloat(d || '0'), src: 'fetch', vid: vid, sbJson: sbDump };
+                        }
+                      } catch(e) {}
                     }).catch(function(){});
                   }).catch(function(){});
                 }
                 return p;
               };
-              var origXhrOpen = XMLHttpRequest.prototype.open;
-              var origXhrSend = XMLHttpRequest.prototype.send;
-              XMLHttpRequest.prototype.open = function(m, u) {
-                this.__u = u;
-                return origXhrOpen.apply(this, arguments);
-              };
-              XMLHttpRequest.prototype.send = function() {
-                var self = this;
-                this.addEventListener('load', function() {
-                  if (self.__u && self.__u.indexOf('/youtubei/v1/player') !== -1) {
-                    try {
-                      var j = JSON.parse(self.responseText);
-                      var s = j && j.storyboards && j.storyboards.playerStoryboardSpecRenderer && j.storyboards.playerStoryboardSpecRenderer.spec;
-                      var d = j && j.videoDetails && j.videoDetails.lengthSeconds;
-                      if (s) window.__ytSbSpec = { spec: s, duration: parseFloat(d || '0'), src: 'xhr' };
-                    } catch(e) {}
-                  }
-                });
-                return origXhrSend.apply(this, arguments);
-              };
             })()
           `);
 
           await this.applyYouTubeConsentCookies(page);
-          await page.goto(
-            "https://www.youtube.com/watch?v=" + adVideoId,
-            { waitUntil: "networkidle2", timeout: 45000 }
-          );
-          await this.dismissYouTubeConsent(page);
 
-          // Wait for YouTube's JS to make player API calls (up to 8s)
+          // Try embed page first (less restricted than watch page)
+          console.log("[YouTube] storyboard: trying embed page for " + adVideoId);
+          await page.goto(
+            "https://www.youtube.com/embed/" + adVideoId,
+            { waitUntil: "networkidle2", timeout: 30000 }
+          );
+
           let intercepted = false;
-          for (let w = 0; w < 8; w++) {
+          for (let w = 0; w < 6; w++) {
             await new Promise((r) => setTimeout(r, 1000));
-            const result = await page.evaluate<{ spec: string; duration: number; src: string; sbJson?: string } | null>(
-              "window.__ytSbSpec"
-            );
-            if (result) {
-              console.log("[YouTube] storyboard XHR result: src=" + result.src + " specLen=" + (result.spec || "").length + " dur=" + result.duration);
-              if (result.sbJson) {
-                console.log("[YouTube] storyboard XHR sbJson: " + result.sbJson.substring(0, 500));
-              }
+            const result = await page.evaluate<{
+              spec: string; duration: number; src: string; vid: string; sbJson?: string;
+            } | null>("window.__ytSbSpec");
+            if (result && result.vid === targetVid) {
+              console.log("[YouTube] storyboard embed XHR: vid=" + result.vid + " specLen=" + (result.spec || "").length + " dur=" + result.duration);
+              if (result.sbJson) console.log("[YouTube] storyboard embed sbJson: " + result.sbJson.substring(0, 500));
               if (result.spec) {
                 spec = result.spec;
                 videoDuration = result.duration;
                 intercepted = true;
-                console.log("[YouTube] storyboard spec from browser XHR intercept (" + result.src + ")");
+                console.log("[YouTube] storyboard spec from embed XHR (" + result.src + ")");
+              }
+              break;
+            }
+          }
+
+          // If embed didn't work, try watch page
+          if (!intercepted) {
+            console.log("[YouTube] storyboard: embed failed, trying watch page");
+            await page.goto(
+              "https://www.youtube.com/watch?v=" + adVideoId,
+              { waitUntil: "networkidle2", timeout: 30000 }
+            );
+            await this.dismissYouTubeConsent(page);
+            for (let w = 0; w < 6; w++) {
+              await new Promise((r) => setTimeout(r, 1000));
+              const result = await page.evaluate<{
+                spec: string; duration: number; src: string; vid: string; sbJson?: string;
+              } | null>("window.__ytSbSpec");
+              if (result && result.vid === targetVid) {
+                console.log("[YouTube] storyboard watch XHR: vid=" + result.vid + " specLen=" + (result.spec || "").length + " dur=" + result.duration);
+                if (result.sbJson) console.log("[YouTube] storyboard watch sbJson: " + result.sbJson.substring(0, 500));
+                if (result.spec) {
+                  spec = result.spec;
+                  videoDuration = result.duration;
+                  intercepted = true;
+                  console.log("[YouTube] storyboard spec from watch XHR (" + result.src + ")");
+                }
                 break;
               }
             }
           }
 
+          // Log all intercepted responses for debugging
           if (!intercepted) {
-            // Try reading all possible globals
-            const globalCheck = await page.evaluate<{
-              hasInitialPR: boolean;
-              prStatus: string;
-              prDuration: number;
-              prSbKeys: string;
-              hasYtcfg: boolean;
-              specFromPage: string;
-            }>(`
-              (() => {
-                try {
-                  var pr = window.ytInitialPlayerResponse || {};
-                  var status = (pr.playabilityStatus && pr.playabilityStatus.status) || 'none';
-                  var dur = parseFloat((pr.videoDetails && pr.videoDetails.lengthSeconds) || '0');
-                  var sbKeys = Object.keys(pr.storyboards || {}).join(',') || 'none';
-                  var spec = '';
-                  if (pr.storyboards && pr.storyboards.playerStoryboardSpecRenderer) {
-                    spec = pr.storyboards.playerStoryboardSpecRenderer.spec || '';
-                  }
-                  return {
-                    hasInitialPR: !!window.ytInitialPlayerResponse,
-                    prStatus: status,
-                    prDuration: dur,
-                    prSbKeys: sbKeys,
-                    hasYtcfg: !!window.ytcfg,
-                    specFromPage: spec
-                  };
-                } catch(e) { return { hasInitialPR: false, prStatus: 'error', prDuration: 0, prSbKeys: 'error', hasYtcfg: false, specFromPage: '' }; }
-              })()
-            `);
-            console.warn("[YouTube] storyboard browser intercept: no XHR caught. globals: pr=" + globalCheck.hasInitialPR + " status=" + globalCheck.prStatus + " dur=" + globalCheck.prDuration + " sb=" + globalCheck.prSbKeys + " ytcfg=" + globalCheck.hasYtcfg);
-
-            if (globalCheck.specFromPage) {
-              spec = globalCheck.specFromPage;
-              videoDuration = globalCheck.prDuration;
-              console.log("[YouTube] storyboard spec from browser global");
-            }
+            const allCaught = await page.evaluate<string>("JSON.stringify(window.__ytSbAll || [])");
+            console.warn("[YouTube] storyboard browser: no match for " + targetVid + ". all caught: " + allCaught.substring(0, 500));
           }
         } catch (browserErr) {
-          console.warn("[YouTube] storyboard browser fallback error:", browserErr);
+          console.warn("[YouTube] storyboard browser error:", browserErr);
         }
       }
 
@@ -1371,36 +1352,55 @@ export class YouTubeCapture extends BaseChannel {
       }
 
       // 3) Storyboard 레벨 파싱
-      // Decode possible unicode escapes from JSON
       spec = spec.replace(/\\u0026/g, "&").replace(/\\u007c/g, "|");
 
-      console.log("[YouTube] storyboard raw spec (" + spec.length + "): " + spec.substring(0, 300));
-
       const segments = spec.split("|");
-      console.log("[YouTube] storyboard segments: " + segments.length);
       const baseUrl = segments[0];
 
       const levels: {
         w: number; h: number; count: number;
         cols: number; rows: number; name: string; sigh: string; idx: number;
       }[] = [];
-      for (let i = 1; i < segments.length; i++) {
-        const parts = segments[i].split("#");
-        console.log("[YouTube] storyboard seg[" + i + "] parts=" + parts.length + ": " + segments[i].substring(0, 80));
-        if (parts.length < 6) continue;
-        levels.push({
-          w: parseInt(parts[0], 10),
-          h: parseInt(parts[1], 10),
-          count: parseInt(parts[2], 10),
-          cols: parseInt(parts[3], 10),
-          rows: parseInt(parts[4], 10),
-          name: parts[6] || "default",
-          sigh: parts[parts.length - 1] || "",
-          idx: i - 1,
+
+      if (segments.length > 1) {
+        // Classic format: baseUrl|w#h#count#cols#rows#ms#name#sigh|...
+        for (let i = 1; i < segments.length; i++) {
+          const parts = segments[i].split("#");
+          if (parts.length < 6) continue;
+          levels.push({
+            w: parseInt(parts[0], 10),
+            h: parseInt(parts[1], 10),
+            count: parseInt(parts[2], 10),
+            cols: parseInt(parts[3], 10),
+            rows: parseInt(parts[4], 10),
+            name: parts[6] || "default",
+            sigh: parts[parts.length - 1] || "",
+            idx: i - 1,
+          });
+        }
+      } else {
+        // New format: base URL only (no | levels). Use standard YouTube levels.
+        console.log("[YouTube] storyboard: new format (no levels in spec), using standard levels");
+        const dur = videoDuration || 30;
+        const frameCount = Math.max(1, Math.ceil(dur));
+        const standardLevels = [
+          { w: 48, h: 27, cols: 10, rows: 10, name: "default" },
+          { w: 80, h: 45, cols: 10, rows: 10, name: "M$M" },
+          { w: 160, h: 90, cols: 5, rows: 5, name: "M$M" },
+          { w: 320, h: 180, cols: 3, rows: 3, name: "M$M" },
+        ];
+        standardLevels.forEach((sl, idx) => {
+          levels.push({
+            w: sl.w, h: sl.h,
+            count: Math.min(frameCount, dur > 0 ? Math.ceil(dur) : 100),
+            cols: sl.cols, rows: sl.rows,
+            name: sl.name, sigh: "", idx,
+          });
         });
       }
+
       if (levels.length === 0) {
-        console.warn("[YouTube] storyboard: 0 levels");
+        console.warn("[YouTube] storyboard: 0 levels after parsing");
         return { frameDataUrl: null, durationSec: videoDuration };
       }
 
@@ -1426,11 +1426,13 @@ export class YouTubeCapture extends BaseChannel {
       let sheetUrl = baseUrl
         .replace("$L", String(lv.idx))
         .replace("$N", sheetName);
-      if (sheetUrl.includes("sigh=")) {
-        sheetUrl = sheetUrl.replace(/sigh=[^&#]+/, "sigh=" + lv.sigh);
-      } else {
-        sheetUrl +=
-          (sheetUrl.includes("?") ? "&" : "?") + "sigh=" + lv.sigh;
+      if (lv.sigh) {
+        if (sheetUrl.includes("sigh=")) {
+          sheetUrl = sheetUrl.replace(/sigh=[^&#]+/, "sigh=" + lv.sigh);
+        } else {
+          sheetUrl +=
+            (sheetUrl.includes("?") ? "&" : "?") + "sigh=" + lv.sigh;
+        }
       }
 
       console.log(
