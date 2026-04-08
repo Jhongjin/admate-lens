@@ -1063,54 +1063,45 @@ export class YouTubeCapture extends BaseChannel {
       let spec = "";
       let videoDuration = 0;
 
-      // 0-a) Edge Function proxy — runs on Vercel Edge (non-datacenter IPs)
+      // 0-a) Edge Function proxy — uses Vercel Edge network
+      let ytIpBlocked = false;
       try {
-        // Prefer production URL (no deployment protection), fall back to deployment URL
         const prodUrl = process.env.VERCEL_PROJECT_PRODUCTION_URL;
-        const deployUrl = process.env.VERCEL_URL;
-        const candidates: string[] = [];
-        if (prodUrl) candidates.push(`https://${prodUrl}`);
-        if (deployUrl && deployUrl !== prodUrl) candidates.push(`https://${deployUrl}`);
-        if (candidates.length === 0) candidates.push("http://localhost:3000");
+        const baseUrl = prodUrl
+          ? `https://${prodUrl}`
+          : process.env.VERCEL_URL
+            ? `https://${process.env.VERCEL_URL}`
+            : "http://localhost:3000";
 
-        for (const baseUrl of candidates) {
-          try {
-            const edgeUrl = `${baseUrl}/api/yt-storyboard?v=${adVideoId}`;
-            console.log("[YouTube] edge storyboard: trying " + baseUrl.substring(0, 60));
-            const headers: Record<string, string> = { Accept: "application/json" };
-            const bypassSecret = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
-            if (bypassSecret) {
-              headers["x-vercel-protection-bypass"] = bypassSecret;
-            }
-            const edgeResp = await fetch(edgeUrl, { headers });
-            if (edgeResp.ok) {
-              const edgeData = await edgeResp.json() as {
-                spec?: string; duration?: number; status?: string;
-              };
-              console.log(
-                "[YouTube] edge storyboard: status=" + (edgeData.status || "?") +
-                " dur=" + (edgeData.duration || 0) +
-                " specLen=" + (edgeData.spec || "").length
-              );
-              if (edgeData.spec && edgeData.spec.includes("|")) {
-                spec = edgeData.spec;
-                videoDuration = edgeData.duration || 0;
-                console.log("[YouTube] ✅ storyboard spec from Edge Function");
-                break;
-              }
-            } else {
-              console.warn("[YouTube] edge storyboard " + baseUrl.substring(0, 40) + ": HTTP " + edgeResp.status);
-            }
-          } catch {
-            // try next candidate
+        const edgeUrl = `${baseUrl}/api/yt-storyboard?v=${adVideoId}`;
+        const headers: Record<string, string> = { Accept: "application/json" };
+        const bypassSecret = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
+        if (bypassSecret) headers["x-vercel-protection-bypass"] = bypassSecret;
+
+        const edgeResp = await fetch(edgeUrl, { headers });
+        if (edgeResp.ok) {
+          const edgeData = await edgeResp.json() as {
+            spec?: string; duration?: number; status?: string;
+          };
+          if (edgeData.spec && edgeData.spec.includes("|")) {
+            spec = edgeData.spec;
+            videoDuration = edgeData.duration || 0;
+            console.log("[YouTube] ✅ storyboard spec from Edge Function (dur=" + videoDuration + ")");
+          } else if (edgeData.status === "LOGIN_REQUIRED") {
+            ytIpBlocked = true;
+            console.warn("[YouTube] storyboard: YouTube IP-blocked (edge returned LOGIN_REQUIRED) — skipping all server-side attempts");
           }
         }
       } catch (edgeErr) {
         console.warn("[YouTube] edge storyboard error:", edgeErr);
       }
 
+      // If YouTube blocks this IP range, skip all other server-side attempts
+      // and go straight to numbered thumbnails (saves ~20 seconds)
+      if (!spec && !ytIpBlocked) {
+
       // 0-b) Invidious proxy API (fallback)
-      if (!spec) try {
+      try {
         const invInstances = [
           "https://vid.puffyan.us",
           "https://inv.tux.pizza",
@@ -1521,6 +1512,8 @@ export class YouTubeCapture extends BaseChannel {
           console.warn("[YouTube] storyboard browser error:", browserErr);
         }
       }
+
+      } // end of if (!spec && !ytIpBlocked)
 
       if (!spec) {
         console.warn("[YouTube] storyboard: all spec sources failed — trying numbered thumbnails");
