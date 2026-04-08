@@ -608,7 +608,7 @@ export class YouTubeCapture extends BaseChannel {
             'align-items: center',
             'justify-content: center',
             'overflow: hidden',
-            'border-radius: 12px',
+            'border-radius: 0',
           ].join(' !important;') + ' !important';
 
           // ─── 광고 소재 이미지 (존재할 경우 화면 꽉 채움) ───
@@ -702,11 +702,11 @@ export class YouTubeCapture extends BaseChannel {
 
           // ─── 하단: 노란색 프로그레스 바 ───
           const timerBg = document.createElement('div');
-          timerBg.style.cssText = 'position:absolute;bottom:0;left:0;width:100%;height:3px;background:rgba(255,255,255,0.15);z-index:10;border-radius:0 0 12px 12px';
+          timerBg.style.cssText = 'position:absolute;bottom:0;left:0;width:100%;height:3px;background:rgba(255,255,255,0.15);z-index:10;border-radius:0';
           overlay.appendChild(timerBg);
 
           const timerBar = document.createElement('div');
-          const barRadius = progressFillPct >= 99.5 ? '0 0 12px 12px' : '0 0 0 12px';
+          const barRadius = '0';
           timerBar.style.cssText = 'position:absolute;bottom:0;left:0;width:' + progressFillPct + '%;height:3px;background:#f2bc42;z-index:11;border-radius:' + barRadius;
           overlay.appendChild(timerBar);
 
@@ -1123,8 +1123,13 @@ export class YouTubeCapture extends BaseChannel {
                     const sheetB64 = "data:" + sheetMime + ";base64," + sheetBuf.toString("base64");
                     const outW = 1280;
                     const outH = 720;
-                    const cropX = tileCol * sb.width;
-                    const cropY = tileRow * sb.height;
+                    // Some storyboard sheets include thin divider pixels around tiles.
+                    // Trim a small inset to avoid black edge artifacts after upscale.
+                    const inset = 2;
+                    const cropX = tileCol * sb.width + inset;
+                    const cropY = tileRow * sb.height + inset;
+                    const cropW = Math.max(1, sb.width - inset * 2);
+                    const cropH = Math.max(1, sb.height - inset * 2);
 
                     await page.goto("about:blank", { waitUntil: "load", timeout: 5000 });
                     const frameDataUrl = await page.evaluate<string>(`
@@ -1138,7 +1143,7 @@ export class YouTubeCapture extends BaseChannel {
                             if (!ctx) { resolve(""); return; }
                             ctx.imageSmoothingEnabled = true;
                             ctx.imageSmoothingQuality = "high";
-                            ctx.drawImage(img, ${cropX}, ${cropY}, ${sb.width}, ${sb.height}, 0, 0, ${outW}, ${outH});
+                            ctx.drawImage(img, ${cropX}, ${cropY}, ${cropW}, ${cropH}, 0, 0, ${outW}, ${outH});
                             resolve(c.toDataURL("image/png"));
                           } catch { resolve(""); }
                         };
