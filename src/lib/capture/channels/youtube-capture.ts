@@ -1063,6 +1063,144 @@ export class YouTubeCapture extends BaseChannel {
       let spec = "";
       let videoDuration = 0;
 
+      // 0) Invidious proxy API — bypasses YouTube datacenter IP blocking
+      //    Invidious instances proxy requests through their own (non-datacenter) IPs,
+      //    and the returned storyboard URLs include valid sqp/sigh tokens.
+      try {
+        const invInstances = [
+          "https://vid.puffyan.us",
+          "https://inv.tux.pizza",
+          "https://iv.ggtyler.dev",
+          "https://invidious.nerdvpn.de",
+          "https://inv.nadeko.net",
+          "https://yewtu.be",
+        ];
+
+        const invResults = await Promise.allSettled(
+          invInstances.map((inst) => {
+            const ctrl = new AbortController();
+            const timer = setTimeout(() => ctrl.abort(), 6000);
+            return fetch(
+              `${inst}/api/v1/videos/${adVideoId}?fields=storyboards,lengthSeconds`,
+              { signal: ctrl.signal, headers: { Accept: "application/json" } }
+            )
+              .then((r) => {
+                if (!r.ok) throw new Error("HTTP " + r.status);
+                return r.json();
+              })
+              .then((data) => ({ ...data, _inst: inst }))
+              .finally(() => clearTimeout(timer));
+          })
+        );
+
+        for (const res of invResults) {
+          if (res.status !== "fulfilled") continue;
+          const data = res.value as {
+            storyboards?: { templateUrl?: string; url?: string; width?: number; height?: number; count?: number; storyboardWidth?: number; storyboardHeight?: number }[];
+            lengthSeconds?: number;
+            _inst: string;
+          };
+          if (!Array.isArray(data.storyboards) || data.storyboards.length === 0) continue;
+
+          const sb = data.storyboards[data.storyboards.length - 1];
+          const tpl = sb.templateUrl || sb.url || "";
+          if (!tpl) continue;
+
+          const dur = parseFloat(String(data.lengthSeconds || "0"));
+          const count = sb.count || 1;
+          const cols = sb.storyboardWidth || 1;
+          const rows = sb.storyboardHeight || 1;
+          const tileW = sb.width || 320;
+          const tileH = sb.height || 180;
+
+          console.log(
+            "[YouTube] storyboard from Invidious (" + data._inst + "): " +
+            tileW + "x" + tileH + " count=" + count + " dur=" + dur
+          );
+
+          videoDuration = dur;
+          const interval = dur > 0 && count > 0 ? dur / count : 1;
+          const fIdx = Math.min(
+            Math.floor(seconds / interval),
+            Math.max(0, count - 1)
+          );
+          const perSheet = cols * rows;
+          const sheetIdx = Math.floor(fIdx / perSheet);
+          const tile = fIdx % perSheet;
+          const tileCol = tile % cols;
+          const tileRow = Math.floor(tile / cols);
+
+          let sheetUrl = tpl.replace(/\$M/g, String(sheetIdx));
+          console.log(
+            "[YouTube] storyboard proxy: frame " + fIdx + "/" + count +
+            " sheet" + sheetIdx + " (" + tileCol + "," + tileRow + ")"
+          );
+
+          const sheetResp = await fetch(sheetUrl, {
+            headers: {
+              "User-Agent":
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            },
+          });
+          if (!sheetResp.ok) {
+            console.warn("[YouTube] storyboard proxy sheet: HTTP " + sheetResp.status);
+            break;
+          }
+          const sheetBuf = Buffer.from(await sheetResp.arrayBuffer());
+          if (sheetBuf.length < 500) {
+            console.warn("[YouTube] storyboard proxy sheet too small: " + sheetBuf.length);
+            break;
+          }
+
+          const sheetMime = sheetResp.headers.get("content-type") || "image/jpeg";
+          const sheetB64 = "data:" + sheetMime + ";base64," + sheetBuf.toString("base64");
+          const outW = 1280;
+          const outH = 720;
+          const cropX = tileCol * tileW;
+          const cropY = tileRow * tileH;
+
+          await page.goto("about:blank", { waitUntil: "load", timeout: 5000 });
+          const frameDataUrl = await page.evaluate<string>(`
+            (() => new Promise((resolve) => {
+              const img = new Image();
+              img.onload = () => {
+                try {
+                  const c = document.createElement("canvas");
+                  c.width = ${outW};
+                  c.height = ${outH};
+                  const ctx = c.getContext("2d");
+                  if (!ctx) { resolve(""); return; }
+                  ctx.imageSmoothingEnabled = true;
+                  ctx.imageSmoothingQuality = "high";
+                  ctx.drawImage(
+                    img,
+                    ${cropX}, ${cropY}, ${tileW}, ${tileH},
+                    0, 0, ${outW}, ${outH}
+                  );
+                  resolve(c.toDataURL("image/png"));
+                } catch { resolve(""); }
+              };
+              img.onerror = () => resolve("");
+              img.src = ${JSON.stringify(sheetB64)};
+            }))()
+          `);
+
+          if (frameDataUrl && frameDataUrl.length > 2000) {
+            console.log(
+              "[YouTube] ✅ storyboard proxy frame OK at " + seconds + "s (" +
+              tileW + "x" + tileH + " from " + data._inst + ")"
+            );
+            return { frameDataUrl, durationSec: videoDuration };
+          }
+          console.warn("[YouTube] storyboard proxy canvas crop empty");
+          break;
+        }
+
+        console.warn("[YouTube] storyboard proxy: no valid Invidious response");
+      } catch (proxyErr) {
+        console.warn("[YouTube] storyboard proxy error:", proxyErr);
+      }
+
       const innerTubeClients: {
         name: string;
         clientName: string;
