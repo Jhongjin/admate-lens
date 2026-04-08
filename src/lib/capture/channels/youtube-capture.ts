@@ -1062,38 +1062,74 @@ export class YouTubeCapture extends BaseChannel {
       // 1) Storyboard spec 획득 — InnerTube API → 브라우저 폴백
       let spec = "";
       let videoDuration = 0;
-
-      // 0-a) Edge Function proxy — uses Vercel Edge network
       let ytIpBlocked = false;
-      try {
-        const prodUrl = process.env.VERCEL_PROJECT_PRODUCTION_URL;
-        const baseUrl = prodUrl
-          ? `https://${prodUrl}`
-          : process.env.VERCEL_URL
-            ? `https://${process.env.VERCEL_URL}`
-            : "http://localhost:3000";
 
-        const edgeUrl = `${baseUrl}/api/yt-storyboard?v=${adVideoId}`;
-        const headers: Record<string, string> = { Accept: "application/json" };
-        const bypassSecret = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
-        if (bypassSecret) headers["x-vercel-protection-bypass"] = bypassSecret;
-
-        const edgeResp = await fetch(edgeUrl, { headers });
-        if (edgeResp.ok) {
-          const edgeData = await edgeResp.json() as {
-            spec?: string; duration?: number; status?: string;
-          };
-          if (edgeData.spec && edgeData.spec.includes("|")) {
-            spec = edgeData.spec;
-            videoDuration = edgeData.duration || 0;
-            console.log("[YouTube] ✅ storyboard spec from Edge Function (dur=" + videoDuration + ")");
-          } else if (edgeData.status === "LOGIN_REQUIRED") {
-            ytIpBlocked = true;
-            console.warn("[YouTube] storyboard: YouTube IP-blocked (edge returned LOGIN_REQUIRED) — skipping all server-side attempts");
+      // 0) Cloudflare Worker proxy — highest priority, different IP range from Vercel
+      const cfWorkerUrl = process.env.CLOUDFLARE_WORKER_URL;
+      if (!spec && cfWorkerUrl) {
+        try {
+          const cfUrl = `${cfWorkerUrl}?v=${adVideoId}`;
+          console.log("[YouTube] cloudflare worker: trying " + cfWorkerUrl.substring(0, 60));
+          const cfResp = await fetch(cfUrl, {
+            headers: { Accept: "application/json" },
+            signal: AbortSignal.timeout(8000),
+          });
+          if (cfResp.ok) {
+            const cfData = await cfResp.json() as {
+              spec?: string; duration?: number; status?: string;
+            };
+            console.log(
+              "[YouTube] cloudflare worker: status=" + (cfData.status || "?") +
+              " dur=" + (cfData.duration || 0) +
+              " specLen=" + (cfData.spec || "").length
+            );
+            if (cfData.spec && cfData.spec.includes("|")) {
+              spec = cfData.spec;
+              videoDuration = cfData.duration || 0;
+              console.log("[YouTube] ✅ storyboard spec from Cloudflare Worker (dur=" + videoDuration + ")");
+            } else if (cfData.status === "LOGIN_REQUIRED") {
+              console.warn("[YouTube] cloudflare worker: YouTube returned LOGIN_REQUIRED");
+            }
+          } else {
+            console.warn("[YouTube] cloudflare worker: HTTP " + cfResp.status);
           }
+        } catch (cfErr) {
+          console.warn("[YouTube] cloudflare worker error:", cfErr);
         }
-      } catch (edgeErr) {
-        console.warn("[YouTube] edge storyboard error:", edgeErr);
+      }
+
+      // 0-a) Vercel Edge Function fallback
+      if (!spec) {
+        try {
+          const prodUrl = process.env.VERCEL_PROJECT_PRODUCTION_URL;
+          const baseUrl = prodUrl
+            ? `https://${prodUrl}`
+            : process.env.VERCEL_URL
+              ? `https://${process.env.VERCEL_URL}`
+              : "http://localhost:3000";
+
+          const edgeUrl = `${baseUrl}/api/yt-storyboard?v=${adVideoId}`;
+          const headers: Record<string, string> = { Accept: "application/json" };
+          const bypassSecret = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
+          if (bypassSecret) headers["x-vercel-protection-bypass"] = bypassSecret;
+
+          const edgeResp = await fetch(edgeUrl, { headers });
+          if (edgeResp.ok) {
+            const edgeData = await edgeResp.json() as {
+              spec?: string; duration?: number; status?: string;
+            };
+            if (edgeData.spec && edgeData.spec.includes("|")) {
+              spec = edgeData.spec;
+              videoDuration = edgeData.duration || 0;
+              console.log("[YouTube] ✅ storyboard spec from Edge Function (dur=" + videoDuration + ")");
+            } else if (edgeData.status === "LOGIN_REQUIRED") {
+              ytIpBlocked = true;
+              console.warn("[YouTube] storyboard: YouTube IP-blocked — skipping server-side attempts");
+            }
+          }
+        } catch (edgeErr) {
+          console.warn("[YouTube] edge storyboard error:", edgeErr);
+        }
       }
 
       // If YouTube blocks this IP range, skip all other server-side attempts
