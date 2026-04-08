@@ -1257,9 +1257,13 @@ export class YouTubeCapture extends BaseChannel {
                   p.then(function(resp) {
                     var clone = resp.clone();
                     clone.json().then(function(j) {
-                      var s = j && j.storyboards && j.storyboards.playerStoryboardSpecRenderer && j.storyboards.playerStoryboardSpecRenderer.spec;
+                      var sb = j && j.storyboards;
+                      var s = sb && sb.playerStoryboardSpecRenderer && sb.playerStoryboardSpecRenderer.spec;
                       var d = j && j.videoDetails && j.videoDetails.lengthSeconds;
-                      if (s) window.__ytSbSpec = { spec: s, duration: parseFloat(d || '0'), src: 'fetch' };
+                      var sbDump = '';
+                      try { sbDump = JSON.stringify(sb).substring(0, 2000); } catch(e2) {}
+                      if (s) window.__ytSbSpec = { spec: s, duration: parseFloat(d || '0'), src: 'fetch', sbJson: sbDump };
+                      else if (sb) window.__ytSbSpec = { spec: '', duration: parseFloat(d || '0'), src: 'fetch_nospc', sbJson: sbDump };
                     }).catch(function(){});
                   }).catch(function(){});
                 }
@@ -1299,15 +1303,21 @@ export class YouTubeCapture extends BaseChannel {
           let intercepted = false;
           for (let w = 0; w < 8; w++) {
             await new Promise((r) => setTimeout(r, 1000));
-            const result = await page.evaluate<{ spec: string; duration: number; src: string } | null>(
+            const result = await page.evaluate<{ spec: string; duration: number; src: string; sbJson?: string } | null>(
               "window.__ytSbSpec"
             );
-            if (result && result.spec) {
-              spec = result.spec;
-              videoDuration = result.duration;
-              intercepted = true;
-              console.log("[YouTube] storyboard spec from browser XHR intercept (" + result.src + ")");
-              break;
+            if (result) {
+              console.log("[YouTube] storyboard XHR result: src=" + result.src + " specLen=" + (result.spec || "").length + " dur=" + result.duration);
+              if (result.sbJson) {
+                console.log("[YouTube] storyboard XHR sbJson: " + result.sbJson.substring(0, 500));
+              }
+              if (result.spec) {
+                spec = result.spec;
+                videoDuration = result.duration;
+                intercepted = true;
+                console.log("[YouTube] storyboard spec from browser XHR intercept (" + result.src + ")");
+                break;
+              }
             }
           }
 
