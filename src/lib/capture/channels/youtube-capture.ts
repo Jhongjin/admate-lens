@@ -793,7 +793,7 @@ export class YouTubeCapture extends BaseChannel {
             'font-size: 13px',
             'font-weight: 700',
             'color: #ffffff',
-            'text-shadow: 0 1px 2px rgba(0,0,0,0.8)',
+            'filter: drop-shadow(0px 1px 2px rgba(0,0,0,0.75))',
             '-webkit-font-smoothing: antialiased',
             'font-family: "YouTube Noto", "Noto Sans KR", "Malgun Gothic", Roboto, Arial, sans-serif',
             'pointer-events: auto',
@@ -801,9 +801,9 @@ export class YouTubeCapture extends BaseChannel {
             'box-sizing: border-box',
           ].join(' !important;') + ' !important';
           sponsorText.innerHTML = [
-            '<span style="margin-right:8px">스폰서</span>',
-            '<span style="font-family:Arial,sans-serif;font-size:10px;font-weight:bold;width:14px;height:14px;border:1.5px solid #fff;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;line-height:1;margin-right:12px;box-sizing:border-box;box-shadow:0 1px 2px rgba(0,0,0,0.8)">i</span>',
-            '<span style="display:inline-block;max-width:280px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;vertical-align:bottom;">' + sponsorDomainText + '</span>'
+            '<span style="margin-right:6px">스폰서</span>',
+            '<svg width="13" height="13" viewBox="0 0 13 13" fill="none" xmlns="http://www.w3.org/2000/svg" style="margin-right:10px; flex-shrink: 0;"><circle cx="6.5" cy="6.5" r="5.5" stroke="white" stroke-width="1.2"/><rect x="5.9" y="3.3" width="1.2" height="1.2" fill="white"/><rect x="5.9" y="5.7" width="1.2" height="4.2" fill="white"/></svg>',
+            '<span style="display:inline-block;max-width:280px;font-weight:500;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;vertical-align:bottom;">' + sponsorDomainText + '</span>'
           ].join('');
           adLowerStack.appendChild(ctaCard);
           adLowerStack.appendChild(sponsorText);
