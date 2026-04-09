@@ -63,6 +63,7 @@ export async function POST(request: NextRequest) {
         videoUrl?: string;
         skipSeconds?: number;
         adTitle?: string;
+        enableCtaText?: boolean;
         ctaText?: string;
         landingUrl?: string;
         displayUrl?: string;

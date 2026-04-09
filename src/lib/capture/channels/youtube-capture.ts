@@ -621,6 +621,7 @@ export class YouTubeCapture extends BaseChannel {
     instreamOpts: {
       videoUrl?: string;
       adTitle?: string;
+      enableCtaText?: boolean;
       ctaText?: string;
       landingUrl?: string;
       displayUrl?: string;
@@ -695,6 +696,7 @@ export class YouTubeCapture extends BaseChannel {
           const domainText = ${JSON.stringify(displayUrlCard)};
           const sponsorDomainText = ${JSON.stringify(displayUrlSponsor)};
           const titleText = ${JSON.stringify(adTitle)};
+          const enableCtaText = ${JSON.stringify(instreamOpts.enableCtaText !== false)};
           const ctaBtnText = ${JSON.stringify(ctaText)};
           const progressFillPct = ${JSON.stringify(
             Math.min(100, Math.max(0, instreamOpts.progressFillPercent ?? 33))
@@ -856,7 +858,9 @@ export class YouTubeCapture extends BaseChannel {
             '<svg width="13" height="13" viewBox="0 0 13 13" fill="none" xmlns="http://www.w3.org/2000/svg" style="margin-right:10px; flex-shrink: 0;"><circle cx="6.5" cy="6.5" r="5.5" stroke="white" stroke-width="1.2"/><rect x="5.9" y="3.3" width="1.2" height="1.2" fill="white"/><rect x="5.9" y="5.7" width="1.2" height="4.2" fill="white"/></svg>',
             '<span style="display:inline-block;max-width:280px;font-weight:500;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;vertical-align:bottom;">' + sponsorDomainText + '</span>'
           ].join('');
-          adLowerStack.appendChild(ctaCard);
+          if (enableCtaText) {
+            adLowerStack.appendChild(ctaCard);
+          }
           adLowerStack.appendChild(sponsorText);
           overlay.appendChild(adLowerStack);
 

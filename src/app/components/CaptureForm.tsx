@@ -716,6 +716,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                     return Number.isFinite(n) && n >= 0 ? n : 5;
                   })(),
                   adTitle: form.instreamAdTitle || undefined,
+                  enableCtaText: form.instreamEnableCtaText,
                   ctaText: form.instreamEnableCtaText
                     ? form.instreamCtaText || undefined
                     : undefined,
