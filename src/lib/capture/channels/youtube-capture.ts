@@ -1896,15 +1896,20 @@ export class YouTubeCapture extends BaseChannel {
               countryCode.id = 'country-code';
             }
             
-            // #logo > div#logo-icon or a#logo wrap the SVG tightly. Position relative relative to this wrapper.
-            const logoA = logoRenderer.querySelector('a#logo') || logoRenderer.querySelector('#logo-icon') || logoRenderer;
-            logoA.style.position = 'relative';
-            if (countryCode.parentNode !== logoA) {
-               logoA.appendChild(countryCode);
+            // Ensure countryCode is a child of logoRenderer directly
+            if (countryCode.parentNode !== logoRenderer) {
+              logoRenderer.appendChild(countryCode);
             }
 
+            // Force flex layout to guarantee both logo and KR align vertically to the center
+            logoRenderer.style.display = 'flex';
+            logoRenderer.style.alignItems = 'center';
+
             countryCode.textContent = 'KR';
-            countryCode.style.cssText = 'position: absolute; top: 0px; right: -16px; color: var(--yt-spec-text-secondary, #606060); font-family: Roboto, Arial, sans-serif; font-size: 10px; font-weight: 400; padding: 0; margin: 0; line-height: 1;';
+            // Position relative nudges the text upwards from the true vertical center.
+            // This completely ignores the 56px container height trap.
+            countryCode.className = 'style-scope ytd-topbar-logo-renderer';
+            countryCode.style.cssText = 'color: var(--yt-spec-text-secondary, #606060); font-family: Roboto, Arial, sans-serif; font-size: 10px; font-weight: 400; padding: 0; margin: 0 0 0 2px; position: relative; top: -8px; line-height: 1; display: inline-block;';
           }
 
           const floater = document.createElement("div");
