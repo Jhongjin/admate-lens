@@ -1909,7 +1909,7 @@ export class YouTubeCapture extends BaseChannel {
             // Position relative nudges the text upwards from the true vertical center.
             // This completely ignores the 56px container height trap.
             countryCode.className = 'style-scope ytd-topbar-logo-renderer';
-            countryCode.style.cssText = 'color: var(--yt-spec-text-secondary, #606060); font-family: Roboto, Arial, sans-serif; font-size: 10px; font-weight: 400; padding: 0; margin: 0 0 0 2px; position: relative; top: -8px; line-height: 1; display: inline-block;';
+            countryCode.style.cssText = 'color: var(--yt-spec-text-secondary, #606060); font-family: Roboto, Arial, sans-serif; font-size: 10px; font-weight: 400; padding: 0; margin: 0; position: relative; top: -5px; left: -8px; line-height: normal; display: inline-block;';
           }
 
           const floater = document.createElement("div");
