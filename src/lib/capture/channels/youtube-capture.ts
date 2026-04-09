@@ -89,6 +89,32 @@ async function fetchYoutubeChannelBannerUrl(channelUrl: string): Promise<string 
   }
 }
 
+/** YouTube Channel Logo(Profile Image) URL Fetcher */
+async function fetchYoutubeChannelLogoUrl(channelUrl: string): Promise<string | null> {
+  try {
+    const formattedUrl = channelUrl.startsWith("http") ? channelUrl : `https://${channelUrl}`;
+    const res = await fetch(formattedUrl, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko)",
+        "Accept-Language": "en-US,en;q=0.9",
+      }
+    });
+    const html = await res.text();
+    const match = html.match(/ytInitialData\s*=\s*(\{.*?\});/);
+    if (!match) return null;
+    const data = JSON.parse(match[1]);
+    // 다양한 경로에서 채널 아바타 추출 시도
+    const logo =
+      data?.header?.pageHeaderRenderer?.content?.pageHeaderViewModel?.image?.decoratedAvatarViewModel?.avatar?.avatarViewModel?.image?.sources?.[0]?.url ||
+      data?.header?.c4TabbedHeaderRenderer?.avatar?.thumbnails?.[1]?.url ||
+      data?.header?.c4TabbedHeaderRenderer?.avatar?.thumbnails?.[0]?.url;
+    return logo || null;
+  } catch (err) {
+    console.error("[fetchYoutubeChannelLogoUrl] err:", err);
+    return null;
+  }
+}
+
 /** YouTube URL에서 Video ID 추출 */
 function extractVideoId(url: string): string | null {
   try {
@@ -195,14 +221,33 @@ export class YouTubeCapture extends BaseChannel {
     }
 
     // 인스트림 카드 로고: 업로드 URL이 있으면 서버에서 fetch → data URL (YouTube 페이지 CSP/CORS 회피)
+    // 업로드가 없으면 companionChannelUrl에서 채널 로고 자동 추출
     let instreamAvatarDataUrl = creativeDataUrl;
-    if (adType === "preroll" && instreamOpts.avatarImageUrl?.trim()) {
-      const av = await imageUrlToDataUrl(instreamOpts.avatarImageUrl.trim());
-      if (av.ok) {
-        instreamAvatarDataUrl = av.dataUrl;
-        console.log(`[YouTube] 로고 이미지 적용 (${av.sizeKB}KB)`);
-      } else {
-        console.warn("[YouTube] 로고 URL fetch 실패 — 썸네일로 대체");
+    if (adType === "preroll") {
+      if (instreamOpts.avatarImageUrl?.trim()) {
+        // 1순위: 직접 업로드된 로고
+        const av = await imageUrlToDataUrl(instreamOpts.avatarImageUrl.trim());
+        if (av.ok) {
+          instreamAvatarDataUrl = av.dataUrl;
+          console.log(`[YouTube] 로고 이미지 적용 (${av.sizeKB}KB)`);
+        } else {
+          console.warn("[YouTube] 로고 URL fetch 실패 — 썸네일로 대체");
+        }
+      } else if (instreamOpts.companionChannelUrl?.trim()) {
+        // 2순위: 채널 URL에서 프로필 이미지 자동 추출
+        console.log(`[YouTube] 채널 로고 자동 추출 시도: ${instreamOpts.companionChannelUrl}`);
+        const channelLogoUrl = await fetchYoutubeChannelLogoUrl(instreamOpts.companionChannelUrl.trim());
+        if (channelLogoUrl) {
+          const av = await imageUrlToDataUrl(channelLogoUrl);
+          if (av.ok) {
+            instreamAvatarDataUrl = av.dataUrl;
+            console.log(`[YouTube] 채널 로고 자동 적용 성공 (${av.sizeKB}KB)`);
+          } else {
+            console.warn("[YouTube] 채널 로고 fetch 실패 — 썸네일로 대체");
+          }
+        } else {
+          console.warn("[YouTube] 채널 로고 URL 추출 실패 — 썸네일로 대체");
+        }
       }
     }
 
