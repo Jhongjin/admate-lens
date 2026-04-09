@@ -1894,12 +1894,17 @@ export class YouTubeCapture extends BaseChannel {
             if (!countryCode) {
               countryCode = document.createElement('span');
               countryCode.id = 'country-code';
-              logoRenderer.appendChild(countryCode);
             }
+            
+            // #logo > div#logo-icon or a#logo wrap the SVG tightly. Position relative relative to this wrapper.
+            const logoA = logoRenderer.querySelector('a#logo') || logoRenderer.querySelector('#logo-icon') || logoRenderer;
+            logoA.style.position = 'relative';
+            if (countryCode.parentNode !== logoA) {
+               logoA.appendChild(countryCode);
+            }
+
             countryCode.textContent = 'KR';
-            countryCode.className = 'style-scope ytd-topbar-logo-renderer';
-            countryCode.style.cssText = 'color: var(--yt-spec-text-secondary, #606060); font-family: Roboto, Arial, sans-serif; font-size: 10px; margin: 0 0 0 2px;';
-            logoRenderer.style.position = ''; // Remove absolute/relative hacking
+            countryCode.style.cssText = 'position: absolute; top: 0px; right: -16px; color: var(--yt-spec-text-secondary, #606060); font-family: Roboto, Arial, sans-serif; font-size: 10px; font-weight: 400; padding: 0; margin: 0; line-height: 1;';
           }
 
           const floater = document.createElement("div");
