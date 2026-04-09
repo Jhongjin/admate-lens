@@ -58,9 +58,33 @@ type InstreamOptsPayload = {
   displayPath1?: string;
   displayPath2?: string;
   companionImageUrl?: string;
+  companionChannelUrl?: string;
+  companionUseChannelBanner?: boolean;
   /** 카드 원형 로고(업로드 URL → 서버에서 data URL로 변환 후 주입) */
   avatarImageUrl?: string;
 };
+
+/** YouTube Channel Banner URL Fetcher */
+async function fetchYoutubeChannelBannerUrl(channelUrl: string): Promise<string | null> {
+  try {
+    const res = await fetch(channelUrl, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko)",
+        "Accept-Language": "en-US,en;q=0.9",
+      }
+    });
+    const html = await res.text();
+    const match = html.match(/ytInitialData\s*=\s*(\{.*?\});/);
+    if (!match) return null;
+    const data = JSON.parse(match[1]);
+    const banner = data?.header?.pageHeaderRenderer?.content?.pageHeaderViewModel?.banner?.imageBannerViewModel?.image?.sources?.[0]?.url 
+      || data?.header?.c4TabbedHeaderRenderer?.banner?.thumbnails?.[0]?.url;
+    return banner || null;
+  } catch (err) {
+    console.error("[fetchYoutubeChannelBannerUrl] err:", err);
+    return null;
+  }
+}
 
 /** YouTube URL에서 Video ID 추출 */
 function extractVideoId(url: string): string | null {
@@ -176,6 +200,31 @@ export class YouTubeCapture extends BaseChannel {
         console.log(`[YouTube] 로고 이미지 적용 (${av.sizeKB}KB)`);
       } else {
         console.warn("[YouTube] 로고 URL fetch 실패 — 썸네일로 대체");
+      }
+    }
+
+    // 컴패니언 배너 이미지: URL 파싱 -> data URL
+    let instreamCompanionDataUrl: string | null = null;
+    if (adType === "preroll") {
+      let companionSourceUrl = instreamOpts.companionImageUrl?.trim();
+      if (instreamOpts.companionUseChannelBanner && instreamOpts.companionChannelUrl?.trim()) {
+        console.log(`[YouTube] 채널 배너 URL 파싱 시도: ${instreamOpts.companionChannelUrl}`);
+        const extractedBanner = await fetchYoutubeChannelBannerUrl(instreamOpts.companionChannelUrl.trim());
+        if (extractedBanner) {
+          companionSourceUrl = extractedBanner;
+          console.log(`[YouTube] 채널 배너 원본 이미지 발견: ${extractedBanner}`);
+        } else {
+          console.warn("[YouTube] 채널 배너를 찾지 못했습니다.");
+        }
+      }
+      if (companionSourceUrl) {
+        const comp = await imageUrlToDataUrl(companionSourceUrl);
+        if (comp.ok) {
+          instreamCompanionDataUrl = comp.dataUrl;
+          console.log(`[YouTube] 컴패니언 배너 데이터 주입 성공 (${comp.sizeKB}KB)`);
+        } else {
+          console.warn("[YouTube] 컴패니언 배너 이미지 fetch 실패");
+        }
       }
     }
 
@@ -468,7 +517,7 @@ export class YouTubeCapture extends BaseChannel {
           displayUrl: instreamOpts.displayUrl || "",
           displayPath1: instreamOpts.displayPath1 || "",
           displayPath2: instreamOpts.displayPath2 || "",
-          companionImageUrl: instreamOpts.companionImageUrl || "",
+          companionImageUrl: instreamCompanionDataUrl || instreamOpts.companionImageUrl || "",
           avatarImageUrl: instreamAvatarDataUrl,
           progressFillPercent: prerollProgressPercent,
         };
@@ -1852,18 +1901,30 @@ export class YouTubeCapture extends BaseChannel {
             "height:" + size + "px",
             "top:" + topPx + "px",
             "left:" + leftPx + "px",
-            "border-radius:50%",
-            "overflow:hidden",
-            "box-sizing:border-box",
             "pointer-events:none",
-            "box-shadow:0 0 0 2px #fff, 0 1px 4px rgba(0,0,0,0.35)",
           ].join(";");
-          const img = document.createElement("img");
-          img.src = dataUrl;
-          img.alt = "";
-          img.draggable = false;
-          img.style.cssText = "width:100%;height:100%;object-fit:cover;display:block;";
-          floater.appendChild(img);
+          
+          floater.innerHTML = \`
+            <div style="position: absolute; right: 100%; top: 50%; transform: translateY(-50%); display: flex; align-items: center; gap: 24px; padding-right: 24px; color: var(--yt-spec-text-primary, #0f0f0f);">
+              <div style="width: 24px; height: 24px; display: flex; justify-content: center; align-items: center;">
+                <svg viewBox="0 0 24 24" preserveAspectRatio="xMidYMid meet" focusable="false" style="display: block; width: 100%; height: 100%; fill: currentColor;">
+                  <path d="M14,13h-3v3H9v-3H6v-2h3V8h2v3h3V13z M17,6H3v12h14v-6.39l4,1.83V8.56l-4,1.83V6z M16,5v14H2V5H16z"></path>
+                </svg>
+              </div>
+              <div style="width: 24px; height: 24px; display: flex; justify-content: center; align-items: center; position: relative;">
+                <svg viewBox="0 0 24 24" preserveAspectRatio="xMidYMid meet" focusable="false" style="display: block; width: 100%; height: 100%; fill: currentColor;">
+                  <path d="M10,20h4c0,1.1-0.9,2-2,2S10,21.1,10,20z M20,17.35V19H4v-1.65l2-1.88v-5.15c0-2.92,1.56-5.22,4-5.98V3.96 c0-1.42,1.49-2.5,2.99-1.76C13.64,2.52,14,3.23,14,3.96l0,0.42c2.44,0.76,4,3.06,4,5.98v5.15L20,17.35z M19,17.77l-2-1.88v-5.47 c0-2.47-1.19-4.36-3.13-5.1c-1.26-0.53-2.64-0.5-3.84,0.03C8.15,6.11,7,7.99,7,10.42v5.47l-2,1.88V18h14V17.77z"></path>
+                </svg>
+                <div style="position: absolute; top: 0; right: 0; background: #cc0000; color: white; font-family: Roboto, Arial, sans-serif; font-size: 10px; font-weight: 500; border-radius: 10px; min-width: 16px; height: 16px; display: flex; align-items: center; justify-content: center; line-height: 1; padding: 0 4px; transform: translate(50%, -20%); border: 2px solid var(--yt-spec-base-background, white); box-sizing: content-box;">
+                  9+
+                </div>
+              </div>
+            </div>
+            <div style="width: 100%; height: 100%; border-radius: 50%; overflow: hidden; box-shadow: 0 0 0 2px var(--yt-spec-base-background, white), 0 1px 4px rgba(0,0,0,0.35);">
+              <img src="\${dataUrl}" alt="" draggable="false" style="width: 100%; height: 100%; object-fit: cover; display: block;" />
+            </div>
+          \`;
+          
           document.body.appendChild(floater);
 
           console.log("[YouTube Inject] 👤 마스트헤드 로그인 룩 적용 (숨김 " + hideSet.size + " + 플로터)");

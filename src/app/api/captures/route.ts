@@ -69,6 +69,8 @@ export async function POST(request: NextRequest) {
         displayPath1?: string;
         displayPath2?: string;
         companionImageUrl?: string;
+        companionChannelUrl?: string;
+        companionUseChannelBanner?: boolean;
         avatarImageUrl?: string;
       };
     };

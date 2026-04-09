@@ -322,6 +322,7 @@ interface CaptureFormData {
   instreamDisplayPath2: string;
   instreamLogoImageUrl: string;
   instreamCompanionImageUrl: string;
+  instreamCompanionChannelUrl: string;
   instreamUseChannelBanner: boolean;
 }
 
@@ -380,6 +381,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
     instreamDisplayPath2: "",
     instreamLogoImageUrl: "",
     instreamCompanionImageUrl: "",
+    instreamCompanionChannelUrl: "",
     instreamUseChannelBanner: true,
   });
 
@@ -726,6 +728,10 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                     form.instreamUseChannelBanner
                       ? undefined
                       : form.instreamCompanionImageUrl || undefined,
+                  companionChannelUrl:
+                    form.instreamUseChannelBanner
+                      ? form.instreamCompanionChannelUrl || undefined
+                      : undefined,
                   companionUseChannelBanner: form.instreamUseChannelBanner,
                 }
               : undefined,
@@ -763,6 +769,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
         instreamDisplayPath2: "",
         instreamLogoImageUrl: "",
         instreamCompanionImageUrl: "",
+        instreamCompanionChannelUrl: "",
         instreamUseChannelBanner: true,
       }));
       setUploadedFile(null);
@@ -1257,6 +1264,28 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                         이미지 업로드
                       </label>
                     </div>
+                    {form.instreamUseChannelBanner && (
+                      <div className="mt-2 space-y-2">
+                        <input
+                          type="url"
+                          className="form-input"
+                          placeholder="채널 URL (예: https://youtube.com/@shiseidokorea)"
+                          value={form.instreamCompanionChannelUrl}
+                          onChange={(e) =>
+                            setForm((prev) => ({
+                              ...prev,
+                              instreamCompanionChannelUrl: e.target.value,
+                            }))
+                          }
+                        />
+                        <p
+                          className="text-[10px] mt-0.5"
+                          style={{ color: "var(--color-text-muted)" }}
+                        >
+                          * 해당 채널의 배너 이미지를 가져와 적용합니다.
+                        </p>
+                      </div>
+                    )}
                     {!form.instreamUseChannelBanner && (
                       <div className="mt-2 space-y-2">
                         <button
