@@ -742,7 +742,6 @@ export class YouTubeCapture extends BaseChannel {
             'background: rgba(0,0,0,0.65)',
             'border-radius: 8px',
             'padding: 8px 12px',
-            'width: 320px',
             'max-width: 100%',
             'z-index: 10',
             'overflow: hidden',
@@ -770,7 +769,7 @@ export class YouTubeCapture extends BaseChannel {
           ctaTextDiv.style.cssText = 'flex:1;min-width:0;margin-right:12px';
           // font-family에 작은따옴표를 쓰면 evaluate 문자열이 깨져 SyntaxError 남 → HTML 엔티티 사용
           ctaTextDiv.innerHTML = [
-            '<div style="font-size:14px;font-weight:500;color:#fff;font-family:&quot;YouTube Noto&quot;,Roboto,Arial,Helvetica,sans-serif;white-space:normal;line-height:20px;letter-spacing:normal;word-break:keep-all">' + titleText + '</div>',
+            '<div style="font-size:14px;font-weight:500;color:#fff;font-family:&quot;YouTube Noto&quot;,Roboto,Arial,Helvetica,sans-serif;white-space:nowrap;line-height:20px;letter-spacing:normal;word-break:keep-all">' + titleText + '</div>',
             '<div style="font-size:12px;color:rgba(255,255,255,0.7);font-family:&quot;YouTube Noto&quot;,Roboto,Arial,Helvetica,sans-serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px;line-height:16px;letter-spacing:normal">' + domainText + '</div>',
           ].join('');
           ctaCard.appendChild(ctaTextDiv);
