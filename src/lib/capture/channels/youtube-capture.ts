@@ -702,14 +702,14 @@ export class YouTubeCapture extends BaseChannel {
           adLowerStack.setAttribute('data-injected', 'admate-youtube-preroll');
           adLowerStack.style.cssText = [
             'position: absolute',
-            'left: 22px',
-            'bottom: 15px',
+            'left: 16px',
+            'bottom: 16px',
             'z-index: 20',
             'display: flex',
             'flex-direction: column',
             'align-items: flex-start',
             'justify-content: flex-end',
-            'gap: 36px',
+            'gap: 8px',
             'margin: 0',
             'padding: 0',
             'pointer-events: none',
@@ -720,9 +720,9 @@ export class YouTubeCapture extends BaseChannel {
             'position: relative',
             'display: flex',
             'align-items: center',
-            'background: rgba(0,0,0,0.6)',
+            'background: rgba(0,0,0,0.65)',
             'border-radius: 8px',
-            'padding: 12px',
+            'padding: 8px 12px',
             'max-width: 400px',
             'z-index: 10',
             'overflow: hidden',
@@ -735,12 +735,12 @@ export class YouTubeCapture extends BaseChannel {
           if (avatarImgUrl) {
             const ctaIcon = document.createElement('img');
             ctaIcon.src = avatarImgUrl;
-            ctaIcon.style.cssText = 'width:40px !important;height:40px !important;border-radius:50% !important;object-fit:cover !important;flex-shrink:0 !important;margin-right:12px !important';
+            ctaIcon.style.cssText = 'width:38px !important;height:38px !important;border-radius:50% !important;object-fit:cover !important;flex-shrink:0 !important;margin-right:12px !important';
             ctaCard.appendChild(ctaIcon);
           } else {
             // 이미지가 없으면 기본 아이콘 표시 (사용자 아바타 느낌)
             const ctaIconFallback = document.createElement('div');
-            ctaIconFallback.style.cssText = 'width:40px !important;height:40px !important;border-radius:50% !important;background:#555 !important;display:flex;align-items:center;justify-content:center;flex-shrink:0 !important;margin-right:12px !important;color:#fff;font-size:20px;';
+            ctaIconFallback.style.cssText = 'width:38px !important;height:38px !important;border-radius:50% !important;background:#555 !important;display:flex;align-items:center;justify-content:center;flex-shrink:0 !important;margin-right:12px !important;color:#fff;font-size:20px;';
             ctaIconFallback.textContent = titleText.charAt(0) || '선';
             ctaCard.appendChild(ctaIconFallback);
           }
@@ -762,7 +762,7 @@ export class YouTubeCapture extends BaseChannel {
           ctaBtn.textContent = ctaBtnText;
           ctaCard.appendChild(ctaBtn);
 
-          // ─── "스폰서 ⓘ  URL" — 실제 유튜브처럼 배경색 없이 약간 투명한 텍스트로 처리
+          // ─── "스폰서 ⓘ  URL" — 밝은 영상에서도 읽히도록 다중 텍스트 그림자 적용
           const sponsorText = document.createElement('div');
           sponsorText.id = 'admate-preroll-sponsor';
           sponsorText.setAttribute('data-injected', 'admate-youtube-preroll');
@@ -774,9 +774,9 @@ export class YouTubeCapture extends BaseChannel {
             'padding: 0',
             'font-size: 13px',
             'line-height: 16px',
-            'color: rgba(255, 255, 255, 0.75)',
-            'font-family: "YouTube Noto", Roboto, Arial, Helvetica, sans-serif',
-            'text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6), 0 0 2px rgba(0, 0, 0, 0.6)',
+            'color: rgba(255, 255, 255, 0.9)',
+            'font-family: Roboto, Arial, Helvetica, sans-serif',
+            'text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9), 0 1px 8px rgba(0, 0, 0, 0.8), 0 0 14px rgba(0, 0, 0, 0.8), 0 0 2px rgba(0, 0, 0, 0.9)',
             '-webkit-font-smoothing: antialiased',
             'font-weight: 500',
             'pointer-events: auto',
@@ -784,8 +784,8 @@ export class YouTubeCapture extends BaseChannel {
             'box-sizing: border-box',
           ].join(' !important;') + ' !important';
           sponsorText.innerHTML = [
-            '<span style="margin-right:6px">스폰서</span>',
-            '<span style="font-family:Arial,Helvetica,sans-serif;font-size:9px;font-weight:600;width:13px;height:13px;border:1.5px solid rgba(255,255,255,0.75);border-radius:50%;display:inline-flex;align-items:center;justify-content:center;line-height:1;flex-shrink:0;box-sizing:border-box;text-shadow:none;margin-right:8px">i</span>',
+            '<span style="margin-right:4px">스폰서</span>',
+            '<span style="font-family:Arial,Helvetica,sans-serif;font-size:9px;font-weight:600;width:13px;height:13px;border:1px solid rgba(255,255,255,0.8);border-radius:50%;display:inline-flex;align-items:center;justify-content:center;line-height:1;flex-shrink:0;box-sizing:border-box;margin-right:6px">i</span>',
             '<span style="display:inline-block;max-width:280px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;vertical-align:bottom;">' + sponsorDomainText + '</span>'
           ].join('');
           adLowerStack.appendChild(ctaCard);
