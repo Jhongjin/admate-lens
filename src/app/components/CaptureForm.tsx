@@ -312,6 +312,7 @@ interface CaptureFormData {
   youtubeAdType: YouTubeAdType; // YouTube 광고 유형
   // 🎬 인스트림 광고 옵션
   instreamVideoUrl: string; // YouTube 동영상 URL
+  instreamPublisherVideoUrl: string; // 콘텐츠(게재면) 영상 URL
   instreamCaptureSecond: string; // 캡처 시점(초)
   instreamAdTitle: string;
   instreamEnableCtaText: boolean;
@@ -372,6 +373,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
     targetAdSizes: [],
     youtubeAdType: "preroll",
     instreamVideoUrl: "",
+    instreamPublisherVideoUrl: "",
     instreamCaptureSecond: "3",
     instreamAdTitle: "",
     instreamEnableCtaText: true,
@@ -682,8 +684,21 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
 
     try {
       // 🎬 YouTube 채널인 경우 기본 게재면 URL 자동 지정
+      // 콘텐츠 URL이 입력되었으면 해당 URL, 없으면 한국 인기 콘텐츠 중 랜덤
+      const KOREAN_FALLBACK_VIDEOS = [
+        "https://www.youtube.com/watch?v=09R8_2nJtjg", // BLACKPINK - Pink Venom
+        "https://www.youtube.com/watch?v=gdZLi9oWNZg", // BTS - Dynamite
+        "https://www.youtube.com/watch?v=MBdVXkSdhwU", // IVE - After LIKE
+        "https://www.youtube.com/watch?v=pB-5XG-DbAA", // NewJeans - Hype Boy
+        "https://www.youtube.com/watch?v=ArmDp-zijuc", // aespa - Next Level
+        "https://www.youtube.com/watch?v=Oc_D9oDKDqE", // TWICE - FANCY
+        "https://www.youtube.com/watch?v=FodHDBg9q7E", // LE SSERAFIM - ANTIFRAGILE
+        "https://www.youtube.com/watch?v=R4QhDP-SLQY", // BTS - Boy With Luv
+      ];
+      const randomKoreanUrl = KOREAN_FALLBACK_VIDEOS[Math.floor(Math.random() * KOREAN_FALLBACK_VIDEOS.length)];
+      const contentVideoUrl = form.instreamPublisherVideoUrl?.trim() || randomKoreanUrl;
       const publisherUrls = isYouTubeChannel && form.selectedPublishers.length === 0
-        ? ["https://www.youtube.com/watch?v=dQw4w9WgXcQ"]
+        ? [contentVideoUrl]
         : form.selectedPublishers;
 
       const res = await fetch("/api/captures", {
@@ -763,6 +778,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
         clickUrl: "",
         captureLanding: false,
         instreamVideoUrl: "",
+        instreamPublisherVideoUrl: "",
         instreamCaptureSecond: "3",
         instreamAdTitle: "",
         instreamEnableCtaText: true,
@@ -979,6 +995,34 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                       style={{ color: "var(--color-text-muted)" }}
                     >
                       프레임 추출 대상이 되는 광고 원본 영상 URL입니다.
+                    </p>
+                  </div>
+
+                  {/* 콘텐츠(게재면) 영상 URL */}
+                  <div>
+                    <label
+                      className="text-[11px] font-medium mb-1 block"
+                      style={{ color: "var(--color-text-secondary)" }}
+                    >
+                      📺 콘텐츠 영상 URL <span className="text-[10px] font-normal" style={{ color: "var(--color-text-muted)" }}>(선택 – 미입력 시 한국 인기 영상 랜덤)</span>
+                    </label>
+                    <input
+                      type="url"
+                      className="form-input"
+                      placeholder="https://www.youtube.com/watch?v=..."
+                      value={form.instreamPublisherVideoUrl}
+                      onChange={(e) =>
+                        setForm((prev) => ({
+                          ...prev,
+                          instreamPublisherVideoUrl: e.target.value,
+                        }))
+                      }
+                    />
+                    <p
+                      className="text-[10px] mt-0.5"
+                      style={{ color: "var(--color-text-muted)" }}
+                    >
+                      광고가 노출될 유튜브 콘텐츠 영상입니다. 비워두면 한국 인기 영상이 자동 선택됩니다.
                     </p>
                   </div>
 
