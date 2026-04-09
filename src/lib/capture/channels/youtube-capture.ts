@@ -1887,6 +1887,24 @@ export class YouTubeCapture extends BaseChannel {
           if (leftPx + size > window.innerWidth - 4) leftPx = window.innerWidth - size - 8;
           if (leftPx < 4) leftPx = 4;
 
+          // Add 'KR' label to YouTube logo
+          const logoRenderer = masthead.querySelector('ytd-topbar-logo-renderer');
+          if (logoRenderer) {
+            let countryCode = logoRenderer.querySelector('#country-code');
+            if (!countryCode) {
+              countryCode = document.createElement('span');
+              countryCode.id = 'country-code';
+              // logoRenderer.querySelector('a') or just append to logoRenderer
+              // Usually the a tag #logo contains it, but appending to the renderer also works if handled properly.
+              // Let's attach to the #logo-icon container if it exists, otherwise to logoRenderer
+              const logoIconContainer = logoRenderer.querySelector('#logo-icon') || logoRenderer;
+              logoRenderer.appendChild(countryCode);
+            }
+            countryCode.textContent = 'KR';
+            countryCode.style.cssText = 'color: #606060; font-family: Roboto, Arial, sans-serif; font-size: 10px; position: absolute; top: -2px; right: -14px;';
+            logoRenderer.style.position = 'relative'; // Ensure relative positioning
+          }
+
           const floater = document.createElement("div");
           floater.id = "admate-fake-profile-floater";
           floater.setAttribute("data-injected", "admate-youtube-avatar");
@@ -1902,18 +1920,16 @@ export class YouTubeCapture extends BaseChannel {
           
           floater.innerHTML = \`
             <div style="position: absolute; right: 100%; top: 50%; transform: translateY(-50%); display: flex; align-items: center; gap: 24px; padding-right: 24px; color: var(--yt-spec-text-primary, #0f0f0f);">
-              <div style="width: 24px; height: 24px; display: flex; justify-content: center; align-items: center;">
-                <svg viewBox="0 0 24 24" preserveAspectRatio="xMidYMid meet" focusable="false" style="display: block; width: 100%; height: 100%; fill: currentColor;">
-                  <path d="M14,13h-3v3H9v-3H6v-2h3V8h2v3h3V13z M17,6H3v12h14v-6.39l4,1.83V8.56l-4,1.83V6z M16,5v14H2V5H16z"></path>
+              <div style="display: flex; align-items: center; gap: 6px; background-color: var(--yt-spec-badge-chip-background, rgba(0,0,0,0.05)); padding: 0 16px 0 12px; height: 36px; border-radius: 18px; font-family: Roboto, Arial, sans-serif; font-size: 14px; font-weight: 500;">
+                <svg viewBox="0 0 24 24" preserveAspectRatio="xMidYMid meet" focusable="false" style="display: block; width: 24px; height: 24px; fill: currentColor;">
+                  <path d="M19,13h-6v6h-2v-6H5v-2h6V5h2v6h6V13z"></path>
                 </svg>
+                <span>만들기</span>
               </div>
               <div style="width: 24px; height: 24px; display: flex; justify-content: center; align-items: center; position: relative;">
                 <svg viewBox="0 0 24 24" preserveAspectRatio="xMidYMid meet" focusable="false" style="display: block; width: 100%; height: 100%; fill: currentColor;">
                   <path d="M10,20h4c0,1.1-0.9,2-2,2S10,21.1,10,20z M20,17.35V19H4v-1.65l2-1.88v-5.15c0-2.92,1.56-5.22,4-5.98V3.96 c0-1.42,1.49-2.5,2.99-1.76C13.64,2.52,14,3.23,14,3.96l0,0.42c2.44,0.76,4,3.06,4,5.98v5.15L20,17.35z M19,17.77l-2-1.88v-5.47 c0-2.47-1.19-4.36-3.13-5.1c-1.26-0.53-2.64-0.5-3.84,0.03C8.15,6.11,7,7.99,7,10.42v5.47l-2,1.88V18h14V17.77z"></path>
                 </svg>
-                <div style="position: absolute; top: 0; right: 0; background: #cc0000; color: white; font-family: Roboto, Arial, sans-serif; font-size: 10px; font-weight: 500; border-radius: 10px; min-width: 16px; height: 16px; display: flex; align-items: center; justify-content: center; line-height: 1; padding: 0 4px; transform: translate(50%, -20%); border: 2px solid var(--yt-spec-base-background, white); box-sizing: content-box;">
-                  9+
-                </div>
               </div>
             </div>
             <div style="width: 100%; height: 100%; border-radius: 50%; overflow: hidden; box-shadow: 0 0 0 2px var(--yt-spec-base-background, white), 0 1px 4px rgba(0,0,0,0.35);">
