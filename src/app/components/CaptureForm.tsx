@@ -1267,7 +1267,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                     {form.instreamUseChannelBanner && (
                       <div className="mt-2 space-y-2">
                         <input
-                          type="url"
+                          type="text"
                           className="form-input"
                           placeholder="채널 URL (예: https://youtube.com/@shiseidokorea)"
                           value={form.instreamCompanionChannelUrl}

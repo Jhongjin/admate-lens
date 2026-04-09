@@ -67,7 +67,8 @@ type InstreamOptsPayload = {
 /** YouTube Channel Banner URL Fetcher */
 async function fetchYoutubeChannelBannerUrl(channelUrl: string): Promise<string | null> {
   try {
-    const res = await fetch(channelUrl, {
+    const formattedUrl = channelUrl.startsWith("http") ? channelUrl : `https://${channelUrl}`;
+    const res = await fetch(formattedUrl, {
       headers: {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko)",
         "Accept-Language": "en-US,en;q=0.9",
