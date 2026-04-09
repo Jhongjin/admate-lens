@@ -52,6 +52,7 @@ type InstreamOptsPayload = {
   videoUrl?: string;
   skipSeconds?: number;
   adTitle?: string;
+  enableCtaText?: boolean;
   ctaText?: string;
   landingUrl?: string;
   displayUrl?: string;
@@ -521,14 +522,15 @@ export class YouTubeCapture extends BaseChannel {
           companionImageUrl: instreamCompanionDataUrl || instreamOpts.companionImageUrl || "",
           avatarImageUrl: instreamAvatarDataUrl,
           progressFillPercent: prerollProgressPercent,
+          enableCtaText: instreamOpts.enableCtaText,
         };
         console.log(
-          `[YouTube] 인스트림 옵션: title="${prerollUiOpts.adTitle}" cta="${prerollUiOpts.ctaText}" landing="${prerollUiOpts.landingUrl}"`
+          `[YouTube] 인스트림 옵션: title="${prerollUiOpts.adTitle}" cta="${prerollUiOpts.ctaText}" landing="${prerollUiOpts.landingUrl}" enableCtaText="${prerollUiOpts.enableCtaText}"`
         );
 
         injectionSuccess = await this.injectPrerollAd(page, prerollOverlayImageUrl, playerInfo, prerollUiOpts);
-        // 🎯 컴패니언 배너 동시 삽입
-        if (injectionSuccess) {
+        // 🎯 컴패니언 배너 동시 삽입 (CTA 텍스트 활성화 시에만 포함 - 사용자 요청 조건)
+        if (injectionSuccess && instreamOpts.enableCtaText !== false) {
           const companionImg = prerollUiOpts.companionImageUrl || creativeDataUrl;
           const companionResult = await this.injectDisplayAd(page, companionImg, {
             variant: "companion-300x60",
