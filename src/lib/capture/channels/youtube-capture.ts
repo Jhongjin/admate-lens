@@ -642,12 +642,12 @@ export class YouTubeCapture extends BaseChannel {
     let displayUrlText = "";
     try {
       if (instreamOpts.displayUrl?.trim()) {
-        displayUrlText = instreamOpts.displayUrl.trim().replace(/^https?:\/\//, "");
+        displayUrlText = instreamOpts.displayUrl.trim().replace(/^https?:\/\//i, "").replace(/^www\./i, "").split('/')[0];
       }
       if (instreamOpts.videoUrl) {
-        landingDomain = new URL(instreamOpts.videoUrl).hostname.replace("www.", "");
+        landingDomain = new URL(instreamOpts.videoUrl).hostname.replace(/^www\./i, "");
       } else if (instreamOpts.landingUrl) {
-        landingDomain = new URL(instreamOpts.landingUrl).hostname.replace("www.", "");
+        landingDomain = new URL(instreamOpts.landingUrl).hostname.replace(/^www\./i, "");
       }
     } catch { /* ignore */ }
     if (!displayUrlText) displayUrlText = landingDomain;
