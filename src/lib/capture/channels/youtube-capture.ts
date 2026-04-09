@@ -781,7 +781,6 @@ export class YouTubeCapture extends BaseChannel {
           ctaBtn.textContent = ctaBtnText;
           ctaCard.appendChild(ctaBtn);
 
-          // ─── "스폰서 ⓘ  URL" — 밝은 영상에서도 읽히도록 다중 텍스트 그림자 적용
           const sponsorText = document.createElement('div');
           sponsorText.id = 'admate-preroll-sponsor';
           sponsorText.setAttribute('data-injected', 'admate-youtube-preroll');
@@ -791,21 +790,17 @@ export class YouTubeCapture extends BaseChannel {
             'align-items: center',
             'margin: 0',
             'padding: 0',
-            'font-size: 13px',
-            'line-height: 16px',
             'color: #ffffff',
-            'font-family: "YouTube Noto", "Noto Sans KR", "Malgun Gothic", Roboto, Arial, sans-serif',
             'text-shadow: 0 0 4px rgba(0,0,0,0.75)',
             '-webkit-font-smoothing: antialiased',
-            'font-weight: 700',
             'pointer-events: auto',
             'flex-shrink: 0',
             'box-sizing: border-box',
           ].join(' !important;') + ' !important';
           sponsorText.innerHTML = [
-            '<span style="margin-right:6px">스폰서</span>',
-            '<span style="font-family:Arial,Helvetica,sans-serif;font-size:9px;font-weight:bold;width:13px;height:13px;border:1px solid #fff;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;line-height:1;flex-shrink:0;box-sizing:border-box;margin-right:12px;background:transparent;filter:drop-shadow(0 0 4px rgba(0, 0, 0, 0.75))">i</span>',
-            '<span style="display:inline-block;max-width:280px;font-weight:500;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;vertical-align:bottom;">' + sponsorDomainText + '</span>'
+            '<span style="font-family:&quot;YouTube Noto&quot;,Roboto,arial,sans-serif;font-weight:600;font-size:12px;line-height:28px;margin-right:6px">스폰서</span>',
+            '<span style="font-family:Arial;font-weight:400;font-size:12px;width:14px;height:14px;border:1px solid #fff;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;line-height:1;flex-shrink:0;box-sizing:border-box;margin-right:12px;background:transparent;filter:drop-shadow(0 0 4px rgba(0, 0, 0, 0.75))">i</span>',
+            '<span style="font-family:&quot;YouTube Noto&quot;,Roboto,Arial,Helvetica,sans-serif;font-weight:400;font-size:11px;line-height:14px;display:inline-block;max-width:280px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;vertical-align:bottom;">' + sponsorDomainText + '</span>'
           ].join('');
           adLowerStack.appendChild(ctaCard);
           adLowerStack.appendChild(sponsorText);
