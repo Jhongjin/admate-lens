@@ -750,8 +750,8 @@ export class YouTubeCapture extends BaseChannel {
           ctaTextDiv.style.cssText = 'flex:1;min-width:0;margin-right:12px';
           // font-family에 작은따옴표를 쓰면 evaluate 문자열이 깨져 SyntaxError 남 → HTML 엔티티 사용
           ctaTextDiv.innerHTML = [
-            '<div style="font-size:14px;font-weight:500;color:#fff;font-family:&quot;YouTube Noto&quot;,Roboto,Arial,Helvetica,sans-serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:20px;letter-spacing:normal">' + titleText + '</div>',
-            '<div style="font-size:12px;color:rgba(255,255,255,0.7);font-family:&quot;YouTube Noto&quot;,Roboto,Arial,Helvetica,sans-serif;margin-top:2px;line-height:16px;letter-spacing:normal">' + domainText + '</div>',
+            '<div style="font-size:14px;font-weight:500;color:#fff;font-family:&quot;YouTube Noto&quot;,Roboto,Arial,Helvetica,sans-serif;white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;line-height:20px;letter-spacing:normal;word-break:keep-all">' + titleText + '</div>',
+            '<div style="font-size:12px;color:rgba(255,255,255,0.7);font-family:&quot;YouTube Noto&quot;,Roboto,Arial,Helvetica,sans-serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px;line-height:16px;letter-spacing:normal">' + domainText + '</div>',
           ].join('');
           ctaCard.appendChild(ctaTextDiv);
 
@@ -776,7 +776,7 @@ export class YouTubeCapture extends BaseChannel {
             'line-height: 16px',
             'color: rgba(255, 255, 255, 0.9)',
             'font-family: Roboto, Arial, Helvetica, sans-serif',
-            'text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9), 0 1px 8px rgba(0, 0, 0, 0.8), 0 0 14px rgba(0, 0, 0, 0.8), 0 0 2px rgba(0, 0, 0, 0.9)',
+            'text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8), 0 0 5px rgba(0, 0, 0, 0.5)',
             '-webkit-font-smoothing: antialiased',
             'font-weight: 500',
             'pointer-events: auto',
