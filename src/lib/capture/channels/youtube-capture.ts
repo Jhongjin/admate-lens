@@ -615,8 +615,24 @@ export class YouTubeCapture extends BaseChannel {
     const displayUrlSponsor = truncateWithDots(displayUrlText, 32);
 
     let adTitle = instreamOpts.adTitle || '광고 제목';
-    if (adTitle.length > 14) {
-      adTitle = adTitle.slice(0, 14) + '<br/>' + adTitle.slice(14);
+    let currentLineCost = 0;
+    let breakIdx = -1;
+    for (let i = 0; i < adTitle.length; i++) {
+      const char = adTitle[i];
+      if (/[ㄱ-ㅎㅏ-ㅣ가-힣]/.test(char)) {
+        currentLineCost += 2;
+      } else if (char === ' ') {
+        currentLineCost += 1;
+      } else {
+        currentLineCost += 1.14; 
+      }
+      if (currentLineCost > 26.01) {
+        breakIdx = i;
+        break;
+      }
+    }
+    if (breakIdx !== -1) {
+      adTitle = adTitle.slice(0, breakIdx) + '<br/>' + adTitle.slice(breakIdx);
     }
     const ctaText = instreamOpts.ctaText || '자세히 알아보기';
 
@@ -754,7 +770,7 @@ export class YouTubeCapture extends BaseChannel {
           ctaTextDiv.style.cssText = 'flex:1;min-width:0;margin-right:12px';
           // font-family에 작은따옴표를 쓰면 evaluate 문자열이 깨져 SyntaxError 남 → HTML 엔티티 사용
           ctaTextDiv.innerHTML = [
-            '<div style="font-size:14px;font-weight:500;color:#fff;font-family:&quot;YouTube Noto&quot;,Roboto,Arial,Helvetica,sans-serif;white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;line-height:20px;letter-spacing:normal;word-break:keep-all">' + titleText + '</div>',
+            '<div style="font-size:14px;font-weight:500;color:#fff;font-family:&quot;YouTube Noto&quot;,Roboto,Arial,Helvetica,sans-serif;white-space:normal;line-height:20px;letter-spacing:normal;word-break:keep-all">' + titleText + '</div>',
             '<div style="font-size:12px;color:rgba(255,255,255,0.7);font-family:&quot;YouTube Noto&quot;,Roboto,Arial,Helvetica,sans-serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px;line-height:16px;letter-spacing:normal">' + domainText + '</div>',
           ].join('');
           ctaCard.appendChild(ctaTextDiv);

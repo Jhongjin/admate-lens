@@ -1083,19 +1083,37 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                     >
                       🏷️ 광고 제목
                     </label>
-                    <input
-                      type="text"
-                      maxLength={30}
-                      className="form-input"
-                      placeholder="예: 광고 제목"
-                      value={form.instreamAdTitle}
-                      onChange={(e) =>
-                        setForm((prev) => ({
-                          ...prev,
-                          instreamAdTitle: e.target.value,
-                        }))
-                      }
-                    />
+                    <div className="relative">
+                      <input
+                        type="text"
+                        className="form-input pr-12"
+                        placeholder="예: 광고 제목"
+                        value={form.instreamAdTitle}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          let b = 0;
+                          for (let i = 0; i < val.length; i++) {
+                            b += /[ㄱ-ㅎㅏ-ㅣ가-힣]/.test(val[i]) ? 2 : 1;
+                          }
+                          if (b <= 30) {
+                            setForm((prev) => ({
+                              ...prev,
+                              instreamAdTitle: val,
+                            }));
+                          }
+                        }}
+                      />
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-gray-400">
+                        {(() => {
+                          let b = 0;
+                          const t = form.instreamAdTitle || "";
+                          for (let i = 0; i < t.length; i++) {
+                            b += /[ㄱ-ㅎㅏ-ㅣ가-힣]/.test(t[i]) ? 2 : 1;
+                          }
+                          return b;
+                        })()}/30
+                      </span>
+                    </div>
                   </div>
 
                   {/* 표시 URL */}
