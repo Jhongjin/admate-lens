@@ -532,6 +532,7 @@ export class YouTubeCapture extends BaseChannel {
           const companionImg = prerollUiOpts.companionImageUrl || creativeDataUrl;
           const companionResult = await this.injectDisplayAd(page, companionImg, {
             variant: "companion-300x60",
+            uiOpts: prerollUiOpts,
           });
           console.log(`[YouTube] 컴패니언 배너: ${companionResult ? '✅ 성공' : '⚠️ 실패'}`);
         }
@@ -932,7 +933,7 @@ export class YouTubeCapture extends BaseChannel {
   private async injectDisplayAd(
     page: IPageHandle,
     imgDataUrl: string,
-    options?: { variant?: "sidebar-display" | "companion-300x60" }
+    options?: { variant?: "sidebar-display" | "companion-300x60"; uiOpts?: any }
   ): Promise<boolean> {
     const variant = options?.variant ?? "sidebar-display";
     console.log(
@@ -988,49 +989,74 @@ export class YouTubeCapture extends BaseChannel {
         alignW = Math.round(alignW);
 
         const isCompanion = variant === 'companion-300x60';
-        const adWidth = isCompanion
-          ? alignW
-          : Math.min(alignW, 336);
+        const adWidth = isCompanion ? alignW : Math.min(alignW, 336);
 
-        // ═══════════════════════════════════════════════════
-        // 전체 광고 컨테이너 (실제 YouTube 스타일)
-        // ═══════════════════════════════════════════════════
-        const container = document.createElement('div');
-        container.setAttribute(
-          'data-injected',
-          isCompanion ? 'admate-youtube-companion' : 'admate-youtube-display'
-        );
-        const containerStyles = [
-          'width: 100% !important',
-          'max-width: 100% !important',
-          'box-sizing: border-box !important',
-          'margin: 0 !important',
-          'overflow: hidden !important',
-          'box-shadow: 0 1px 2px rgba(0,0,0,0.1) !important',
-          'background: #fff !important',
-          'border: 1px solid #e5e5e5 !important',
-          'position: relative !important',
-        ];
+        const wrap = document.createElement('div');
+        wrap.setAttribute('data-injected', 'admate-youtube-sidebar-ad-wrap');
+        
         if (isCompanion) {
-          containerStyles.push('border-radius: 2px !important', 'height: 60px !important');
+          const uiOpts = ${JSON.stringify(options?.uiOpts || {})};
+          const companionWrapStyles = [
+            'width: ' + adWidth + 'px',
+            'max-width: 100%',
+            'box-sizing: border-box',
+            'margin: 0 0 24px 0',
+            'display: flex',
+            'flex-direction: column',
+            'border-radius: 12px',
+            'border: 1px solid var(--yt-spec-10-percent-layer, #e5e5e5)',
+            'overflow: hidden',
+            'cursor: pointer'
+          ];
+          wrap.style.cssText = companionWrapStyles.join(' !important;') + ' !important';
+          
+          wrap.innerHTML = \`<div style="width: 100%; height: auto; aspect-ratio: 1060 / 175; overflow: hidden; background: #e5e5e5; display: flex; align-items: stretch; border-radius: 12px 12px 0 0;">
+                 <img src="\${imgUrl}" style="width: 100%; height: 100%; object-fit: cover; display: block;" />
+              </div>
+              <div style="padding: 12px 16px; display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; background: var(--yt-spec-base-background, #fff); border-radius: 0 0 12px 12px;">
+                 <div style="display: flex; align-items: flex-start; gap: 12px; flex: 1; min-width: 0;">
+                    <div style="width: 48px; height: 48px; border-radius: 50%; overflow: hidden; flex-shrink: 0; background: #f0f0f0;">
+                       \${uiOpts.avatarImageUrl ? \`<img src="\${uiOpts.avatarImageUrl}" style="width: 100%; height: 100%; object-fit: cover;" />\` : ''}
+                    </div>
+                    <div style="display: flex; flex-direction: column; justify-content: center; min-width: 0;">
+                       <span style="font-family: 'Roboto', 'Arial', sans-serif; font-size: 1.4rem; font-weight: 500; line-height: 2rem; color: var(--yt-spec-text-primary, #0f0f0f); white-space: pre-wrap; word-break: break-word;">\${uiOpts.adTitle || 'AD TITLE'}</span>
+                       <div style="display: flex; align-items: center; gap: 4px; margin-top: 2px;">
+                          <span style="font-family: 'Roboto', 'Arial', sans-serif; font-size: 1.2rem; font-weight: 700; color: var(--yt-spec-text-primary, #0f0f0f);">스폰서</span>
+                          <span style="display: inline-flex; align-items: center; color: var(--yt-spec-text-primary, #0f0f0f); margin: 0 2px;">
+                             <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M12,2C6.48,2,2,6.48,2,12s4.48,10,10,10s10-4.48,10-10S17.52,2,12,2z M13,17h-2v-6h2V17z M13,9h-2V7h2V9z" />
+                             </svg>
+                          </span>
+                          <span style="font-family: 'Roboto', 'Arial', sans-serif; font-size: 1.2rem; color: var(--yt-spec-text-primary, #0f0f0f); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">\${uiOpts.displayUrl || uiOpts.landingUrl || ''}</span>
+                       </div>
+                    </div>
+                 </div>
+                 <div style="display: flex; align-items: center; gap: 8px; flex-shrink: 0;">
+                    \${uiOpts.ctaText ? \`<a style="display: inline-flex; align-items: center; justify-content: center; padding: 0 16px; height: 36px; border-radius: 18px; background: #e5f2ff; color: #065fd4; font-family: 'Roboto', 'Arial', sans-serif; font-size: 1.4rem; font-weight: 500; text-decoration: none;">\${uiOpts.ctaText}</a>\` : ''}
+                    <button style="background: none; border: none; padding: 8px; margin-right: -8px; cursor: pointer; color: var(--yt-spec-text-primary, #0f0f0f);">
+                       <svg height="24" viewBox="0 0 24 24" width="24" focusable="false" style="display: block; width: 24px; height: 24px; fill: currentColor;"><path d="M12 4a2 2 0 100 4 2 2 0 000-4Zm0 6a2 2 0 100 4 2 2 0 000-4Zm0 6a2 2 0 100 4 2 2 0 000-4Z"></path></svg>
+                    </button>
+                 </div>
+              </div>\`;
         } else {
-          containerStyles.push('border-radius: 12px !important');
-        }
-        container.style.cssText = containerStyles.join(';');
-
-        // ─── 배너 이미지 ───
-        const imgEl = document.createElement('img');
-        imgEl.src = imgUrl;
-        imgEl.setAttribute('data-injected', 'admate');
-        if (isCompanion) {
-          imgEl.style.cssText = [
-            'display: block !important',
+          const container = document.createElement('div');
+          container.setAttribute('data-injected', 'admate-youtube-display');
+          const containerStyles = [
             'width: 100% !important',
-            'height: 60px !important',
-            'object-fit: cover !important',
-            'object-position: center !important',
-          ].join(';');
-        } else {
+            'max-width: 100% !important',
+            'box-sizing: border-box !important',
+            'margin: 0 !important',
+            'overflow: hidden !important',
+            'background: #fff !important',
+            'border: 1px solid #e5e5e5 !important',
+            'position: relative !important',
+            'border-radius: 12px !important'
+          ];
+          container.style.cssText = containerStyles.join(';');
+
+          const imgEl = document.createElement('img');
+          imgEl.src = imgUrl;
+          imgEl.setAttribute('data-injected', 'admate');
           imgEl.style.cssText = [
             'display: block !important',
             'width: 100% !important',
@@ -1038,11 +1064,8 @@ export class YouTubeCapture extends BaseChannel {
             'aspect-ratio: 300/250 !important',
             'object-fit: cover !important',
           ].join(';');
-        }
-        container.appendChild(imgEl);
+          container.appendChild(imgEl);
 
-        if (!isCompanion) {
-          // ─── 하단 푸터: [파비콘] "광고주 사이트 방문" + "Ad · Sponsored" (디스플레이 전용) ───
           const footer = document.createElement('div');
           footer.style.cssText = [
             'padding: 12px 12px !important',
@@ -1061,49 +1084,22 @@ export class YouTubeCapture extends BaseChannel {
           const textArea = document.createElement('div');
           textArea.style.cssText = 'flex:1;min-width:0';
           textArea.innerHTML = [
-            "<div style=\\"font-size:14px;font-weight:400;color:#0f0f0f;font-family:Roboto,'Noto Sans KR',Arial,sans-serif;line-height:1.4\\">광고주 사이트 방문</div>",
+            "<div style=\\"font-size:14px;font-weight:400;color:#0f0f0f;font-family:Roboto,'Arial',sans-serif;line-height:1.4\\">광고주 사이트 방문</div>",
             "<div style=\\"font-size:12px;color:#606060;font-family:Roboto,Arial,sans-serif;margin-top:2px;\\">Ad · Sponsored</div>",
           ].join('');
 
           footer.appendChild(favicon);
           footer.appendChild(textArea);
           container.appendChild(footer);
-        }
 
-        const wrap = document.createElement('div');
-        wrap.setAttribute('data-injected', 'admate-youtube-sidebar-ad-wrap');
-        const wrapStyles = [
-          'width: ' + adWidth + 'px',
-          'max-width: 100%',
-          'box-sizing: border-box',
-          isCompanion ? 'margin: 0 0 24px 0' : 'margin: 0 0 16px 0',
-        ];
-        if (isCompanion) {
-          wrapStyles.push(
-            'display: flex',
-            'flex-direction: column',
-            'gap: 16px',
-            'align-items: stretch'
-          );
-        }
-        wrap.style.cssText = wrapStyles.join(' !important;') + ' !important';
-        wrap.appendChild(container);
-
-        if (isCompanion) {
-          const belowBox = document.createElement('div');
-          belowBox.id = 'admate-companion-below-slot';
-          belowBox.setAttribute('data-injected', 'admate-youtube-companion');
-          belowBox.setAttribute('aria-hidden', 'true');
-          belowBox.style.cssText = [
-            'width: 100%',
+          const wrapStyles = [
+            'width: ' + adWidth + 'px',
+            'max-width: 100%',
             'box-sizing: border-box',
-            'min-height: 88px',
-            'flex-shrink: 0',
-            'background: #ffffff',
-            'border: 1px solid #e5e5e5',
-            'border-radius: 12px',
-          ].join(' !important;') + ' !important';
-          wrap.appendChild(belowBox);
+            'margin: 0 0 16px 0',
+          ];
+          wrap.style.cssText = wrapStyles.join(' !important;') + ' !important';
+          wrap.appendChild(container);
         }
 
         // ═══════════════════════════════════════════════════
