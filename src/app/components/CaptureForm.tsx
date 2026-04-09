@@ -324,6 +324,7 @@ interface CaptureFormData {
   instreamCompanionImageUrl: string;
   instreamCompanionChannelUrl: string;
   instreamUseChannelBanner: boolean;
+  instreamEnableCompanionBanner: boolean;
 }
 
 /** 캡처 결과 타입 */
@@ -383,6 +384,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
     instreamCompanionImageUrl: "",
     instreamCompanionChannelUrl: "",
     instreamUseChannelBanner: true,
+    instreamEnableCompanionBanner: true,
   });
 
   // 이미지 업로드 관련 상태
@@ -734,6 +736,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                       ? form.instreamCompanionChannelUrl || undefined
                       : undefined,
                   companionUseChannelBanner: form.instreamUseChannelBanner,
+                  enableCompanionBanner: form.instreamEnableCompanionBanner,
                 }
               : undefined,
         }),
@@ -1229,101 +1232,122 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
 
                   {/* 컴패니언 배너 */}
                   <div>
-                    <label
-                      className="text-[11px] font-medium mb-1 block"
-                      style={{ color: "var(--color-text-secondary)" }}
-                    >
-                      🖼️ 컴패니언 배너 (컴퓨터)
-                    </label>
-                    <div className="space-y-2">
-                      <label className="flex items-center gap-2 text-xs" style={{ color: "var(--color-text-secondary)" }}>
-                        <input
-                          type="radio"
-                          name="companion-mode"
-                          checked={form.instreamUseChannelBanner}
-                          onChange={() =>
-                            setForm((prev) => ({
-                              ...prev,
-                              instreamUseChannelBanner: true,
-                            }))
-                          }
-                        />
-                        채널 배너를 사용하여 자동 생성 (권장)
+                    <div className="flex items-center mb-1 gap-2">
+                      <label
+                        className="text-[11px] font-medium block"
+                        style={{ color: "var(--color-text-secondary)" }}
+                      >
+                        🖼️ 컴패니언 배너 (컴퓨터)
                       </label>
-                      <label className="flex items-center gap-2 text-xs" style={{ color: "var(--color-text-secondary)" }}>
+                      <label className="flex items-center gap-1.5 cursor-pointer">
                         <input
-                          type="radio"
-                          name="companion-mode"
-                          checked={!form.instreamUseChannelBanner}
-                          onChange={() =>
-                            setForm((prev) => ({
-                              ...prev,
-                              instreamUseChannelBanner: false,
-                            }))
-                          }
-                        />
-                        이미지 업로드
-                      </label>
-                    </div>
-                    {form.instreamUseChannelBanner && (
-                      <div className="mt-2 space-y-2">
-                        <input
-                          type="text"
-                          className="form-input"
-                          placeholder="채널 URL (예: https://youtube.com/@shiseidokorea)"
-                          value={form.instreamCompanionChannelUrl}
+                          type="checkbox"
+                          className="w-3 h-3 rounded"
+                          style={{ accentColor: "var(--color-accent)", borderColor: "var(--color-border-input)" }}
+                          checked={form.instreamEnableCompanionBanner}
                           onChange={(e) =>
                             setForm((prev) => ({
                               ...prev,
-                              instreamCompanionChannelUrl: e.target.value,
+                              instreamEnableCompanionBanner: e.target.checked,
                             }))
                           }
                         />
+                        <span className="text-[10px]" style={{ color: "var(--color-text-muted)" }}>배너 표시</span>
+                      </label>
+                    </div>
+                    {form.instreamEnableCompanionBanner && (
+                      <>
+                        <div className="space-y-2">
+                          <label className="flex items-center gap-2 text-xs" style={{ color: "var(--color-text-secondary)" }}>
+                            <input
+                              type="radio"
+                              name="companion-mode"
+                              checked={form.instreamUseChannelBanner}
+                              onChange={() =>
+                                setForm((prev) => ({
+                                  ...prev,
+                                  instreamUseChannelBanner: true,
+                                }))
+                              }
+                            />
+                            채널 배너를 사용하여 자동 생성 (권장)
+                          </label>
+                          <label className="flex items-center gap-2 text-xs" style={{ color: "var(--color-text-secondary)" }}>
+                            <input
+                              type="radio"
+                              name="companion-mode"
+                              checked={!form.instreamUseChannelBanner}
+                              onChange={() =>
+                                setForm((prev) => ({
+                                  ...prev,
+                                  instreamUseChannelBanner: false,
+                                }))
+                              }
+                            />
+                            이미지 업로드
+                          </label>
+                        </div>
+                        {form.instreamUseChannelBanner && (
+                          <div className="mt-2 space-y-2">
+                            <input
+                              type="text"
+                              className="form-input"
+                              placeholder="채널 URL (예: https://youtube.com/@shiseidokorea)"
+                              value={form.instreamCompanionChannelUrl}
+                              onChange={(e) =>
+                                setForm((prev) => ({
+                                  ...prev,
+                                  instreamCompanionChannelUrl: e.target.value,
+                                }))
+                              }
+                            />
+                            <p
+                              className="text-[10px] mt-0.5"
+                              style={{ color: "var(--color-text-muted)" }}
+                            >
+                              * 해당 채널의 배너 이미지를 가져와 적용합니다.
+                            </p>
+                          </div>
+                        )}
+                        {!form.instreamUseChannelBanner && (
+                          <div className="mt-2 space-y-2">
+                            <button
+                              type="button"
+                              className="btn btn-secondary text-xs px-3 py-1.5"
+                              onClick={() => companionInputRef.current?.click()}
+                              disabled={isCompanionUploading}
+                            >
+                              {isCompanionUploading ? "업로드 중..." : "파일 선택"}
+                            </button>
+                            <input
+                              ref={companionInputRef}
+                              type="file"
+                              accept="image/png,image/jpeg,image/webp,image/gif"
+                              onChange={handleCompanionSelect}
+                              className="hidden"
+                            />
+                            <input
+                              type="url"
+                              className="form-input"
+                              placeholder="또는 이미지 URL 직접 입력"
+                              value={form.instreamCompanionImageUrl}
+                              onChange={(e) =>
+                                setForm((prev) => ({
+                                  ...prev,
+                                  instreamCompanionImageUrl: e.target.value,
+                                }))
+                              }
+                            />
+                          </div>
+                        )}
                         <p
                           className="text-[10px] mt-0.5"
                           style={{ color: "var(--color-text-muted)" }}
                         >
-                          * 해당 채널의 배너 이미지를 가져와 적용합니다.
+                          크기: 300x60픽셀, 최대 파일 크기: 150KB
                         </p>
-                      </div>
+                      </>
                     )}
-                    {!form.instreamUseChannelBanner && (
-                      <div className="mt-2 space-y-2">
-                        <button
-                          type="button"
-                          className="btn btn-secondary text-xs px-3 py-1.5"
-                          onClick={() => companionInputRef.current?.click()}
-                          disabled={isCompanionUploading}
-                        >
-                          {isCompanionUploading ? "업로드 중..." : "파일 선택"}
-                        </button>
-                        <input
-                          ref={companionInputRef}
-                          type="file"
-                          accept="image/png,image/jpeg,image/webp,image/gif"
-                          onChange={handleCompanionSelect}
-                          className="hidden"
-                        />
-                        <input
-                          type="url"
-                          className="form-input"
-                          placeholder="또는 이미지 URL 직접 입력"
-                          value={form.instreamCompanionImageUrl}
-                          onChange={(e) =>
-                            setForm((prev) => ({
-                              ...prev,
-                              instreamCompanionImageUrl: e.target.value,
-                            }))
-                          }
-                        />
-                      </div>
-                    )}
-                    <p
-                      className="text-[10px] mt-0.5"
-                      style={{ color: "var(--color-text-muted)" }}
-                    >
-                      크기: 300x60픽셀, 최대 파일 크기: 150KB
-                    </p>
                   </div>
                 </div>
               </div>

@@ -61,6 +61,7 @@ type InstreamOptsPayload = {
   companionImageUrl?: string;
   companionChannelUrl?: string;
   companionUseChannelBanner?: boolean;
+  enableCompanionBanner?: boolean;
   /** 카드 원형 로고(업로드 URL → 서버에서 data URL로 변환 후 주입) */
   avatarImageUrl?: string;
 };
@@ -529,14 +530,18 @@ export class YouTubeCapture extends BaseChannel {
         );
 
         injectionSuccess = await this.injectPrerollAd(page, prerollOverlayImageUrl, playerInfo, prerollUiOpts);
-        // 🎯 컴패니언 배너 동시 삽입 (CTA 텍스트 활성화 시에만 포함 - 사용자 요청 조건)
-        if (injectionSuccess && instreamOpts.enableCtaText !== false) {
-          const companionImg = prerollUiOpts.companionImageUrl || creativeDataUrl;
-          const companionResult = await this.injectDisplayAd(page, companionImg, {
-            variant: "companion-300x60",
-            uiOpts: prerollUiOpts,
-          });
-          console.log(`[YouTube] 컴패니언 배너: ${companionResult ? '✅ 성공' : '⚠️ 실패'}`);
+        // 🎯 컴패니언 배너 동시 삽입
+        if (injectionSuccess) {
+          if (instreamOpts.enableCompanionBanner !== false) {
+            const companionImg = prerollUiOpts.companionImageUrl || creativeDataUrl;
+            const companionResult = await this.injectDisplayAd(page, companionImg, {
+              variant: "companion-300x60",
+              uiOpts: prerollUiOpts,
+            });
+            console.log(`[YouTube] 컴패니언 배너: ${companionResult ? '✅ 성공' : '⚠️ 실패'}`);
+          } else {
+            console.log('[YouTube] 컴패니언 배너 삽입 생략 (opt-out)');
+          }
         }
         break;
       }
@@ -1019,13 +1024,22 @@ export class YouTubeCapture extends BaseChannel {
           ];
           wrap.style.cssText = companionWrapStyles.join(' !important;') + ' !important';
           
-          wrap.innerHTML = \`<div style="width: 100%; height: auto; aspect-ratio: 1060 / 175; overflow: hidden; background: #e5e5e5; display: flex; align-items: stretch; border-radius: 12px 12px 0 0;">
-                 <img src="\${imgUrl}" style="width: 100%; height: 100%; object-fit: cover; display: block;" />
-              </div>
+          
+          let bottomBarHTML = '';
+          if (uiOpts.enableCtaText === false) {
+            bottomBarHTML = \`
+              <div style="padding: 10px 16px; display: flex; align-items: center; justify-content: space-between; background: var(--yt-spec-base-background, #fff); border-radius: 0 0 12px 12px;">
+                 <span style="font-family: 'Roboto', 'Arial', sans-serif; font-size: 1.2rem; font-weight: 500; color: var(--yt-spec-text-primary, #0f0f0f); opacity: 0.8;">스폰서</span>
+                 <button style="background: none; border: none; padding: 0; margin: 0; cursor: pointer; color: var(--yt-spec-text-primary, #0f0f0f);">
+                    <svg height="24" viewBox="0 0 24 24" width="24" focusable="false" style="display: block; width: 24px; height: 24px; fill: currentColor;"><path d="M12 4a2 2 0 100 4 2 2 0 000-4Zm0 6a2 2 0 100 4 2 2 0 000-4Zm0 6a2 2 0 100 4 2 2 0 000-4Z"></path></svg>
+                 </button>
+              </div>\`;
+          } else {
+            bottomBarHTML = \`
               <div style="padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; gap: 8px; background: var(--yt-spec-base-background, #fff); border-radius: 0 0 12px 12px;">
                  <div style="display: flex; align-items: center; gap: 12px; flex: 1; min-width: 0;">
                     <div style="width: 40px; height: 40px; border-radius: 50%; overflow: hidden; flex-shrink: 0; background: #f0f0f0;">
-                       \${uiOpts.avatarImageUrl ? \`<img src="\${uiOpts.avatarImageUrl}" style="width: 100%; height: 100%; object-fit: cover;" />\` : ''}
+                       \${uiOpts.avatarImageUrl ? \\\`<img src="\${uiOpts.avatarImageUrl}" style="width: 100%; height: 100%; object-fit: cover;" />\\\` : ''}
                     </div>
                     <div style="display: flex; flex-direction: column; justify-content: center; min-width: 0;">
                        <span style="font-family: 'Roboto', 'Arial', sans-serif; font-size: 1.4rem; font-weight: 500; line-height: 2rem; color: var(--yt-spec-text-primary, #0f0f0f); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">\${uiOpts.adTitle || 'AD TITLE'}</span>
@@ -1037,12 +1051,18 @@ export class YouTubeCapture extends BaseChannel {
                     </div>
                  </div>
                  <div style="display: flex; align-items: center; gap: 8px; flex-shrink: 0;">
-                    \${uiOpts.ctaText ? \`<a style="display: inline-flex; align-items: center; justify-content: center; padding: 0 16px; height: 36px; border-radius: 18px; background: var(--yt-spec-badge-chip-background, rgba(0,0,0,0.05)); color: var(--yt-spec-text-primary, #0f0f0f); font-family: 'Roboto', 'Arial', sans-serif; font-size: 1.4rem; font-weight: 500; text-decoration: none;">\${uiOpts.ctaText}</a>\` : ''}
+                    \${uiOpts.ctaText ? \\\`<a style="display: inline-flex; align-items: center; justify-content: center; padding: 0 16px; height: 36px; border-radius: 18px; background: var(--yt-spec-badge-chip-background, rgba(0,0,0,0.05)); color: var(--yt-spec-text-primary, #0f0f0f); font-family: 'Roboto', 'Arial', sans-serif; font-size: 1.4rem; font-weight: 500; text-decoration: none;">\${uiOpts.ctaText}</a>\\\` : ''}
                     <button style="background: none; border: none; padding: 8px; margin-right: -8px; cursor: pointer; color: var(--yt-spec-text-primary, #0f0f0f);">
                        <svg height="24" viewBox="0 0 24 24" width="24" focusable="false" style="display: block; width: 24px; height: 24px; fill: currentColor;"><path d="M12 4a2 2 0 100 4 2 2 0 000-4Zm0 6a2 2 0 100 4 2 2 0 000-4Zm0 6a2 2 0 100 4 2 2 0 000-4Z"></path></svg>
                     </button>
                  </div>
               </div>\`;
+          }
+
+          wrap.innerHTML = \`<div style="width: 100%; height: auto; aspect-ratio: 1060 / 175; overflow: hidden; background: #e5e5e5; display: flex; align-items: stretch; border-radius: 12px 12px 0 0;">
+                 <img src="\${imgUrl}" style="width: 100%; height: 100%; object-fit: cover; display: block;" />
+              </div>
+              \${bottomBarHTML}\`;
         } else {
           const container = document.createElement('div');
           container.setAttribute('data-injected', 'admate-youtube-display');

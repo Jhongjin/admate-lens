@@ -72,6 +72,7 @@ export async function POST(request: NextRequest) {
         companionImageUrl?: string;
         companionChannelUrl?: string;
         companionUseChannelBanner?: boolean;
+        enableCompanionBanner?: boolean;
         avatarImageUrl?: string;
       };
     };
