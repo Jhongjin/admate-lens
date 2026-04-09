@@ -1894,15 +1894,12 @@ export class YouTubeCapture extends BaseChannel {
             if (!countryCode) {
               countryCode = document.createElement('span');
               countryCode.id = 'country-code';
-              // logoRenderer.querySelector('a') or just append to logoRenderer
-              // Usually the a tag #logo contains it, but appending to the renderer also works if handled properly.
-              // Let's attach to the #logo-icon container if it exists, otherwise to logoRenderer
-              const logoIconContainer = logoRenderer.querySelector('#logo-icon') || logoRenderer;
               logoRenderer.appendChild(countryCode);
             }
             countryCode.textContent = 'KR';
-            countryCode.style.cssText = 'color: var(--yt-spec-text-secondary, #606060); font-family: Roboto, Arial, sans-serif; font-size: 10px; position: absolute; top: -1px; right: -10px; font-weight: 400; padding: 0; margin: 0; display: block; line-height: 14px; letter-spacing: 0;';
-            logoRenderer.style.position = 'relative'; // Ensure relative positioning
+            countryCode.className = 'style-scope ytd-topbar-logo-renderer';
+            countryCode.style.cssText = 'color: var(--yt-spec-text-secondary, #606060); font-family: Roboto, Arial, sans-serif; font-size: 10px; margin: 0 0 0 2px;';
+            logoRenderer.style.position = ''; // Remove absolute/relative hacking
           }
 
           const floater = document.createElement("div");
