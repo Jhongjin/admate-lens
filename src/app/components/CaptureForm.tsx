@@ -1052,19 +1052,37 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                     >
                       📢 CTA 버튼 텍스트
                     </label>
-                    <input
-                      type="text"
-                      maxLength={10}
-                      className="form-input"
-                      placeholder="예: 자세히 알아보기"
-                      value={form.instreamCtaText}
-                      onChange={(e) =>
-                        setForm((prev) => ({
-                          ...prev,
-                          instreamCtaText: e.target.value,
-                        }))
-                      }
-                    />
+                    <div className="relative">
+                      <input
+                        type="text"
+                        className="form-input pr-12"
+                        placeholder="예: 더알아보기"
+                        value={form.instreamCtaText}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          let b = 0;
+                          for (let i = 0; i < val.length; i++) {
+                            b += /[ㄱ-ㅎㅏ-ㅣ가-힣]/.test(val[i]) ? 2 : 1;
+                          }
+                          if (b <= 10) {
+                            setForm((prev) => ({
+                              ...prev,
+                              instreamCtaText: val,
+                            }));
+                          }
+                        }}
+                      />
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-gray-400">
+                        {(() => {
+                          let b = 0;
+                          const t = form.instreamCtaText || "";
+                          for (let i = 0; i < t.length; i++) {
+                            b += /[ㄱ-ㅎㅏ-ㅣ가-힣]/.test(t[i]) ? 2 : 1;
+                          }
+                          return b;
+                        })()}/10
+                      </span>
+                    </div>
                     <p
                       className="text-[10px] mt-0.5"
                       style={{ color: "var(--color-text-muted)" }}
