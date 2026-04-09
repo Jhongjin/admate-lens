@@ -1029,7 +1029,7 @@ export class YouTubeCapture extends BaseChannel {
           if (uiOpts.enableCtaText === false) {
             bottomBarHTML =
               '<div style="padding: 10px 16px; display: flex; align-items: center; justify-content: space-between; background: var(--yt-spec-base-background, #fff); border-radius: 0 0 12px 12px;">' +
-                '<span style="font-family: \'Roboto\', \'Arial\', sans-serif; font-size: 1.2rem; font-weight: 500; color: var(--yt-spec-text-primary, #0f0f0f); opacity: 0.8;">스폰서</span>' +
+                '<span style="font-family: Roboto, Arial, sans-serif; font-size: 1.2rem; font-weight: 500; color: var(--yt-spec-text-primary, #0f0f0f); opacity: 0.8;">스폰서</span>' +
                 '<button style="background: none; border: none; padding: 0; margin: 0; cursor: pointer; color: var(--yt-spec-text-primary, #0f0f0f);">' +
                   '<svg height="24" viewBox="0 0 24 24" width="24" focusable="false" style="display: block; width: 24px; height: 24px; fill: currentColor;"><path d="M12 4a2 2 0 100 4 2 2 0 000-4Zm0 6a2 2 0 100 4 2 2 0 000-4Zm0 6a2 2 0 100 4 2 2 0 000-4Z"></path></svg>' +
                 '</button>' +
@@ -1039,8 +1039,9 @@ export class YouTubeCapture extends BaseChannel {
               ? '<img src="' + uiOpts.avatarImageUrl + '" style="width: 100%; height: 100%; object-fit: cover;" />'
               : '';
             const ctaHtml = uiOpts.ctaText
-              ? '<a style="display: inline-flex; align-items: center; justify-content: center; padding: 0 16px; height: 36px; border-radius: 18px; background: var(--yt-spec-badge-chip-background, rgba(0,0,0,0.05)); color: var(--yt-spec-text-primary, #0f0f0f); font-family: \'Roboto\', \'Arial\', sans-serif; font-size: 1.4rem; font-weight: 500; text-decoration: none;">' + uiOpts.ctaText + '</a>'
+              ? '<a style="display: inline-flex; align-items: center; justify-content: center; padding: 0 16px; height: 36px; border-radius: 18px; background: var(--yt-spec-badge-chip-background, rgba(0,0,0,0.05)); color: var(--yt-spec-text-primary, #0f0f0f); font-family: Roboto, Arial, sans-serif; font-size: 1.4rem; font-weight: 500; text-decoration: none;">' + uiOpts.ctaText + '</a>'
               : '';
+            const adTitleText = uiOpts.adTitle || 'AD TITLE';
             bottomBarHTML =
               '<div style="padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; gap: 8px; background: var(--yt-spec-base-background, #fff); border-radius: 0 0 12px 12px;">' +
                 '<div style="display: flex; align-items: center; gap: 12px; flex: 1; min-width: 0;">' +
@@ -1048,11 +1049,11 @@ export class YouTubeCapture extends BaseChannel {
                     avatarHtml +
                   '</div>' +
                   '<div style="display: flex; flex-direction: column; justify-content: center; min-width: 0;">' +
-                    '<span style="font-family: \'Roboto\', \'Arial\', sans-serif; font-size: 1.4rem; font-weight: 500; line-height: 2rem; color: var(--yt-spec-text-primary, #0f0f0f); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">' + (uiOpts.adTitle || 'AD TITLE') + '</span>' +
+                    '<span style="font-family: Roboto, Arial, sans-serif; font-size: 1.4rem; font-weight: 500; line-height: 2rem; color: var(--yt-spec-text-primary, #0f0f0f); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">' + adTitleText + '</span>' +
                     '<div style="display: flex; align-items: center; gap: 4px; margin-top: 2px;">' +
-                      '<span style="font-family: \'Roboto\', \'Arial\', sans-serif; font-size: 1.2rem; font-weight: 700; color: var(--yt-spec-text-primary, #0f0f0f); white-space: nowrap;">스폰서</span>' +
-                      '<span style="font-family: \'Roboto\', \'Arial\', sans-serif; font-size: 1.2rem; color: var(--yt-spec-text-secondary, #606060); white-space: nowrap; margin: 0 2px;">·</span>' +
-                      '<span style="font-family: \'Roboto\', \'Arial\', sans-serif; font-size: 1.2rem; color: var(--yt-spec-text-secondary, #606060); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">' + cleanUrl + '</span>' +
+                      '<span style="font-family: Roboto, Arial, sans-serif; font-size: 1.2rem; font-weight: 700; color: var(--yt-spec-text-primary, #0f0f0f); white-space: nowrap;">스폰서</span>' +
+                      '<span style="font-family: Roboto, Arial, sans-serif; font-size: 1.2rem; color: var(--yt-spec-text-secondary, #606060); white-space: nowrap; margin: 0 2px;">·</span>' +
+                      '<span style="font-family: Roboto, Arial, sans-serif; font-size: 1.2rem; color: var(--yt-spec-text-secondary, #606060); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">' + cleanUrl + '</span>' +
                     '</div>' +
                   '</div>' +
                 '</div>' +
