@@ -774,19 +774,19 @@ export class YouTubeCapture extends BaseChannel {
             'padding: 0',
             'font-size: 13px',
             'line-height: 16px',
-            'color: rgba(255, 255, 255, 0.9)',
-            'font-family: Roboto, Arial, Helvetica, sans-serif',
-            'text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8), 0 0 5px rgba(0, 0, 0, 0.5)',
+            'color: #ffffff',
+            'font-family: "YouTube Noto", "Noto Sans KR", "Malgun Gothic", Roboto, Arial, sans-serif',
+            'text-shadow: 0 1px 2px rgba(0,0,0,1), 0 0 2px rgba(0,0,0,0.8)',
             '-webkit-font-smoothing: antialiased',
-            'font-weight: 500',
+            'font-weight: 700',
             'pointer-events: auto',
             'flex-shrink: 0',
             'box-sizing: border-box',
           ].join(' !important;') + ' !important';
           sponsorText.innerHTML = [
             '<span style="margin-right:4px">스폰서</span>',
-            '<span style="font-family:Arial,Helvetica,sans-serif;font-size:9px;font-weight:600;width:13px;height:13px;border:1px solid rgba(255,255,255,0.8);border-radius:50%;display:inline-flex;align-items:center;justify-content:center;line-height:1;flex-shrink:0;box-sizing:border-box;margin-right:6px">i</span>',
-            '<span style="display:inline-block;max-width:280px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;vertical-align:bottom;">' + sponsorDomainText + '</span>'
+            '<span style="font-family:Arial,Helvetica,sans-serif;font-size:9px;font-weight:bold;width:13px;height:13px;border:1px solid #fff;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;line-height:1;flex-shrink:0;box-sizing:border-box;margin-right:6px;box-shadow:0 1px 2px rgba(0,0,0,1), 0 0 2px rgba(0,0,0,0.8)">i</span>',
+            '<span style="display:inline-block;max-width:280px;font-weight:500;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;vertical-align:bottom;">' + sponsorDomainText + '</span>'
           ].join('');
           adLowerStack.appendChild(ctaCard);
           adLowerStack.appendChild(sponsorText);
