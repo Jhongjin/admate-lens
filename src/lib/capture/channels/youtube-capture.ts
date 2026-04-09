@@ -606,15 +606,18 @@ export class YouTubeCapture extends BaseChannel {
     if (displayPathSegments.length > 0) {
       displayUrlText = displayUrlText.replace(/\/+$/g, "") + "/" + displayPathSegments.join("/");
     }
-    const truncateWithDots = (text: string, maxLen: number): string => {
-      if (!text || maxLen <= 3) return text;
-      return text.length > maxLen ? text.slice(0, maxLen - 3) + "..." : text;
+    const truncateWithDots = (text: string, limit: number): string => {
+      if (!text) return text;
+      return text.length > limit ? text.slice(0, limit) + "..." : text;
     };
     // 원본 YouTube 카드/스폰서 영역에서 보이는 URL 길이에 맞춰 수동 절삭(...)
     const displayUrlCard = truncateWithDots(displayUrlText, 28);
-    const displayUrlSponsor = truncateWithDots(displayUrlText, 34);
+    const displayUrlSponsor = truncateWithDots(displayUrlText, 32);
 
-    const adTitle = instreamOpts.adTitle || '광고주 사이트 방문';
+    let adTitle = instreamOpts.adTitle || '광고 제목';
+    if (adTitle.length > 14) {
+      adTitle = adTitle.slice(0, 14) + '<br/>' + adTitle.slice(14);
+    }
     const ctaText = instreamOpts.ctaText || '자세히 알아보기';
 
     const result = await page.evaluate<boolean>(`

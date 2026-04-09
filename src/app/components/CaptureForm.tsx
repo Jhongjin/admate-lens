@@ -1054,6 +1054,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                     </label>
                     <input
                       type="text"
+                      maxLength={10}
                       className="form-input"
                       placeholder="예: 자세히 알아보기"
                       value={form.instreamCtaText}
@@ -1084,6 +1085,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                     </label>
                     <input
                       type="text"
+                      maxLength={30}
                       className="form-input"
                       placeholder="예: 광고 제목"
                       value={form.instreamAdTitle}
