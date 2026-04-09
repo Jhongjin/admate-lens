@@ -1909,7 +1909,7 @@ export class YouTubeCapture extends BaseChannel {
             // Position relative nudges the text upwards from the true vertical center.
             // This completely ignores the 56px container height trap.
             countryCode.className = 'style-scope ytd-topbar-logo-renderer';
-            countryCode.style.cssText = 'color: var(--yt-spec-text-secondary, #606060); font-family: Roboto, Arial, sans-serif; font-size: 10px; font-weight: 400; padding: 0; margin: 0; position: relative; top: -5px; left: -8px; line-height: normal; display: inline-block;';
+            countryCode.style.cssText = 'color: var(--yt-spec-text-secondary, #606060); font-family: Roboto, Arial, sans-serif; font-size: 10px; font-weight: 400; padding: 0; margin: 0; position: relative; top: -7px; left: -10px; line-height: normal; display: inline-block;';
           }
 
           const floater = document.createElement("div");
@@ -1926,8 +1926,8 @@ export class YouTubeCapture extends BaseChannel {
           ].join(";");
           
           floater.innerHTML = \`
-            <div style="position: absolute; right: 100%; top: 50%; transform: translateY(-50%); display: flex; align-items: center; gap: 12px; padding-right: 16px; color: var(--yt-spec-text-primary, #0f0f0f);">
-              <div style="display: flex; align-items: center; gap: 6px; background-color: var(--yt-spec-badge-chip-background, rgba(0,0,0,0.05)); padding: 0 16px 0 12px; height: 36px; border-radius: 18px; font-family: Roboto, Arial, sans-serif; font-size: 14px; font-weight: 500; white-space: nowrap; flex-shrink: 0;">
+            <div style="position: absolute; right: 100%; top: 50%; transform: translateY(-50%); display: flex; align-items: center; gap: 24px; padding-right: 24px; color: var(--yt-spec-text-primary, #0f0f0f);">
+              <div style="display: flex; align-items: center; gap: 6px; background-color: var(--yt-spec-badge-chip-background, rgba(0,0,0,0.05)); padding: 0 15px 0 11px; height: 36px; border-radius: 18px; font-family: Roboto, Arial, sans-serif; font-size: 14px; font-weight: 500; white-space: nowrap; flex-shrink: 0;">
                 <svg viewBox="0 0 24 24" preserveAspectRatio="xMidYMid meet" focusable="false" style="display: block; width: 24px; height: 24px; fill: currentColor; flex-shrink: 0;">
                   <path d="M19,13h-6v6h-2v-6H5v-2h6V5h2v6h6V13z"></path>
                 </svg>
@@ -1935,11 +1935,11 @@ export class YouTubeCapture extends BaseChannel {
               </div>
               <div style="width: 40px; height: 40px; display: flex; justify-content: center; align-items: center; position: relative; border-radius: 50%;">
                 <svg viewBox="0 0 24 24" preserveAspectRatio="xMidYMid meet" focusable="false" style="display: block; width: 24px; height: 24px; fill: currentColor;">
-                  <path d="M10,20h4c0,1.1-0.9,2-2,2S10,21.1,10,20z M20,17.35V19H4v-1.65l2-1.88v-5.15c0-2.92,1.56-5.22,4-5.98V3.96 c0-1.42,1.49-2.5,2.99-1.76C13.64,2.52,14,3.23,14,3.96l0,0.42c2.44,0.76,4,3.06,4,5.98v5.15L20,17.35z M19,17.77l-2-1.88v-5.47 c0-2.47-1.19-4.36-3.13-5.1c-1.26-0.53-2.64-0.5-3.84,0.03C8.15,6.11,7,7.99,7,10.42v5.47l-2,1.88V18h14V17.77z"></path>
+                  <path d="M16 19a4 4 0 11-8 0H4.765C3.21 19 2.25 17.304 3.05 15.97l1.806-3.01A1 1 0 005 12.446V8a7 7 0 0114 0v4.446c0 .181.05.36.142.515l1.807 3.01c.8 1.333-.161 3.029-1.716 3.029H16ZM12 3a5 5 0 00-5 5v4.446a3 3 0 01-.428 1.543L4.765 17h14.468l-1.805-3.01A3 3 0 0117 12.445V8a5 5 0 00-5-5Zm-2 16a2 2 0 104 0h-4Z"></path>
                 </svg>
               </div>
             </div>
-            <div style="width: 100%; height: 100%; border-radius: 50%; overflow: hidden; box-shadow: 0 0 0 2px var(--yt-spec-base-background, white), 0 1px 4px rgba(0,0,0,0.35);">
+            <div style="width: 100%; height: 100%; border-radius: 50%; overflow: hidden;">
               <img src="\${dataUrl}" alt="" draggable="false" style="width: 100%; height: 100%; object-fit: cover; display: block;" />
             </div>
           \`;
