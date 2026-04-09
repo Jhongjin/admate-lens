@@ -312,11 +312,17 @@ interface CaptureFormData {
   youtubeAdType: YouTubeAdType; // YouTube 광고 유형
   // 🎬 인스트림 광고 옵션
   instreamVideoUrl: string; // YouTube 동영상 URL
-  instreamSkipSeconds: string; // 정지할 초수
+  instreamCaptureSecond: string; // 캡처 시점(초)
   instreamAdTitle: string;
+  instreamEnableCtaText: boolean;
   instreamCtaText: string;
   instreamLandingUrl: string;
+  instreamDisplayUrl: string;
+  instreamDisplayPath1: string;
+  instreamDisplayPath2: string;
+  instreamLogoImageUrl: string;
   instreamCompanionImageUrl: string;
+  instreamUseChannelBanner: boolean;
 }
 
 /** 캡처 결과 타입 */
@@ -364,11 +370,17 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
     targetAdSizes: [],
     youtubeAdType: "preroll",
     instreamVideoUrl: "",
-    instreamSkipSeconds: "5",
+    instreamCaptureSecond: "5",
     instreamAdTitle: "",
+    instreamEnableCtaText: true,
     instreamCtaText: "",
     instreamLandingUrl: "",
+    instreamDisplayUrl: "",
+    instreamDisplayPath1: "",
+    instreamDisplayPath2: "",
+    instreamLogoImageUrl: "",
     instreamCompanionImageUrl: "",
+    instreamUseChannelBanner: true,
   });
 
   // 이미지 업로드 관련 상태
@@ -383,6 +395,10 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
   const [isUploading, setIsUploading] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const companionInputRef = useRef<HTMLInputElement>(null);
+  const logoInputRef = useRef<HTMLInputElement>(null);
+  const [isCompanionUploading, setIsCompanionUploading] = useState(false);
+  const [isLogoUploading, setIsLogoUploading] = useState(false);
 
   // 게재면 프리셋 관련 상태
   const [publisherMode, setPublisherMode] = useState<"preset" | "custom">(
@@ -476,6 +492,49 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
     }
   };
 
+  /** 공용 이미지 업로드 (인스트림 부가 에셋) */
+  const uploadAssetImage = useCallback(
+    async (
+      file: File,
+      opts?: { maxBytes?: number; exactWidth?: number; exactHeight?: number },
+    ): Promise<string> => {
+      const allowedTypes = ["image/png", "image/jpeg", "image/webp", "image/gif"];
+      if (!allowedTypes.includes(file.type)) {
+        throw new Error("PNG, JPG, WebP, GIF 형식만 지원합니다.");
+      }
+      const maxBytes = opts?.maxBytes ?? 10 * 1024 * 1024;
+      if (file.size > maxBytes) {
+        const kb = Math.floor(maxBytes / 1024);
+        throw new Error(`파일 크기는 ${kb}KB 이하여야 합니다.`);
+      }
+
+      if (opts?.exactWidth && opts?.exactHeight) {
+        const dim = await new Promise<{ width: number; height: number }>((resolve) => {
+          const img = new Image();
+          img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight });
+          img.onerror = () => resolve({ width: 0, height: 0 });
+          img.src = URL.createObjectURL(file);
+        });
+        if (dim.width !== opts.exactWidth || dim.height !== opts.exactHeight) {
+          throw new Error(`이미지 크기는 ${opts.exactWidth}x${opts.exactHeight}px 이어야 합니다.`);
+        }
+      }
+
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch("/api/upload", {
+        method: "POST",
+        body: formData,
+      });
+      const result = await res.json();
+      if (!res.ok || !result.url) {
+        throw new Error(result.error || "이미지 업로드 실패");
+      }
+      return result.url as string;
+    },
+    [],
+  );
+
   /** 드래그 앤 드롭 핸들러 */
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -493,6 +552,46 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) handleFileUpload(file);
+  };
+
+  const handleCompanionSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsCompanionUploading(true);
+    try {
+      const url = await uploadAssetImage(file, {
+        maxBytes: 150 * 1024,
+        exactWidth: 300,
+        exactHeight: 60,
+      });
+      setForm((prev) => ({
+        ...prev,
+        instreamCompanionImageUrl: url,
+        instreamUseChannelBanner: false,
+      }));
+      showToast("success", "컴패니언 배너 이미지 업로드 완료");
+    } catch (err) {
+      showToast("error", err instanceof Error ? err.message : "컴패니언 업로드 실패");
+    } finally {
+      setIsCompanionUploading(false);
+      if (companionInputRef.current) companionInputRef.current.value = "";
+    }
+  };
+
+  const handleLogoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsLogoUploading(true);
+    try {
+      const url = await uploadAssetImage(file);
+      setForm((prev) => ({ ...prev, instreamLogoImageUrl: url }));
+      showToast("success", "로고 이미지 업로드 완료");
+    } catch (err) {
+      showToast("error", err instanceof Error ? err.message : "로고 업로드 실패");
+    } finally {
+      setIsLogoUploading(false);
+      if (logoInputRef.current) logoInputRef.current.value = "";
+    }
   };
 
   /** 업로드 파일 제거 */
@@ -611,14 +710,23 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
               ? {
                   videoUrl: form.instreamVideoUrl || undefined,
                   skipSeconds: (() => {
-                    const n = parseInt(form.instreamSkipSeconds, 10);
+                    const n = parseInt(form.instreamCaptureSecond, 10);
                     return Number.isFinite(n) && n >= 0 ? n : 5;
                   })(),
                   adTitle: form.instreamAdTitle || undefined,
-                  ctaText: form.instreamCtaText || undefined,
+                  ctaText: form.instreamEnableCtaText
+                    ? form.instreamCtaText || undefined
+                    : undefined,
                   landingUrl: form.instreamLandingUrl || undefined,
+                  displayUrl: form.instreamDisplayUrl || undefined,
+                  displayPath1: form.instreamDisplayPath1 || undefined,
+                  displayPath2: form.instreamDisplayPath2 || undefined,
+                  avatarImageUrl: form.instreamLogoImageUrl || undefined,
                   companionImageUrl:
-                    form.instreamCompanionImageUrl || undefined,
+                    form.instreamUseChannelBanner
+                      ? undefined
+                      : form.instreamCompanionImageUrl || undefined,
+                  companionUseChannelBanner: form.instreamUseChannelBanner,
                 }
               : undefined,
         }),
@@ -645,11 +753,17 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
         clickUrl: "",
         captureLanding: false,
         instreamVideoUrl: "",
-        instreamSkipSeconds: "5",
+        instreamCaptureSecond: "5",
         instreamAdTitle: "",
+        instreamEnableCtaText: true,
         instreamCtaText: "",
         instreamLandingUrl: "",
+        instreamDisplayUrl: "",
+        instreamDisplayPath1: "",
+        instreamDisplayPath2: "",
+        instreamLogoImageUrl: "",
         instreamCompanionImageUrl: "",
+        instreamUseChannelBanner: true,
       }));
       setUploadedFile(null);
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -825,7 +939,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                   style={{ color: "var(--color-text-muted)" }}
                 >
                   실제 YouTube 인스트림 광고처럼 CTA 카드, 스폰서 정보가
-                  표시됩니다. 입력하지 않으면 기본값이 사용됩니다.
+                  표시됩니다. 아래 값으로 "원본 영상 + 캡처 시점"을 지정하세요.
                 </p>
 
                 <div className="space-y-3">
@@ -853,7 +967,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                       className="text-[10px] mt-0.5"
                       style={{ color: "var(--color-text-muted)" }}
                     >
-                      실제로 인스트림 광고 형태로 재생될 YouTube 영상의 URL입니다.
+                      프레임 추출 대상이 되는 광고 원본 영상 URL입니다.
                     </p>
                   </div>
 
@@ -863,18 +977,18 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                       className="text-[11px] font-medium mb-1 block"
                       style={{ color: "var(--color-text-secondary)" }}
                     >
-                      ⏰ 캡처 시점 (초) <span style={{ color: "var(--color-error)" }}>*</span>
+                      ⏰ 프레임 캡처 시점 (초) <span style={{ color: "var(--color-error)" }}>*</span>
                     </label>
                     <input
                       type="number"
                       className="form-input"
-                      placeholder="예: 5"
+                      placeholder="예: 10"
                       min="0"
-                      value={form.instreamSkipSeconds}
+                      value={form.instreamCaptureSecond}
                       onChange={(e) =>
                         setForm((prev) => ({
                           ...prev,
-                          instreamSkipSeconds: e.target.value,
+                          instreamCaptureSecond: e.target.value,
                         }))
                       }
                     />
@@ -882,35 +996,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                       className="text-[10px] mt-0.5"
                       style={{ color: "var(--color-text-muted)" }}
                     >
-                      해당 초수에서 정지된 화면으로 캡처됩니다. (기본 5초)
-                    </p>
-                  </div>
-
-                  {/* 광고 제목 */}
-                  <div>
-                    <label
-                      className="text-[11px] font-medium mb-1 block"
-                      style={{ color: "var(--color-text-secondary)" }}
-                    >
-                      🏷️ 광고 제목
-                    </label>
-                    <input
-                      type="text"
-                      className="form-input"
-                      placeholder="예: 삼성 갤럭시 S25 Ultra"
-                      value={form.instreamAdTitle}
-                      onChange={(e) =>
-                        setForm((prev) => ({
-                          ...prev,
-                          instreamAdTitle: e.target.value,
-                        }))
-                      }
-                    />
-                    <p
-                      className="text-[10px] mt-0.5"
-                      style={{ color: "var(--color-text-muted)" }}
-                    >
-                      CTA 카드에 표시될 광고주명 또는 상품명
+                      입력한 초수의 프레임을 추출합니다. 예: 10 입력 시 10초 프레임 캡처
                     </p>
                   </div>
 
@@ -945,6 +1031,21 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
 
                   {/* CTA 버튼 텍스트 */}
                   <div>
+                    <label className="flex items-center gap-2 text-[11px] mb-1" style={{ color: "var(--color-text-secondary)" }}>
+                      <input
+                        type="checkbox"
+                        checked={form.instreamEnableCtaText}
+                        onChange={(e) =>
+                          setForm((prev) => ({
+                            ...prev,
+                            instreamEnableCtaText: e.target.checked,
+                          }))
+                        }
+                      />
+                      클릭 유도문안
+                    </label>
+                    {form.instreamEnableCtaText && (
+                      <>
                     <label
                       className="text-[11px] font-medium mb-1 block"
                       style={{ color: "var(--color-text-secondary)" }}
@@ -967,42 +1068,193 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                       className="text-[10px] mt-0.5"
                       style={{ color: "var(--color-text-muted)" }}
                     >
-                      CTA 카드의 흰색 버튼에 표시될 문구
+                      클릭 유도문안 (예: 자세히 알아보기)
                     </p>
+                      </>
+                    )}
                   </div>
 
-                  {/* 컴패니언 배너 URL */}
+                  {/* 광고 제목 */}
                   <div>
                     <label
                       className="text-[11px] font-medium mb-1 block"
                       style={{ color: "var(--color-text-secondary)" }}
                     >
-                      🖼️ 컴패니언 배너 URL{" "}
-                      <span
-                        className="text-[9px] font-normal"
-                        style={{ color: "var(--color-text-muted)" }}
-                      >
-                        (별도 이미지)
-                      </span>
+                      🏷️ 광고 제목
                     </label>
                     <input
-                      type="url"
+                      type="text"
                       className="form-input"
-                      placeholder="https://example.com/companion-300x250.png"
-                      value={form.instreamCompanionImageUrl}
+                      placeholder="예: 광고 제목"
+                      value={form.instreamAdTitle}
                       onChange={(e) =>
                         setForm((prev) => ({
                           ...prev,
-                          instreamCompanionImageUrl: e.target.value,
+                          instreamAdTitle: e.target.value,
                         }))
                       }
                     />
+                  </div>
+
+                  {/* 표시 URL */}
+                  <div>
+                    <label
+                      className="text-[11px] font-medium mb-1 block"
+                      style={{ color: "var(--color-text-secondary)" }}
+                    >
+                      🔗 표시 URL
+                    </label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      placeholder="예: admate-capture-pro.vercel.app/ab/cd"
+                      value={form.instreamDisplayUrl}
+                      onChange={(e) =>
+                        setForm((prev) => ({
+                          ...prev,
+                          instreamDisplayUrl: e.target.value,
+                        }))
+                      }
+                    />
+                    <div className="grid grid-cols-2 gap-2 mt-2">
+                      <input
+                        type="text"
+                        className="form-input"
+                        placeholder="경로 1"
+                        value={form.instreamDisplayPath1}
+                        onChange={(e) =>
+                          setForm((prev) => ({
+                            ...prev,
+                            instreamDisplayPath1: e.target.value,
+                          }))
+                        }
+                      />
+                      <input
+                        type="text"
+                        className="form-input"
+                        placeholder="경로 2"
+                        value={form.instreamDisplayPath2}
+                        onChange={(e) =>
+                          setForm((prev) => ({
+                            ...prev,
+                            instreamDisplayPath2: e.target.value,
+                          }))
+                        }
+                      />
+                    </div>
+                  </div>
+
+                  {/* 로고 이미지 */}
+                  <div>
+                    <label
+                      className="text-[11px] font-medium mb-1 block"
+                      style={{ color: "var(--color-text-secondary)" }}
+                    >
+                      🧩 로고 이미지
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        className="btn btn-secondary text-xs px-3 py-1.5"
+                        onClick={() => logoInputRef.current?.click()}
+                        disabled={isLogoUploading}
+                      >
+                        {isLogoUploading ? "업로드 중..." : "파일 업로드"}
+                      </button>
+                      <input
+                        ref={logoInputRef}
+                        type="file"
+                        accept="image/png,image/jpeg,image/webp,image/gif"
+                        onChange={handleLogoSelect}
+                        className="hidden"
+                      />
+                      {form.instreamLogoImageUrl && (
+                        <a
+                          href={form.instreamLogoImageUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-[11px] text-[var(--color-accent)] hover:underline truncate"
+                        >
+                          업로드된 로고 보기
+                        </a>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* 컴패니언 배너 */}
+                  <div>
+                    <label
+                      className="text-[11px] font-medium mb-1 block"
+                      style={{ color: "var(--color-text-secondary)" }}
+                    >
+                      🖼️ 컴패니언 배너 (컴퓨터)
+                    </label>
+                    <div className="space-y-2">
+                      <label className="flex items-center gap-2 text-xs" style={{ color: "var(--color-text-secondary)" }}>
+                        <input
+                          type="radio"
+                          name="companion-mode"
+                          checked={form.instreamUseChannelBanner}
+                          onChange={() =>
+                            setForm((prev) => ({
+                              ...prev,
+                              instreamUseChannelBanner: true,
+                            }))
+                          }
+                        />
+                        채널 배너를 사용하여 자동 생성 (권장)
+                      </label>
+                      <label className="flex items-center gap-2 text-xs" style={{ color: "var(--color-text-secondary)" }}>
+                        <input
+                          type="radio"
+                          name="companion-mode"
+                          checked={!form.instreamUseChannelBanner}
+                          onChange={() =>
+                            setForm((prev) => ({
+                              ...prev,
+                              instreamUseChannelBanner: false,
+                            }))
+                          }
+                        />
+                        이미지 업로드
+                      </label>
+                    </div>
+                    {!form.instreamUseChannelBanner && (
+                      <div className="mt-2 space-y-2">
+                        <button
+                          type="button"
+                          className="btn btn-secondary text-xs px-3 py-1.5"
+                          onClick={() => companionInputRef.current?.click()}
+                          disabled={isCompanionUploading}
+                        >
+                          {isCompanionUploading ? "업로드 중..." : "파일 선택"}
+                        </button>
+                        <input
+                          ref={companionInputRef}
+                          type="file"
+                          accept="image/png,image/jpeg,image/webp,image/gif"
+                          onChange={handleCompanionSelect}
+                          className="hidden"
+                        />
+                        <input
+                          type="url"
+                          className="form-input"
+                          placeholder="또는 이미지 URL 직접 입력"
+                          value={form.instreamCompanionImageUrl}
+                          onChange={(e) =>
+                            setForm((prev) => ({
+                              ...prev,
+                              instreamCompanionImageUrl: e.target.value,
+                            }))
+                          }
+                        />
+                      </div>
+                    )}
                     <p
                       className="text-[10px] mt-0.5"
                       style={{ color: "var(--color-text-muted)" }}
                     >
-                      사이드바 컴패니언 배너에 사용할 별도 이미지 (미입력 시
-                      메인 소재 사용)
+                      크기: 300x60픽셀, 최대 파일 크기: 150KB
                     </p>
                   </div>
                 </div>

@@ -1,4 +1,4 @@
-﻿/**
+/**
  * YouTube Capture v1 — YouTube 광고 캡처 모듈
  *
  * 지원 광고 유형:
@@ -54,7 +54,12 @@ type InstreamOptsPayload = {
   adTitle?: string;
   ctaText?: string;
   landingUrl?: string;
+  displayUrl?: string;
+  displayPath1?: string;
+  displayPath2?: string;
   companionImageUrl?: string;
+  /** 카드 원형 로고(업로드 URL → 서버에서 data URL로 변환 후 주입) */
+  avatarImageUrl?: string;
 };
 
 /** YouTube URL에서 Video ID 추출 */
@@ -118,6 +123,9 @@ export class YouTubeCapture extends BaseChannel {
       creativeBase64Size: 0,
     };
 
+    /** 캡처 1회당 1장 — 마스트헤드 폴백 오버레이·재주입에 동일 이미지 사용 */
+    const mastheadProfileDataUrl = await this.pickRandomMastheadAvatarDataUrl();
+
     // 1) 소재 이미지 → base64 data URL
     // 인스트림은 폼에서 creativeUrl 없이 videoUrl만 보내는 경우가 많음 → 광고 동영상의 썸네일을 소재로 사용
     const rawCreative = (request.creativeUrl || "").trim();
@@ -157,6 +165,18 @@ export class YouTubeCapture extends BaseChannel {
       console.error(
         `[YouTube] 인스트림 소재 이미지 확보 실패 — creativeUrl·videoUrl을 확인하세요 (fetch 시도: ${creativeFetchUrl || "(없음)"})`
       );
+    }
+
+    // 인스트림 카드 로고: 업로드 URL이 있으면 서버에서 fetch → data URL (YouTube 페이지 CSP/CORS 회피)
+    let instreamAvatarDataUrl = creativeDataUrl;
+    if (adType === "preroll" && instreamOpts.avatarImageUrl?.trim()) {
+      const av = await imageUrlToDataUrl(instreamOpts.avatarImageUrl.trim());
+      if (av.ok) {
+        instreamAvatarDataUrl = av.dataUrl;
+        console.log(`[YouTube] 로고 이미지 적용 (${av.sizeKB}KB)`);
+      } else {
+        console.warn("[YouTube] 로고 URL fetch 실패 — 썸네일로 대체");
+      }
     }
 
     // 1.5) 🖼️ 비디오 ID 추출 + 썸네일 준비
@@ -213,6 +233,9 @@ export class YouTubeCapture extends BaseChannel {
     // /embed/ URL로 먼저 접근하여 봇 감지를 우회
     const targetUrl = request.publisherUrl;
 
+    // 데스크톱 시청 레이아웃 고정 — 로컬 2560 등과 무관하게 실제 브라우저(≈1920)와 동일 비율로 캡처
+    await page.setViewport({ width: 1920, height: 1080, deviceScaleFactor: 1 });
+
     // 📺 YouTube watch 페이지 로드 (레이아웃 확보 목적)
     await page.goto(targetUrl, {
       waitUntil: "networkidle2",
@@ -227,6 +250,7 @@ export class YouTubeCapture extends BaseChannel {
 
     // 4) YouTube 페이지 안정화 대기
     await new Promise((r) => setTimeout(r, 3000));
+    await this.applyMastheadLoggedInLook(page, mastheadProfileDataUrl);
 
     // 4.5) 쿠키 동의 팝업이 여전히 있으면 재시도
     const hasConsent = await page.evaluate<boolean>(`
@@ -262,6 +286,7 @@ export class YouTubeCapture extends BaseChannel {
       `);
       await page.goto(targetUrl, { waitUntil: "networkidle2", timeout: 45000 });
       await new Promise((r) => setTimeout(r, 3000));
+      await this.applyMastheadLoggedInLook(page, mastheadProfileDataUrl);
     }
 
     // 🔑 4.7) 봇 감지 확인 + 강력한 폴백 전략
@@ -436,11 +461,15 @@ export class YouTubeCapture extends BaseChannel {
     switch (adType) {
       case "preroll": {
         const prerollUiOpts = {
+          videoUrl: instreamOpts.videoUrl || "",
           adTitle: instreamOpts.adTitle || "",
           ctaText: instreamOpts.ctaText || "",
           landingUrl: instreamOpts.landingUrl || request.clickUrl || "",
+          displayUrl: instreamOpts.displayUrl || "",
+          displayPath1: instreamOpts.displayPath1 || "",
+          displayPath2: instreamOpts.displayPath2 || "",
           companionImageUrl: instreamOpts.companionImageUrl || "",
-          avatarImageUrl: creativeDataUrl,
+          avatarImageUrl: instreamAvatarDataUrl,
           progressFillPercent: prerollProgressPercent,
         };
         console.log(
@@ -451,7 +480,9 @@ export class YouTubeCapture extends BaseChannel {
         // 🎯 컴패니언 배너 동시 삽입
         if (injectionSuccess) {
           const companionImg = prerollUiOpts.companionImageUrl || creativeDataUrl;
-          const companionResult = await this.injectDisplayAd(page, companionImg);
+          const companionResult = await this.injectDisplayAd(page, companionImg, {
+            variant: "companion-300x60",
+          });
           console.log(`[YouTube] 컴패니언 배너: ${companionResult ? '✅ 성공' : '⚠️ 실패'}`);
         }
         break;
@@ -469,7 +500,7 @@ export class YouTubeCapture extends BaseChannel {
     if (!injectionSuccess) {
       console.warn(`[YouTube] ⚠️ 기본 인젝션 실패 — 폴백: 프리롤 강제 오버레이`);
       await this.injectPrerollAd(page, prerollOverlayImageUrl, playerInfo, {
-        avatarImageUrl: creativeDataUrl,
+        avatarImageUrl: instreamAvatarDataUrl,
         progressFillPercent: prerollProgressPercent,
       });
     }
@@ -511,6 +542,9 @@ export class YouTubeCapture extends BaseChannel {
       await new Promise((r) => setTimeout(r, 300));
     }
 
+    // 유튜브가 헤더를 다시 그리면 로그인 버튼이 복구될 수 있음 → 캡처 직전 한 번 더 덮음
+    await this.applyMastheadLoggedInLook(page, mastheadProfileDataUrl);
+
     // 10) 전체 페이지 스크린샷
     const screenshot = await page.screenshot({
       fullPage: false, // YouTube는 뷰포트 캡처가 더 적합
@@ -534,9 +568,13 @@ export class YouTubeCapture extends BaseChannel {
     imgDataUrl: string,
     playerInfo: { found: boolean; width: number; height: number; top: number; left: number },
     instreamOpts: {
+      videoUrl?: string;
       adTitle?: string;
       ctaText?: string;
       landingUrl?: string;
+      displayUrl?: string;
+      displayPath1?: string;
+      displayPath2?: string;
       skipSeconds?: number;
       companionImageUrl?: string;
       avatarImageUrl?: string;
@@ -545,13 +583,36 @@ export class YouTubeCapture extends BaseChannel {
   ): Promise<boolean> {
     console.log(`[YouTube] 🎬 프리롤 광고 인젝션 시작`);
 
-    // 랜딩 URL에서 도메인 추출
-    let landingDomain = 'advertiser.com';
+    // 표시 URL 텍스트 구성:
+    // 1) 폼의 displayUrl 입력값 우선
+    // 2) 없으면 videoUrl 호스트
+    // 3) 그래도 없으면 landingUrl 호스트
+    let landingDomain = "advertiser.com";
+    let displayUrlText = "";
     try {
-      if (instreamOpts.landingUrl) {
-        landingDomain = new URL(instreamOpts.landingUrl).hostname.replace('www.', '');
+      if (instreamOpts.displayUrl?.trim()) {
+        displayUrlText = instreamOpts.displayUrl.trim().replace(/^https?:\/\//, "");
+      }
+      if (instreamOpts.videoUrl) {
+        landingDomain = new URL(instreamOpts.videoUrl).hostname.replace("www.", "");
+      } else if (instreamOpts.landingUrl) {
+        landingDomain = new URL(instreamOpts.landingUrl).hostname.replace("www.", "");
       }
     } catch { /* ignore */ }
+    if (!displayUrlText) displayUrlText = landingDomain;
+    const displayPathSegments = [instreamOpts.displayPath1, instreamOpts.displayPath2]
+      .map((v) => (v || "").trim().replace(/^\/+|\/+$/g, ""))
+      .filter((v) => v.length > 0);
+    if (displayPathSegments.length > 0) {
+      displayUrlText = displayUrlText.replace(/\/+$/g, "") + "/" + displayPathSegments.join("/");
+    }
+    const truncateWithDots = (text: string, maxLen: number): string => {
+      if (!text || maxLen <= 3) return text;
+      return text.length > maxLen ? text.slice(0, maxLen - 3) + "..." : text;
+    };
+    // 원본 YouTube 카드/스폰서 영역에서 보이는 URL 길이에 맞춰 수동 절삭(...)
+    const displayUrlCard = truncateWithDots(displayUrlText, 28);
+    const displayUrlSponsor = truncateWithDots(displayUrlText, 34);
 
     const adTitle = instreamOpts.adTitle || '광고주 사이트 방문';
     const ctaText = instreamOpts.ctaText || '자세히 알아보기';
@@ -560,8 +621,9 @@ export class YouTubeCapture extends BaseChannel {
       (() => {
         try {
           const imgUrl = ${JSON.stringify(imgDataUrl)};
-          const avatarImgUrl = ${JSON.stringify(instreamOpts.avatarImageUrl || imgDataUrl)};
-          const domainText = ${JSON.stringify(landingDomain)};
+          const avatarImgUrl = ${JSON.stringify(instreamOpts.avatarImageUrl || "")};
+          const domainText = ${JSON.stringify(displayUrlCard)};
+          const sponsorDomainText = ${JSON.stringify(displayUrlSponsor)};
           const titleText = ${JSON.stringify(adTitle)};
           const ctaBtnText = ${JSON.stringify(ctaText)};
           const progressFillPct = ${JSON.stringify(
@@ -610,15 +672,19 @@ export class YouTubeCapture extends BaseChannel {
             'overflow: hidden',
             'border-radius: ' + playerRadius,
             'transform: translateZ(0)',
+            'backface-visibility: hidden',
+            'isolation: isolate',
           ].join(' !important;') + ' !important';
 
           // ─── 광고 소재 이미지 (존재할 경우 화면 꽉 채움) ───
           if (imgUrl) {
-            overlay.style.background = '#000 !important';
+            // Black halo 방지: 코너 안티앨리어싱 픽셀 뒤에 검정 배경을 두지 않는다.
+            overlay.style.background = 'transparent !important';
             const img = document.createElement('img');
             img.src = imgUrl;
             img.setAttribute('data-injected', 'admate');
-            img.style.cssText = 'width:100% !important;height:100% !important;object-fit:cover !important;display:block !important;position:absolute !important;top:0 !important;left:0 !important;z-index:1 !important;border-radius:inherit !important;transform:translateZ(0) !important';
+            // Subpixel seam 방지: 이미지를 0.5px bleed 시켜 가장자리 틈/검은선 제거
+            img.style.cssText = 'width:calc(100% + 1px) !important;height:calc(100% + 1px) !important;object-fit:cover !important;display:block !important;position:absolute !important;top:-0.5px !important;left:-0.5px !important;z-index:1 !important;border-radius:inherit !important;transform:translateZ(0) !important;backface-visibility:hidden !important';
             overlay.appendChild(img);
           } else {
             overlay.style.background = 'transparent !important';
@@ -626,21 +692,32 @@ export class YouTubeCapture extends BaseChannel {
 
           // ─── 좌상단: "광고" 라벨 (실제 YouTube처럼 극히 미세하게) ───
           const adLabel = document.createElement('div');
-          adLabel.style.cssText = "position:absolute;top:10px;left:10px;color:rgba(255,255,255,0.5);font-size:10px;font-family:'Roboto',Arial,sans-serif;font-weight:400;letter-spacing:0.2px;z-index:10";
+          adLabel.style.cssText = "position:absolute;top:10px;left:10px;color:rgba(255,255,255,0.5);font-size:10px;font-family:Roboto,Arial,sans-serif;font-weight:400;letter-spacing:0.2px;z-index:10";
           adLabel.textContent = '광고';
           overlay.appendChild(adLabel);
 
-          // ═══ 좌하단: CTA 카드 ═══
-          // 📌 YouTube 실제 CSS 그대로 적용 (DevTools 추출):
-          //   .ytp-ad-avatar-lockup-card { padding: 12px; max-width: 400px; }
-          //   .ytp-delhi-modern .ytp-ad-avatar-lockup-card { background: rgba(0,0,0,.6); border-radius: 8px; }
-          //   --yt-frosted-glass-backdrop-filter-override: none; → blur 없음
-          //   .ytp-ad-player-overlay-layout__player-card-container { bottom: 95px; left: 22px; }
+          // ═══ 좌하단: CTA 카드 + 스폰서 줄 (한 스택으로 묶어 좌측 정렬·세로 간격 고정) ═══
+          const adLowerStack = document.createElement('div');
+          adLowerStack.id = 'admate-preroll-lower-stack';
+          adLowerStack.setAttribute('data-injected', 'admate-youtube-preroll');
+          adLowerStack.style.cssText = [
+            'position: absolute',
+            'left: 22px',
+            'bottom: 15px',
+            'z-index: 20',
+            'display: flex',
+            'flex-direction: column',
+            'align-items: flex-start',
+            'justify-content: flex-end',
+            'gap: 36px',
+            'margin: 0',
+            'padding: 0',
+            'pointer-events: none',
+          ].join(' !important;') + ' !important';
+
           const ctaCard = document.createElement('div');
           ctaCard.style.cssText = [
-            'position: absolute',
-            'bottom: 95px',
-            'left: 22px',
+            'position: relative',
             'display: flex',
             'align-items: center',
             'background: rgba(0,0,0,0.6)',
@@ -650,6 +727,8 @@ export class YouTubeCapture extends BaseChannel {
             'z-index: 10',
             'overflow: hidden',
             'cursor: pointer',
+            'pointer-events: auto',
+            'flex-shrink: 0',
           ].join(' !important;') + ' !important';
 
           // 원형 아이콘 (ytp-ad-avatar--size-m = 40px)
@@ -669,37 +748,49 @@ export class YouTubeCapture extends BaseChannel {
           // 텍스트 영역 (광고제목 + 도메인)
           const ctaTextDiv = document.createElement('div');
           ctaTextDiv.style.cssText = 'flex:1;min-width:0;margin-right:12px';
+          // font-family에 작은따옴표를 쓰면 evaluate 문자열이 깨져 SyntaxError 남 → HTML 엔티티 사용
           ctaTextDiv.innerHTML = [
-            '<div style="font-size:14px;font-weight:500;color:#fff;font-family:YouTube Noto,Roboto,Arial,Helvetica,sans-serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:20px">' + titleText + '</div>',
-            '<div style="font-size:12px;color:rgba(255,255,255,0.7);font-family:YouTube Noto,Roboto,Arial,Helvetica,sans-serif;margin-top:2px;line-height:16px">' + domainText + '</div>',
+            '<div style="font-size:14px;font-weight:500;color:#fff;font-family:&quot;YouTube Noto&quot;,Roboto,Arial,Helvetica,sans-serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:20px;letter-spacing:normal">' + titleText + '</div>',
+            '<div style="font-size:12px;color:rgba(255,255,255,0.7);font-family:&quot;YouTube Noto&quot;,Roboto,Arial,Helvetica,sans-serif;margin-top:2px;line-height:16px;letter-spacing:normal">' + domainText + '</div>',
           ].join('');
           ctaCard.appendChild(ctaTextDiv);
 
           // ✅ CTA 버튼 (ytp-ad-button-vm--style-filled-white)
           // YouTube CSS: --yt-spec-white-3: #f1f1f1
           const ctaBtn = document.createElement('div');
-          ctaBtn.style.cssText = "background:#f1f1f1;color:#0f0f0f;font-size:14px;font-weight:500;font-family:YouTube Noto,Roboto,Arial,Helvetica,sans-serif;padding:9px 16px;border-radius:18px;white-space:nowrap;cursor:pointer;flex-shrink:0";
+          ctaBtn.style.cssText = "background:#f1f1f1;color:rgb(15,15,15);font-size:14px;font-weight:500;line-height:36px;letter-spacing:normal;font-family:Roboto,Arial,sans-serif;padding:0 16px;border-radius:18px;height:36px;white-space:nowrap;cursor:pointer;flex-shrink:0;display:inline-flex;align-items:center";
           ctaBtn.textContent = ctaBtnText;
           ctaCard.appendChild(ctaBtn);
 
-          overlay.appendChild(ctaCard);
-
-          // ─── 좌하단 하위: "스폰서 ⓘ 도메인" ───
-          // YouTube 원본 DOM과 동일하게 컬러(#fff), 그림자, margin 적용
+          // ─── "스폰서 ⓘ  URL" — 실제 유튜브처럼 배경색 없이 약간 투명한 텍스트로 처리
           const sponsorText = document.createElement('div');
-          sponsorText.style.cssText = "position:absolute;bottom:68px;left:22px;font-size:13px;color:#fff;font-family:YouTube Noto,Roboto,Arial,Helvetica,sans-serif;z-index:10;display:flex;align-items:center;font-weight:500;text-shadow:0 0 2px rgba(0,0,0,0.5)";
-          
+          sponsorText.id = 'admate-preroll-sponsor';
+          sponsorText.setAttribute('data-injected', 'admate-youtube-preroll');
+          sponsorText.style.cssText = [
+            'position: relative',
+            'display: flex',
+            'align-items: center',
+            'margin: 0',
+            'padding: 0',
+            'font-size: 13px',
+            'line-height: 16px',
+            'color: rgba(255, 255, 255, 0.75)',
+            'font-family: "YouTube Noto", Roboto, Arial, Helvetica, sans-serif',
+            'text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6), 0 0 2px rgba(0, 0, 0, 0.6)',
+            '-webkit-font-smoothing: antialiased',
+            'font-weight: 500',
+            'pointer-events: auto',
+            'flex-shrink: 0',
+            'box-sizing: border-box',
+          ].join(' !important;') + ' !important';
           sponsorText.innerHTML = [
-            '<span style="line-height:16px;">스폰서</span>',
-            '<span style="display:flex;align-items:center;margin:0 6px 0 4px;">',
-              '<svg fill="#fff" height="14px" viewBox="0 -960 960 960" width="14px" style="filter:drop-shadow(0px 0px 2px rgba(0,0,0,0.5));">',
-                '<path d="M430.09-270.8h101.34V-528H430.09v257.2Zm49.52-338.03q20.94 0 35.34-14.01 14.4-14.01 14.4-34.95 0-20.94-14.01-35.34-14.01-14.39-34.95-14.39-20.94 0-35.34 14.01-14.4 14.01-14.4 34.95 0 20.94 14.01 35.34 14.01 14.39 34.95 14.39Zm.67 548.18q-86.64 0-163.19-32.66-76.56-32.66-133.84-89.94t-89.94-133.8q-32.66-76.51-32.66-163.41 0-87.15 32.72-163.31t90.14-133.61q57.42-57.44 133.79-89.7 76.38-32.27 163.16-32.27 87.14 0 163.31 32.26 76.16 32.26 133.61 89.71 57.45 57.45 89.71 133.86 32.26 76.42 32.26 163.33 0 86.91-32.27 163.08-32.26 76.18-89.7 133.6-57.45 57.42-133.83 90.14-76.39 32.72-163.27 32.72Zm-.33-105.18q131.13 0 222.68-91.49 91.54-91.49 91.54-222.63 0-131.13-91.49-222.68-91.49-91.54-222.63-91.54-131.13 0-222.68 91.49-91.54 91.49-91.54 222.63 0 131.13 91.49 222.68 91.49 91.54 222.63 91.54ZM480-480Z"></path>',
-              '</svg>',
-            '</span>',
-            '<span style="line-height:16px;">' + domainText + '</span>'
+            '<span style="margin-right:6px">스폰서</span>',
+            '<span style="font-family:Arial,Helvetica,sans-serif;font-size:9px;font-weight:600;width:13px;height:13px;border:1.5px solid rgba(255,255,255,0.75);border-radius:50%;display:inline-flex;align-items:center;justify-content:center;line-height:1;flex-shrink:0;box-sizing:border-box;text-shadow:none;margin-right:8px">i</span>',
+            '<span style="display:inline-block;max-width:280px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;vertical-align:bottom;">' + sponsorDomainText + '</span>'
           ].join('');
-          
-          overlay.appendChild(sponsorText);
+          adLowerStack.appendChild(ctaCard);
+          adLowerStack.appendChild(sponsorText);
+          overlay.appendChild(adLowerStack);
 
           // ─── 하단: 노란색 프로그레스 바 ───
           const timerBg = document.createElement('div');
@@ -767,19 +858,24 @@ export class YouTubeCapture extends BaseChannel {
   }
 
   /**
-   * 📺 디스플레이 (사이드바 컴패니언) 광고 인젝션
-   * 실제 YouTube 디스플레이 광고 형태를 정확히 재현:
-   *   - "스폰서 광고" 헤더 + ⓘ 아이콘 + X 닫기 버튼
-   *   - 300x250 배너 이미지 (사이드바 전체 너비)
-   *   - [파비콘] "광고주 사이트 방문" + "Ad · Sponsored" 푸터
-   *   - 카테고리 칩 아래, 추천 영상 리스트 위에 배치
+   * 📺 디스플레이 / 인스트림 컴패니언 광고 인젝션
+   * - sidebar-display: 300×250 비율 이미지 + 하단 푸터 (순수 디스플레이 슬롯)
+   * - companion-300x60: 높이 60px 배너 + 추천 영상·칩과 동일 가로 정렬, 하단 플레이스홀더 박스
    */
-  private async injectDisplayAd(page: IPageHandle, imgDataUrl: string): Promise<boolean> {
-    console.log(`[YouTube] 📺 디스플레이 광고 인젝션 시작 (실제 YouTube 광고 형태)`);
+  private async injectDisplayAd(
+    page: IPageHandle,
+    imgDataUrl: string,
+    options?: { variant?: "sidebar-display" | "companion-300x60" }
+  ): Promise<boolean> {
+    const variant = options?.variant ?? "sidebar-display";
+    console.log(
+      `[YouTube] 📺 사이드바 광고 인젝션 시작 (variant=${variant})`
+    );
 
     const result = await page.evaluate<boolean>(`
       (() => {
         const imgUrl = ${JSON.stringify(imgDataUrl)};
+        const variant = ${JSON.stringify(variant)};
 
         // 사이드바 영역 찾기 (다양한 셀렉터)
         const sidebarSelectors = [
@@ -807,73 +903,146 @@ export class YouTubeCapture extends BaseChannel {
           return false;
         }
 
-        // 사이드바 실제 너비 측정 (보통 402px @1920 / 336px @1440 등)
-        const sidebarWidth = Math.round(sidebar.getBoundingClientRect().width);
-        const adWidth = Math.min(sidebarWidth, 336); // YouTube 디스플레이 광고 최대 336px
+        // 추천 영상 행·칩바와 동일한 콘텐츠 가로폭 (컴패니언이 더 넓게 보이는 현상 방지)
+        const sidebarRect = sidebar.getBoundingClientRect();
+        const sidebarWidth = Math.round(sidebarRect.width);
+        let alignW = 0;
+        const chipEl = sidebar.querySelector(
+          'ytd-feed-filter-chip-bar-renderer, yt-chip-cloud-renderer'
+        );
+        const firstVideo = sidebar.querySelector('ytd-compact-video-renderer');
+        if (firstVideo) alignW = firstVideo.getBoundingClientRect().width;
+        if (chipEl) {
+          const cw = chipEl.getBoundingClientRect().width;
+          if (alignW > 0) alignW = Math.min(alignW, cw);
+          else alignW = cw;
+        }
+        if (alignW < 120) alignW = sidebarWidth;
+        alignW = Math.round(alignW);
+
+        const isCompanion = variant === 'companion-300x60';
+        const adWidth = isCompanion
+          ? alignW
+          : Math.min(alignW, 336);
 
         // ═══════════════════════════════════════════════════
         // 전체 광고 컨테이너 (실제 YouTube 스타일)
         // ═══════════════════════════════════════════════════
         const container = document.createElement('div');
-        container.setAttribute('data-injected', 'admate-youtube-display');
-        container.style.cssText = [
-          'width: ' + adWidth + 'px !important',
-          'margin: 0 0 16px 0 !important',
-          'border-radius: 12px !important',
+        container.setAttribute(
+          'data-injected',
+          isCompanion ? 'admate-youtube-companion' : 'admate-youtube-display'
+        );
+        const containerStyles = [
+          'width: 100% !important',
+          'max-width: 100% !important',
+          'box-sizing: border-box !important',
+          'margin: 0 !important',
           'overflow: hidden !important',
           'box-shadow: 0 1px 2px rgba(0,0,0,0.1) !important',
           'background: #fff !important',
           'border: 1px solid #e5e5e5 !important',
           'position: relative !important',
-        ].join(';');
+        ];
+        if (isCompanion) {
+          containerStyles.push('border-radius: 2px !important', 'height: 60px !important');
+        } else {
+          containerStyles.push('border-radius: 12px !important');
+        }
+        container.style.cssText = containerStyles.join(';');
 
-        // ─── 상단 헤더 제거: 실제 YouTube 컴패니언 배너에는 "스폰서 광고" 헤더가 없음 ───
-
-        // ─── 배너 이미지 (300x250 비율) ───
+        // ─── 배너 이미지 ───
         const imgEl = document.createElement('img');
         imgEl.src = imgUrl;
         imgEl.setAttribute('data-injected', 'admate');
-        imgEl.style.cssText = [
-          'display: block !important',
-          'width: 100% !important',
-          'height: auto !important',
-          'aspect-ratio: 300/250 !important',
-          'object-fit: cover !important',
-        ].join(';');
+        if (isCompanion) {
+          imgEl.style.cssText = [
+            'display: block !important',
+            'width: 100% !important',
+            'height: 60px !important',
+            'object-fit: cover !important',
+            'object-position: center !important',
+          ].join(';');
+        } else {
+          imgEl.style.cssText = [
+            'display: block !important',
+            'width: 100% !important',
+            'height: auto !important',
+            'aspect-ratio: 300/250 !important',
+            'object-fit: cover !important',
+          ].join(';');
+        }
         container.appendChild(imgEl);
 
-        // ─── 하단 푸터: [파비콘] "광고주 사이트 방문" + "스폰서 · domain" (실제 YouTube 동일) ───
-        const footer = document.createElement('div');
-        footer.style.cssText = [
-          'padding: 12px 12px !important',
-          'display: flex !important',
-          'align-items: center !important',
-          'gap: 10px !important',
-          'background: #fff !important',
-        ].join(';');
+        if (!isCompanion) {
+          // ─── 하단 푸터: [파비콘] "광고주 사이트 방문" + "Ad · Sponsored" (디스플레이 전용) ───
+          const footer = document.createElement('div');
+          footer.style.cssText = [
+            'padding: 12px 12px !important',
+            'display: flex !important',
+            'align-items: center !important',
+            'gap: 10px !important',
+            'background: #fff !important',
+          ].join(';');
 
-        // 파비콘 (파란색 원형 아이콘)
-        const favicon = document.createElement('div');
-        favicon.style.cssText = 'width:36px;height:36px;border-radius:50%;background:#065fd4;display:flex;align-items:center;justify-content:center;flex-shrink:0';
-        favicon.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="white"><path d="M19 19H5V5h7V3H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"/></svg>';
+          const favicon = document.createElement('div');
+          favicon.style.cssText =
+            'width:36px;height:36px;border-radius:50%;background:#065fd4;display:flex;align-items:center;justify-content:center;flex-shrink:0';
+          favicon.innerHTML =
+            '<svg width="18" height="18" viewBox="0 0 24 24" fill="white"><path d="M19 19H5V5h7V3H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"/></svg>';
 
-        // 텍스트 영역 (실제 YouTube: "광고주 사이트 방문" + "Ad · Sponsored")
-        const textArea = document.createElement('div');
-        textArea.style.cssText = 'flex:1;min-width:0';
-        textArea.innerHTML = [
-          "<div style=\\"font-size:14px;font-weight:400;color:#0f0f0f;font-family:Roboto,'Noto Sans KR',Arial,sans-serif;line-height:1.4\\">광고주 사이트 방문</div>",
-          "<div style=\\"font-size:12px;color:#606060;font-family:Roboto,Arial,sans-serif;margin-top:2px;\\">Ad · Sponsored</div>",
-        ].join('');
+          const textArea = document.createElement('div');
+          textArea.style.cssText = 'flex:1;min-width:0';
+          textArea.innerHTML = [
+            "<div style=\\"font-size:14px;font-weight:400;color:#0f0f0f;font-family:Roboto,'Noto Sans KR',Arial,sans-serif;line-height:1.4\\">광고주 사이트 방문</div>",
+            "<div style=\\"font-size:12px;color:#606060;font-family:Roboto,Arial,sans-serif;margin-top:2px;\\">Ad · Sponsored</div>",
+          ].join('');
 
-        footer.appendChild(favicon);
-        footer.appendChild(textArea);
-        container.appendChild(footer);
+          footer.appendChild(favicon);
+          footer.appendChild(textArea);
+          container.appendChild(footer);
+        }
+
+        const wrap = document.createElement('div');
+        wrap.setAttribute('data-injected', 'admate-youtube-sidebar-ad-wrap');
+        const wrapStyles = [
+          'width: ' + adWidth + 'px',
+          'max-width: 100%',
+          'box-sizing: border-box',
+          isCompanion ? 'margin: 0 0 24px 0' : 'margin: 0 0 16px 0',
+        ];
+        if (isCompanion) {
+          wrapStyles.push(
+            'display: flex',
+            'flex-direction: column',
+            'gap: 16px',
+            'align-items: stretch'
+          );
+        }
+        wrap.style.cssText = wrapStyles.join(' !important;') + ' !important';
+        wrap.appendChild(container);
+
+        if (isCompanion) {
+          const belowBox = document.createElement('div');
+          belowBox.id = 'admate-companion-below-slot';
+          belowBox.setAttribute('data-injected', 'admate-youtube-companion');
+          belowBox.setAttribute('aria-hidden', 'true');
+          belowBox.style.cssText = [
+            'width: 100%',
+            'box-sizing: border-box',
+            'min-height: 88px',
+            'flex-shrink: 0',
+            'background: #ffffff',
+            'border: 1px solid #e5e5e5',
+            'border-radius: 12px',
+          ].join(' !important;') + ' !important';
+          wrap.appendChild(belowBox);
+        }
 
         // ═══════════════════════════════════════════════════
         // 삽입 위치: 카테고리 칩 아래, 추천 영상 리스트 위
         // ═══════════════════════════════════════════════════
 
-        // 카테고리 칩 컨테이너 찾기
         const chipContainer = sidebar.querySelector(
           'ytd-feed-filter-chip-bar-renderer, ' +
           'yt-chip-cloud-renderer, ' +
@@ -882,13 +1051,17 @@ export class YouTubeCapture extends BaseChannel {
         );
 
         if (chipContainer) {
-          // 칩 컨테이너 바로 다음에 삽입
-          chipContainer.parentNode.insertBefore(container, chipContainer.nextSibling);
-          console.log('[YouTube Inject] ✅ 디스플레이 광고 (칩 아래) 삽입 성공');
+          chipContainer.parentNode.insertBefore(wrap, chipContainer.nextSibling);
+          console.log(
+            '[YouTube Inject] ✅ 사이드바 광고 (칩 아래) 삽입 성공',
+            isCompanion ? '(컴패니언+하단박스, alignW=' + alignW + ')' : '(디스플레이)'
+          );
         } else {
-          // 칩이 없으면 사이드바 최상단에 삽입
-          sidebar.insertBefore(container, sidebar.firstChild);
-          console.log('[YouTube Inject] ✅ 디스플레이 광고 (최상단) 삽입 성공');
+          sidebar.insertBefore(wrap, sidebar.firstChild);
+          console.log(
+            '[YouTube Inject] ✅ 사이드바 광고 (최상단) 삽입 성공',
+            isCompanion ? '(컴패니언+하단박스, alignW=' + alignW + ')' : '(디스플레이)'
+          );
         }
 
         return true;
@@ -1548,6 +1721,140 @@ export class YouTubeCapture extends BaseChannel {
     } catch (err) {
       console.warn(`[YouTube] 🔤 한글 폰트 인젝션 실패 (진행 계속):`, err);
     }
+  }
+
+  /** 마스트헤드용 랜덤 프로필(data URL). 캡처 1회당 한 번만 호출해 URL을 재사용한다. */
+  private async pickRandomMastheadAvatarDataUrl(): Promise<string> {
+    const imgIndex = 1 + Math.floor(Math.random() * 70);
+    const fetched = await imageUrlToDataUrl(`https://i.pravatar.cc/128?img=${imgIndex}`);
+    if (fetched.ok) return fetched.dataUrl;
+    return `data:image/svg+xml,${encodeURIComponent(
+      '<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128"><rect fill="#1a73e8" width="128" height="128"/><circle cx="64" cy="45" r="22" fill="#fff" opacity=".9"/><path fill="#fff" opacity=".9" d="M32 118c8-28 56-28 64 0z"/></svg>'
+    )}`;
+  }
+
+  /**
+   * 우측 상단 로그인 UI를 최대한 숨기고, fixed 프로필 원을 올려 실제 로그인 상태처럼 보이게 한다.
+   * Shadow DOM·URL 변형·재렌더에 대비해 (1) 버튼 숨김 (2) #end 기준 좌표의 플로터를 항상 시도.
+   */
+  private async applyMastheadLoggedInLook(page: IPageHandle, avatarDataUrl: string): Promise<void> {
+    const avatarJson = JSON.stringify(avatarDataUrl);
+    await page.evaluate<void>(`
+      (() => {
+        const dataUrl = ${avatarJson};
+        try {
+          const masthead = document.querySelector("ytd-masthead");
+          if (!masthead) return;
+
+          function walk(node, fn) {
+            if (!node) return;
+            if (node.nodeType === 1) {
+              fn(node);
+              const sr = node.shadowRoot;
+              if (sr) walk(sr, fn);
+              const ch = node.children;
+              for (let i = 0; i < ch.length; i++) walk(ch[i], fn);
+            }
+          }
+
+          function hideHost(el) {
+            try {
+              el.style.setProperty("display", "none", "important");
+              el.style.setProperty("visibility", "hidden", "important");
+              el.style.setProperty("opacity", "0", "important");
+              el.style.setProperty("pointer-events", "none", "important");
+              el.style.setProperty("max-width", "0", "important");
+              el.style.setProperty("max-height", "0", "important");
+              el.style.setProperty("overflow", "hidden", "important");
+              el.style.setProperty("margin", "0", "important");
+              el.style.setProperty("padding", "0", "important");
+            } catch (e) { /* ignore */ }
+          }
+
+          function findButtonRendererHost(start) {
+            let cur = start;
+            while (cur && cur !== masthead) {
+              const tag = cur.tagName || "";
+              if (tag === "YTD-BUTTON-RENDERER" || tag === "YT-BUTTON-SHAPE-BUTTON-VIEW-MODEL") return cur;
+              const p = cur.parentElement;
+              if (p) cur = p;
+              else {
+                const rn = cur.getRootNode && cur.getRootNode();
+                cur = rn && rn.host ? rn.host : null;
+              }
+            }
+            return null;
+          }
+
+          const hideSet = new Set();
+
+          walk(masthead, (el) => {
+            if (el.tagName !== "A") return;
+            const href = (el.href || el.getAttribute("href") || "").toString();
+            if (!href) return;
+            const isGoogleAcct =
+              href.includes("accounts.google.com") ||
+              href.includes("youtube.com/signin") ||
+              href.includes("youtube.com/channel_switcher");
+            if (!isGoogleAcct) return;
+            const host = findButtonRendererHost(el);
+            if (host) hideSet.add(host);
+          });
+
+          walk(masthead, (el) => {
+            const tag = el.tagName || "";
+            if (tag !== "YTD-BUTTON-RENDERER" && tag !== "YT-BUTTON-SHAPE-BUTTON-VIEW-MODEL") return;
+            const t = (el.textContent || "").replace(/\\s+/g, " ").trim();
+            if (t === "로그인" || t === "Sign in" || (t.includes("로그인") && t.length < 24)) {
+              hideSet.add(el);
+            }
+          });
+
+          hideSet.forEach(hideHost);
+
+          document.getElementById("admate-masthead-avatar-slot")?.remove();
+          const prevFloater = document.getElementById("admate-fake-profile-floater");
+          if (prevFloater) prevFloater.remove();
+
+          const end = masthead.querySelector("#end") || masthead.querySelector("#buttons");
+          const refRect = end ? end.getBoundingClientRect() : masthead.getBoundingClientRect();
+          const size = 32;
+          const topPx = Math.round(refRect.top + Math.max(0, (refRect.height - size) / 2));
+          // #end 영역 오른쪽 안쪽에 붙임 (viewport right 기준이면 바가 짧을 때 치우침)
+          var leftPx = Math.round(refRect.right - size - 10);
+          if (leftPx + size > window.innerWidth - 4) leftPx = window.innerWidth - size - 8;
+          if (leftPx < 4) leftPx = 4;
+
+          const floater = document.createElement("div");
+          floater.id = "admate-fake-profile-floater";
+          floater.setAttribute("data-injected", "admate-youtube-avatar");
+          floater.style.cssText = [
+            "position:fixed",
+            "z-index:2147483646",
+            "width:" + size + "px",
+            "height:" + size + "px",
+            "top:" + topPx + "px",
+            "left:" + leftPx + "px",
+            "border-radius:50%",
+            "overflow:hidden",
+            "box-sizing:border-box",
+            "pointer-events:none",
+            "box-shadow:0 0 0 2px #fff, 0 1px 4px rgba(0,0,0,0.35)",
+          ].join(";");
+          const img = document.createElement("img");
+          img.src = dataUrl;
+          img.alt = "";
+          img.draggable = false;
+          img.style.cssText = "width:100%;height:100%;object-fit:cover;display:block;";
+          floater.appendChild(img);
+          document.body.appendChild(floater);
+
+          console.log("[YouTube Inject] 👤 마스트헤드 로그인 룩 적용 (숨김 " + hideSet.size + " + 플로터)");
+        } catch (e) {
+          console.warn("[admate] applyMastheadLoggedInLook", e);
+        }
+      })()
+    `);
   }
 
   /**

@@ -56,6 +56,35 @@ function truncateUrl(url: string, maxLength = 40): string {
   return url.substring(0, maxLength) + "…";
 }
 
+function getDurationMs(metadata: Record<string, unknown> | null): number | null {
+  if (!metadata) return null;
+  const direct = metadata.durationMs;
+  if (typeof direct === "number") return direct;
+  if (typeof direct === "string" && !Number.isNaN(Number(direct))) return Number(direct);
+  const runtime = metadata.runtime as Record<string, unknown> | undefined;
+  const nested = runtime?.durationMs;
+  if (typeof nested === "number") return nested;
+  if (typeof nested === "string" && !Number.isNaN(Number(nested))) return Number(nested);
+  return null;
+}
+
+function getYoutubeMeta(metadata: Record<string, unknown> | null): {
+  adType?: string;
+  captureSecond?: number;
+} {
+  if (!metadata) return {};
+  const adType = typeof metadata.youtubeAdType === "string" ? metadata.youtubeAdType : undefined;
+  const instreamOpts = metadata.instreamOpts as Record<string, unknown> | undefined;
+  const captureSecondRaw = instreamOpts?.skipSeconds;
+  const captureSecond =
+    typeof captureSecondRaw === "number"
+      ? captureSecondRaw
+      : typeof captureSecondRaw === "string" && !Number.isNaN(Number(captureSecondRaw))
+        ? Number(captureSecondRaw)
+        : undefined;
+  return { adType, captureSecond };
+}
+
 export default function CaptureList({ refreshTrigger }: CaptureListProps) {
   const [captures, setCaptures] = useState<CaptureRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -326,12 +355,29 @@ export default function CaptureList({ refreshTrigger }: CaptureListProps) {
                     </p>
                     <p className="text-xs text-[var(--color-text-muted)] mt-0.5">
                       {formatDate(capture.created_at)}
-                      {capture.metadata && typeof capture.metadata === "object" && "durationMs" in capture.metadata && (
+                      {capture.metadata && typeof capture.metadata === "object" && getDurationMs(capture.metadata) !== null && (
                         <span className="ml-2">
-                          ⏱ {Math.round(Number(capture.metadata.durationMs) / 1000)}초
+                          ⏱ {Math.round((getDurationMs(capture.metadata) || 0) / 1000)}초
                         </span>
                       )}
                     </p>
+                    {capture.channel === "youtube" && capture.metadata && typeof capture.metadata === "object" && (
+                      <p className="text-[11px] text-[var(--color-text-muted)] mt-1">
+                        {(() => {
+                          const yt = getYoutubeMeta(capture.metadata);
+                          const adLabel =
+                            yt.adType === "preroll"
+                              ? "인스트림"
+                              : yt.adType === "display"
+                                ? "디스플레이"
+                                : yt.adType === "overlay"
+                                  ? "오버레이"
+                                  : null;
+                          if (!adLabel && yt.captureSecond === undefined) return null;
+                          return `▶️ ${adLabel || "YouTube"}${yt.captureSecond !== undefined ? ` · ${yt.captureSecond}초` : ""}`;
+                        })()}
+                      </p>
+                    )}
                     {capture.status === "failed" && capture.error_message && (
                       <p className="text-xs text-[var(--color-error)] mt-1 truncate">
                         {capture.error_message}
@@ -494,11 +540,15 @@ function CaptureDetailModal({
         {capture.status === "completed" && capture.placement_image_url && (
           <div className="mb-6">
             <p className="form-label mb-2">게재면 스크린샷</p>
-            <div className="rounded-xl overflow-hidden border border-[var(--color-border)] bg-[var(--color-bg-primary)]">
+            <div className="rounded-xl overflow-hidden border border-[var(--color-border)] bg-[var(--color-bg-primary)] flex justify-center">
               <img
                 src={capture.placement_image_url}
                 alt="게재면 캡처"
-                className="w-full h-auto"
+                className={
+                  capture.channel === "youtube"
+                    ? "w-full max-w-[1920px] h-auto object-contain"
+                    : "w-full h-auto"
+                }
               />
             </div>
             <div className="mt-2 flex gap-2">
@@ -598,13 +648,38 @@ function CaptureDetailModal({
               <span className="text-[var(--color-text-muted)]">랜딩 캡처</span>
               <span className="text-[var(--color-text-secondary)]">{capture.capture_landing ? "예" : "아니오"}</span>
             </div>
-            {capture.metadata && typeof capture.metadata === "object" && "durationMs" in capture.metadata && (
+            {capture.metadata && typeof capture.metadata === "object" && getDurationMs(capture.metadata) !== null && (
               <div className="flex justify-between">
                 <span className="text-[var(--color-text-muted)]">소요 시간</span>
                 <span className="text-[var(--color-text-secondary)]">
-                  {(Number(capture.metadata.durationMs) / 1000).toFixed(1)}초
+                  {((getDurationMs(capture.metadata) || 0) / 1000).toFixed(1)}초
                 </span>
               </div>
+            )}
+            {capture.channel === "youtube" && capture.metadata && typeof capture.metadata === "object" && (
+              <>
+                <div className="flex justify-between">
+                  <span className="text-[var(--color-text-muted)]">YouTube 유형</span>
+                  <span className="text-[var(--color-text-secondary)]">
+                    {(() => {
+                      const yt = getYoutubeMeta(capture.metadata);
+                      if (yt.adType === "preroll") return "인스트림";
+                      if (yt.adType === "display") return "디스플레이";
+                      if (yt.adType === "overlay") return "오버레이";
+                      return "-";
+                    })()}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-[var(--color-text-muted)]">캡처 시점</span>
+                  <span className="text-[var(--color-text-secondary)]">
+                    {(() => {
+                      const yt = getYoutubeMeta(capture.metadata);
+                      return yt.captureSecond !== undefined ? `${yt.captureSecond}초` : "-";
+                    })()}
+                  </span>
+                </div>
+              </>
             )}
           </div>
         </div>

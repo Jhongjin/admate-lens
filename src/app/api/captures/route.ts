@@ -16,6 +16,16 @@ import type { ChannelType, VisionDaCaptureRow } from "@/lib/supabase/types";
 export const maxDuration = 300; // 5분
 export const dynamic = "force-dynamic";
 
+function isValidHttpUrl(value?: string | null): boolean {
+  if (!value) return false;
+  try {
+    const url = new URL(value);
+    return url.protocol === "http:" || url.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
 /** POST: 새 캡처 요청 생성 (멀티 사이트 지원) */
 export async function POST(request: NextRequest) {
   try {
@@ -55,7 +65,11 @@ export async function POST(request: NextRequest) {
         adTitle?: string;
         ctaText?: string;
         landingUrl?: string;
+        displayUrl?: string;
+        displayPath1?: string;
+        displayPath2?: string;
         companionImageUrl?: string;
+        avatarImageUrl?: string;
       };
     };
 
@@ -67,12 +81,15 @@ export async function POST(request: NextRequest) {
         : [];
 
     // 인스트림 광고는 creativeUrl 대신 videoUrl 사용
+    const normalizedUrls = urls.filter((url) => isValidHttpUrl(url));
     const isPreroll = channel === "youtube" && youtubeAdType === "preroll";
-    const hasSource = isPreroll ? !!instreamOpts?.videoUrl : !!creativeUrl;
+    const hasValidVideoSource = isPreroll && isValidHttpUrl(instreamOpts?.videoUrl);
+    const hasValidCreativeSource = !isPreroll && isValidHttpUrl(creativeUrl);
+    const hasSource = hasValidVideoSource || hasValidCreativeSource;
 
-    if (!channel || urls.length === 0 || !hasSource) {
+    if (!channel || normalizedUrls.length === 0 || !hasSource) {
       return NextResponse.json(
-        { error: "channel, publisherUrl(s), creative/videoUrl은 필수입니다." },
+        { error: "channel, publisherUrl(s), creativeUrl/videoUrl 형식을 확인해주세요." },
         { status: 400 }
       );
     }
@@ -81,7 +98,16 @@ export async function POST(request: NextRequest) {
     const createdCaptures: any[] = [];
 
     // 각 URL마다 캡처 요청 생성
-    for (const url of urls) {
+    for (const url of normalizedUrls) {
+      const requestMetadata = {
+        injectionMode,
+        slotCount,
+        creativeDimensions,
+        adSizeMode,
+        targetAdSizes,
+        youtubeAdType,
+        instreamOpts,
+      };
       const { data, error } = await supabase
         .from("vision_da_captures")
         .insert({
@@ -91,7 +117,7 @@ export async function POST(request: NextRequest) {
           click_url: clickUrl ?? null,
           capture_landing: captureLanding ?? false,
           status: "pending",
-          metadata: { injectionMode, slotCount, creativeDimensions, adSizeMode, targetAdSizes, youtubeAdType, instreamOpts },
+          metadata: requestMetadata,
         })
         .select()
         .single();
@@ -252,9 +278,15 @@ async function executeBatchCaptures(captureIds: string[]): Promise<void> {
             landing_image_url: landingPublicUrl,
             landing_final_url: result.landingUrl ?? null,
             metadata: {
+              ...captureMetadata,
               capturedAt: result.capturedAt,
               durationMs,
               diagnostics,
+              runtime: {
+                capturedAt: result.capturedAt,
+                durationMs,
+                diagnostics,
+              },
             },
             updated_at: new Date().toISOString(),
           })

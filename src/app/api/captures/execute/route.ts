@@ -164,9 +164,15 @@ export async function POST(request: NextRequest) {
               landing_image_url: landingPublicUrl,
               landing_final_url: result.landingUrl ?? null,
               metadata: {
+                ...captureMetadata,
                 capturedAt: result.capturedAt,
                 durationMs,
                 diagnostics,
+                runtime: {
+                  capturedAt: result.capturedAt,
+                  durationMs,
+                  diagnostics,
+                },
               },
               updated_at: new Date().toISOString(),
             })
