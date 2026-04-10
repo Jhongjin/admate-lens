@@ -993,6 +993,18 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
           >
             {isOptionPanelExpanded ? "선택된 옵션 접기" : "선택된 옵션 펼치기"}
           </button>
+
+          <div className="flex flex-wrap items-center gap-2 pt-1">
+            <span className="text-[10px] px-2 py-1 rounded-full bg-[var(--color-bg-tertiary)] text-[var(--color-text-secondary)]">
+              매체: {selectedMediaMenu === "youtube" ? "YouTube" : "Google Ads"}
+            </span>
+            <span className="text-[10px] px-2 py-1 rounded-full bg-[var(--color-bg-tertiary)] text-[var(--color-text-secondary)]">
+              상품: {selectedProduct === "instream" ? "Instream" : "Network Ads"}
+            </span>
+            <span className="text-[10px] px-2 py-1 rounded-full bg-[var(--color-accent-subtle)] text-[var(--color-accent)]">
+              옵션: {selectedOptionPreset}
+            </span>
+          </div>
         </div>
 
         {isOptionPanelExpanded && form.channel === "youtube" && (

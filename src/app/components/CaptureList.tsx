@@ -150,6 +150,8 @@ export default function CaptureList({ refreshTrigger }: CaptureListProps) {
 
   /** 필터링된 캡처 목록 */
   const filteredCaptures = captures;
+  const activeCount = captures.filter((c) => c.status === "pending" || c.status === "processing").length;
+  const latestCompleted = captures.find((c) => c.status === "completed" && !!c.placement_image_url) || null;
 
   /** 상태별 카운트 */
   const statusCounts = captures.reduce(
@@ -270,6 +272,46 @@ export default function CaptureList({ refreshTrigger }: CaptureListProps) {
             전체 삭제
           </button>
         )}
+      </div>
+
+      {/* 렌더링 현황 + 최신 결과 */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
+        <div className="glass-card-static p-4 md:col-span-1">
+          <p className="text-xs text-[var(--color-text-muted)] mb-1">렌더링 현황</p>
+          <p className="text-2xl font-bold text-[var(--color-text-primary)]">{activeCount}</p>
+          <p className="text-xs text-[var(--color-text-secondary)] mt-1">
+            {activeCount > 0 ? "진행 중 작업이 있습니다" : "대기/진행 작업 없음"}
+          </p>
+        </div>
+        <div className="glass-card-static p-4 md:col-span-2">
+          <p className="text-xs text-[var(--color-text-muted)] mb-2">최신 렌더링 결과</p>
+          {latestCompleted?.placement_image_url ? (
+            <div className="flex items-center gap-3">
+              <img
+                src={latestCompleted.placement_image_url}
+                alt="최신 렌더링"
+                className="w-24 h-16 rounded-lg object-cover border border-[var(--color-border)]"
+              />
+              <div className="min-w-0 flex-1">
+                <p className="text-sm text-[var(--color-text-primary)] truncate">
+                  {latestCompleted.source_url ? truncateUrl(latestCompleted.source_url, 56) : "URL 없음"}
+                </p>
+                <p className="text-xs text-[var(--color-text-muted)] mt-1">
+                  {formatDate(latestCompleted.created_at)}
+                </p>
+              </div>
+              <a
+                href={latestCompleted.placement_image_url}
+                download
+                className="btn btn-primary text-xs px-3 py-2 whitespace-nowrap"
+              >
+                다운로드
+              </a>
+            </div>
+          ) : (
+            <p className="text-xs text-[var(--color-text-muted)]">아직 완료된 렌더링 결과가 없습니다.</p>
+          )}
+        </div>
       </div>
 
       {/* 리스트 */}
