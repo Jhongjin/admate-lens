@@ -612,7 +612,10 @@ export class GdnCapture extends BaseChannel {
           if (!badge) {
             badge = document.createElement('div');
             badge.setAttribute('data-injected', 'admate-badge');
-            badge.textContent = 'AD';
+            badge.setAttribute('aria-hidden', 'true');
+            badge.setAttribute('dir', 'ltr');
+            badge.className = 'cbb';
+            badge.innerHTML = '<div class="il-icon"><svg fill="none" height="15" viewBox="0 0 15 15" width="15" xmlns="http://www.w3.org/2000/svg"><circle cx="7.5" cy="11.5" fill="#00aecd" r="1.5"></circle><circle cx="7.5" cy="7.5" fill="#00aecd" r="1.5"></circle><circle cx="7.5" cy="3.5" fill="#00aecd" r="1.5"></circle></svg></div>';
             host.appendChild(badge);
           }
 
@@ -621,19 +624,18 @@ export class GdnCapture extends BaseChannel {
             'top: 4px !important',
             'right: 4px !important',
             'z-index: 2147483647 !important',
-            'display: inline-block !important',
-            'font-size: 12px !important',
-            'line-height: 1 !important',
-            'font-weight: 700 !important',
-            'padding: 4px 7px !important',
+            'width: 20px !important',
+            'height: 20px !important',
+            'display: flex !important',
+            'align-items: center !important',
+            'justify-content: center !important',
+            'padding: 0 !important',
             'border-radius: 4px !important',
-            'color: #fff !important',
-            'background: rgba(0,0,0,0.72) !important',
-            'border: 1px solid rgba(255,255,255,0.38) !important',
-            'text-shadow: 0 1px 1px rgba(0,0,0,0.45) !important',
+            'background: #ffffff !important',
+            'border: 1px solid rgba(0,0,0,0.12) !important',
+            'box-shadow: 0 1px 2px rgba(0,0,0,0.18) !important',
             'pointer-events: none !important',
             'user-select: none !important',
-            'font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif !important',
           ].join('; ');
         }
 
