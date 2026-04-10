@@ -175,6 +175,8 @@ async function executeBatchCaptures(captureIds: string[]): Promise<void> {
   const supabase = createServerClient();
   const sharedEngine = new PuppeteerEngine();
   let engineLaunched = false;
+  const isolatedHosts = new Map<string, string>();
+  const hostFailureCounts = new Map<string, number>();
 
   console.log(`[BatchCapture] 🎬 배치 시작: ${captureIds.length}건`);
 
@@ -197,9 +199,34 @@ async function executeBatchCaptures(captureIds: string[]): Promise<void> {
         }
 
         const capture = data as unknown as VisionDaCaptureRow;
+        captureMetadata = ((capture as any).metadata ?? {}) as Record<string, unknown>;
+        const host = getHostname(capture.source_url ?? null);
 
         if (capture.status !== "pending") {
           console.log(`[BatchCapture] ⏭️ 건너뜀 (status: ${capture.status}): ${captureId}`);
+          continue;
+        }
+
+        // 사이트 격리 큐: 배치 중 격리된 도메인은 즉시 스킵(실패 기록) 후 다음 작업 진행
+        if (host && isolatedHosts.has(host)) {
+          const isolateReason = isolatedHosts.get(host) ?? "isolated-host";
+          await supabase
+            .from("vision_da_captures")
+            .update({
+              status: "failed",
+              error_message: `사이트 격리 큐로 스킵됨 (${isolateReason})`,
+              metadata: {
+                ...captureMetadata,
+                failureCategory: "isolation",
+                failureCode: "site_isolated_in_batch",
+                isolatedHost: host,
+                isolatedReason: isolateReason,
+                failedAt: new Date().toISOString(),
+              },
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", captureId);
+          console.warn(`[BatchCapture] ⏭️ 격리 사이트 스킵: ${host} (${captureId})`);
           continue;
         }
 
@@ -220,7 +247,6 @@ async function executeBatchCaptures(captureIds: string[]): Promise<void> {
         const channel = createChannel(capture.channel as ChannelType, sharedEngine);
 
         // 5) 캡처 실행
-        captureMetadata = ((capture as any).metadata ?? {}) as Record<string, unknown>;
         const result = await executeWithRetry(
           () =>
             channel.execute({
@@ -313,6 +339,7 @@ async function executeBatchCaptures(captureIds: string[]): Promise<void> {
       } catch (captureError) {
         const errorMessage = captureError instanceof Error ? captureError.message : "알 수 없는 오류";
         const failureInfo = classifyFailureReason(captureError);
+        const host = getHostname((capture as any)?.source_url ?? null);
 
         await supabase
           .from("vision_da_captures")
@@ -331,6 +358,19 @@ async function executeBatchCaptures(captureIds: string[]): Promise<void> {
           .eq("id", captureId);
 
         console.error(`[BatchCapture] ❌ 실패: ${captureId}`, captureError);
+
+        if (host) {
+          const nextCount = (hostFailureCounts.get(host) ?? 0) + 1;
+          hostFailureCounts.set(host, nextCount);
+          const isolate =
+            failureInfo.hardBlocked ||
+            (nextCount >= 2 && isHostIsolatableRuntimeError(captureError));
+          if (isolate && !isolatedHosts.has(host)) {
+            const reason = failureInfo.code || "host-failure";
+            isolatedHosts.set(host, reason);
+            console.warn(`[BatchCapture] 🚧 사이트 격리 등록: ${host} (reason=${reason}, fails=${nextCount})`);
+          }
+        }
 
         // 브라우저 세션이 죽은 경우(타겟/연결 종료) 다음 건을 위해 엔진 재시작
         if (isBrowserSessionClosedError(captureError)) {
@@ -372,6 +412,29 @@ function isBrowserSessionClosedError(err: unknown): boolean {
     message.includes("session closed") ||
     message.includes("most likely the page has been closed") ||
     message.includes("protocol error (page.capturescreenshot)")
+  );
+}
+
+function getHostname(url: string | null): string | null {
+  if (!url) return null;
+  try {
+    return new URL(url).hostname.toLowerCase();
+  } catch {
+    return null;
+  }
+}
+
+function isHostIsolatableRuntimeError(err: unknown): boolean {
+  const message = (err instanceof Error ? err.message : String(err)).toLowerCase();
+  return (
+    message.includes("connection closed") ||
+    message.includes("target closed") ||
+    message.includes("session closed") ||
+    message.includes("detached frame") ||
+    message.includes("execution context was destroyed") ||
+    message.includes("unable to capture screenshot") ||
+    message.includes("capture timeout") ||
+    message.includes("timeout")
   );
 }
 

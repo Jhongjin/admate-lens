@@ -36,6 +36,8 @@ export async function POST(request: NextRequest) {
 
     const supabase = createServerClient();
     const results: Array<{ captureId: string; success: boolean; error?: string; durationMs?: number }> = [];
+    const isolatedHosts = new Map<string, string>();
+    const hostFailureCounts = new Map<string, number>();
 
     // 🔑 핵심: 하나의 브라우저 엔진을 공유하여 순차 실행
     const sharedEngine = new PuppeteerEngine();
@@ -60,10 +62,35 @@ export async function POST(request: NextRequest) {
           }
 
           const capture = data as unknown as VisionDaCaptureRow;
+          captureMetadata = ((capture as any).metadata ?? {}) as Record<string, unknown>;
+          const host = getHostname(capture.source_url ?? null);
 
           // 이미 처리 중이거나 완료된 경우 건너뛰기
           if (capture.status !== "pending") {
             results.push({ captureId, success: false, error: `이미 처리된 요청입니다 (status: ${capture.status})` });
+            continue;
+          }
+
+          // 사이트 격리 큐: 동일 도메인 연쇄 실패를 막기 위해 즉시 스킵
+          if (host && isolatedHosts.has(host)) {
+            const isolateReason = isolatedHosts.get(host) ?? "isolated-host";
+            await supabase
+              .from("vision_da_captures")
+              .update({
+                status: "failed",
+                error_message: `사이트 격리 큐로 스킵됨 (${isolateReason})`,
+                metadata: {
+                  ...captureMetadata,
+                  failureCategory: "isolation",
+                  failureCode: "site_isolated_in_batch",
+                  isolatedHost: host,
+                  isolatedReason: isolateReason,
+                  failedAt: new Date().toISOString(),
+                },
+                updated_at: new Date().toISOString(),
+              })
+              .eq("id", captureId);
+            results.push({ captureId, success: false, error: `격리 사이트 스킵: ${host}` });
             continue;
           }
 
@@ -94,7 +121,6 @@ export async function POST(request: NextRequest) {
           const channel = createChannel(resolvedChannel, sharedEngine);
 
           // 5) 캡처 실행
-          captureMetadata = ((capture as any).metadata ?? {}) as Record<string, unknown>;
           const result = await executeWithRetry(
             () =>
               channel.execute({
@@ -193,6 +219,7 @@ export async function POST(request: NextRequest) {
           // 개별 캡처 실패 → DB 상태 업데이트 후 다음 캡처 계속
           const errorMessage = captureError instanceof Error ? captureError.message : "알 수 없는 오류";
           const failureInfo = classifyFailureReason(captureError);
+          const host = getHostname((capture as any)?.source_url ?? null);
 
           await supabase
             .from("vision_da_captures")
@@ -212,6 +239,19 @@ export async function POST(request: NextRequest) {
 
           console.error(`[Execute] ❌ 캡처 실패: ${captureId}`, captureError);
           results.push({ captureId, success: false, error: errorMessage });
+
+          if (host) {
+            const nextCount = (hostFailureCounts.get(host) ?? 0) + 1;
+            hostFailureCounts.set(host, nextCount);
+            const isolate =
+              failureInfo.hardBlocked ||
+              (nextCount >= 2 && isHostIsolatableRuntimeError(captureError));
+            if (isolate && !isolatedHosts.has(host)) {
+              const reason = failureInfo.code || "host-failure";
+              isolatedHosts.set(host, reason);
+              console.warn(`[Execute] 🚧 사이트 격리 등록: ${host} (reason=${reason}, fails=${nextCount})`);
+            }
+          }
 
           // 브라우저 세션 종료 에러면 엔진 재시작 후 다음 캡처 계속
           if (isBrowserSessionClosedError(captureError)) {
@@ -271,6 +311,29 @@ function isBrowserSessionClosedError(err: unknown): boolean {
     message.includes("session closed") ||
     message.includes("most likely the page has been closed") ||
     message.includes("protocol error (page.capturescreenshot)")
+  );
+}
+
+function getHostname(url: string | null): string | null {
+  if (!url) return null;
+  try {
+    return new URL(url).hostname.toLowerCase();
+  } catch {
+    return null;
+  }
+}
+
+function isHostIsolatableRuntimeError(err: unknown): boolean {
+  const message = (err instanceof Error ? err.message : String(err)).toLowerCase();
+  return (
+    message.includes("connection closed") ||
+    message.includes("target closed") ||
+    message.includes("session closed") ||
+    message.includes("detached frame") ||
+    message.includes("execution context was destroyed") ||
+    message.includes("unable to capture screenshot") ||
+    message.includes("capture timeout") ||
+    message.includes("timeout")
   );
 }
 
