@@ -182,8 +182,23 @@ export class GdnCapture extends BaseChannel {
     // 3) 광고 로드 + 이미지 렌더링 대기
     await new Promise((r) => setTimeout(r, 3000));
 
+    // 3.1) Access Denied/차단 페이지는 성공 처리하지 않고 즉시 실패로 반환
+    const blocked = await this.detectAccessDenied(page);
+    if (blocked) {
+      throw new Error("게시자 페이지 접근이 차단되었습니다 (Access Denied)");
+    }
+
     // 4) 광고 슬롯 탐지
     const slots = await detectAdSlots(page);
+    const viewport = await page.evaluate<{ width: number; height: number }>(`
+      (() => ({ width: window.innerWidth || 1920, height: window.innerHeight || 1080 }))()
+    `);
+    // 페이지 전체를 덮는 초대형 슬롯은 우선순위를 뒤로 미룸 (빈 selector/비정상 타겟 방지)
+    const normalSlots = slots.filter((s) => !(s.width >= viewport.width * 0.95 && s.height >= viewport.height * 0.95));
+    if (normalSlots.length > 0) {
+      slots.length = 0;
+      normalSlots.forEach((s) => slots.push(s));
+    }
     this.diagnostics.slotsDetected = slots.length;
     console.log(`[GDN] 탐지된 슬롯: ${slots.length}개`);
     
@@ -357,15 +372,48 @@ export class GdnCapture extends BaseChannel {
     `);
     console.log(`[GDN] 스크롤 위치 확인: scrollY=${scrollCheck.scrollY}, bodyH=${scrollCheck.bodyH}`);
 
-    // 8) 전체 페이지 스크린샷 캡처
-    const screenshot = await page.screenshot({
-      fullPage: true,
-      type: "png",
-    });
+    // 8) 스크린샷 캡처 (fullPage 실패 시 뷰포트 폴백)
+    const screenshot = await this.safeCaptureScreenshot(page);
 
     console.log(`[GDN] ===== 캡처 완료 (전체 페이지, ${injectedCount}/${slots.length}개 슬롯 인젝션) =====`);
 
     return screenshot;
+  }
+
+  /** fullPage 스크린샷 실패(메모리/프로토콜) 시 뷰포트 캡처로 폴백 */
+  private async safeCaptureScreenshot(page: IPageHandle): Promise<Buffer> {
+    try {
+      return await page.screenshot({
+        fullPage: true,
+        type: "png",
+      });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.warn(`[GDN] fullPage 캡처 실패 — viewport 폴백: ${msg}`);
+      return await page.screenshot({
+        fullPage: false,
+        type: "png",
+      });
+    }
+  }
+
+  private async detectAccessDenied(page: IPageHandle): Promise<boolean> {
+    return await page.evaluate<boolean>(`
+      (() => {
+        const title = (document.title || '').toLowerCase();
+        const text = (document.body?.innerText || '').toLowerCase();
+        const patterns = [
+          'access denied',
+          'you don\\'t have permission to access',
+          'request blocked',
+          'forbidden',
+          'error 403',
+        ];
+        if (patterns.some((p) => title.includes(p))) return true;
+        if (patterns.some((p) => text.includes(p))) return true;
+        return false;
+      })()
+    `);
   }
 
   /**

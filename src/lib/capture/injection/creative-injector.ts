@@ -112,6 +112,21 @@ export async function injectCreative(
         });
       }
 
+      // selector가 비어있으면 querySelector에서 바로 SyntaxError가 나므로 선제 처리
+      if (!selector || !selector.trim()) {
+        console.warn('[Injector] 빈 selector 감지 — 위치 기반 오버레이 폴백');
+        const overlay = createWrapper();
+        overlay.style.position = 'absolute !important';
+        overlay.style.left = slotX + 'px';
+        overlay.style.top = slotY + 'px';
+        overlay.style.zIndex = '99999';
+        const img = createImgElement();
+        overlay.appendChild(img);
+        document.body.appendChild(overlay);
+        await waitForImageLoad(img);
+        return { success: true, method: 'overlay', error: 'empty-selector-fallback' };
+      }
+
       const el = document.querySelector(selector);
       if (!el) {
         console.warn('[Injector] 슬롯을 찾을 수 없음:', selector);
