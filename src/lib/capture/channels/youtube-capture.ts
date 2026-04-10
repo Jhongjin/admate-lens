@@ -703,6 +703,23 @@ export class YouTubeCapture extends BaseChannel {
     if (isMobilePlatform) {
       await page.evaluate<void>(`
         (() => {
+          const popupSelectors =
+            'ytm-popup-container, tp-yt-paper-dialog, ytm-confirm-dialog-renderer, ytm-single-option-survey-renderer,' +
+            'ytm-bottom-sheet-renderer, ytm-subscribe-button-renderer tp-yt-paper-dialog';
+
+          const removePopups = () => {
+            document.querySelectorAll(popupSelectors).forEach((el) => el.remove());
+            document
+              .querySelectorAll('*')
+              .forEach((el) => {
+                const text = (el.textContent || '').trim();
+                if (text.includes('채널을 구독하시겠습니까?') || text.includes('채널을 구독하려면 로그인')) {
+                  const dialog = el.closest('tp-yt-paper-dialog, ytm-confirm-dialog-renderer, ytm-popup-container');
+                  if (dialog) dialog.remove();
+                }
+              });
+          };
+
           document
             .querySelectorAll(
               'ytm-mobile-topbar-renderer, ytm-app-header, ytm-header, #header, .mobile-topbar-header-content, .ytm-header-bar'
@@ -710,14 +727,18 @@ export class YouTubeCapture extends BaseChannel {
             .forEach((el) => {
               if (el instanceof HTMLElement) el.style.display = 'none';
             });
-          document
-            .querySelectorAll(
-              'ytm-popup-container, tp-yt-paper-dialog, ytm-confirm-dialog-renderer, ytm-single-option-survey-renderer'
-            )
-            .forEach((el) => el.remove());
+
+          removePopups();
+
+          const key = '__admate_popup_observer_installed__';
+          if (!(window as any)[key]) {
+            (window as any)[key] = true;
+            const obs = new MutationObserver(() => removePopups());
+            obs.observe(document.documentElement, { childList: true, subtree: true });
+          }
         })()
       `);
-      await new Promise((r) => setTimeout(r, 150));
+      await new Promise((r) => setTimeout(r, 300));
     }
 
     // 10) 스크린샷
