@@ -340,6 +340,7 @@ interface CaptureFormData {
   instreamDisplayUrl: string;
   instreamDisplayPath1: string;
   instreamDisplayPath2: string;
+  instreamLogoSource: "channel" | "upload";
   instreamLogoImageUrl: string;
   instreamCompanionImageUrl: string;
   instreamCompanionChannelUrl: string;
@@ -401,6 +402,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
     instreamDisplayUrl: "",
     instreamDisplayPath1: "",
     instreamDisplayPath2: "",
+    instreamLogoSource: "channel",
     instreamLogoImageUrl: "",
     instreamCompanionImageUrl: "",
     instreamCompanionChannelUrl: "",
@@ -765,15 +767,24 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                   displayUrl: form.instreamDisplayUrl || undefined,
                   displayPath1: form.instreamDisplayPath1 || undefined,
                   displayPath2: form.instreamDisplayPath2 || undefined,
-                  avatarImageUrl: form.instreamLogoImageUrl || undefined,
+                  avatarImageUrl:
+                    isMobilePreroll
+                      ? form.instreamLogoSource === "upload"
+                        ? form.instreamLogoImageUrl || undefined
+                        : undefined
+                      : form.instreamLogoImageUrl || undefined,
                   companionImageUrl:
                     form.instreamUseChannelBanner
                       ? undefined
                       : form.instreamCompanionImageUrl || undefined,
                   companionChannelUrl:
-                    form.instreamUseChannelBanner
-                      ? form.instreamCompanionChannelUrl || undefined
-                      : undefined,
+                    isMobilePreroll
+                      ? form.instreamLogoSource === "channel"
+                        ? form.instreamCompanionChannelUrl || undefined
+                        : undefined
+                      : form.instreamUseChannelBanner
+                        ? form.instreamCompanionChannelUrl || undefined
+                        : undefined,
                   companionUseChannelBanner: form.instreamUseChannelBanner,
                   enableCompanionBanner: form.instreamEnableCompanionBanner,
                 }
@@ -811,6 +822,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
         instreamDisplayUrl: "",
         instreamDisplayPath1: "",
         instreamDisplayPath2: "",
+        instreamLogoSource: "channel",
         instreamLogoImageUrl: "",
         instreamCompanionImageUrl: "",
         instreamCompanionChannelUrl: "",
@@ -1273,33 +1285,89 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                     >
                       🧩 로고 이미지
                     </label>
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        className="btn btn-secondary text-xs px-3 py-1.5"
-                        onClick={() => logoInputRef.current?.click()}
-                        disabled={isLogoUploading}
-                      >
-                        {isLogoUploading ? "업로드 중..." : "파일 업로드"}
-                      </button>
-                      <input
-                        ref={logoInputRef}
-                        type="file"
-                        accept="image/png,image/jpeg,image/webp,image/gif"
-                        onChange={handleLogoSelect}
-                        className="hidden"
-                      />
-                      {form.instreamLogoImageUrl && (
-                        <a
-                          href={form.instreamLogoImageUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-[11px] text-[var(--color-accent)] hover:underline truncate"
+
+                    {isMobilePreroll && (
+                      <div className="space-y-2 mb-2">
+                        <label className="flex items-center gap-2 text-xs" style={{ color: "var(--color-text-secondary)" }}>
+                          <input
+                            type="radio"
+                            name="mobile-logo-mode"
+                            checked={form.instreamLogoSource === "channel"}
+                            onChange={() =>
+                              setForm((prev) => ({
+                                ...prev,
+                                instreamLogoSource: "channel",
+                              }))
+                            }
+                          />
+                          채널 배너를 사용하여 자동 생성 (권장)
+                        </label>
+                        <label className="flex items-center gap-2 text-xs" style={{ color: "var(--color-text-secondary)" }}>
+                          <input
+                            type="radio"
+                            name="mobile-logo-mode"
+                            checked={form.instreamLogoSource === "upload"}
+                            onChange={() =>
+                              setForm((prev) => ({
+                                ...prev,
+                                instreamLogoSource: "upload",
+                              }))
+                            }
+                          />
+                          이미지 업로드
+                        </label>
+                      </div>
+                    )}
+
+                    {isMobilePreroll && form.instreamLogoSource === "channel" && (
+                      <div className="space-y-2">
+                        <input
+                          type="text"
+                          className="form-input"
+                          placeholder="채널 URL (예: https://youtube.com/@shiseidokorea)"
+                          value={form.instreamCompanionChannelUrl}
+                          onChange={(e) =>
+                            setForm((prev) => ({
+                              ...prev,
+                              instreamCompanionChannelUrl: e.target.value,
+                            }))
+                          }
+                        />
+                        <p className="text-[10px]" style={{ color: "var(--color-text-muted)" }}>
+                          * 채널 URL에서 로고를 자동으로 가져옵니다.
+                        </p>
+                      </div>
+                    )}
+
+                    {(!isMobilePreroll || form.instreamLogoSource === "upload") && (
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          className="btn btn-secondary text-xs px-3 py-1.5"
+                          onClick={() => logoInputRef.current?.click()}
+                          disabled={isLogoUploading}
                         >
-                          업로드된 로고 보기
-                        </a>
-                      )}
-                    </div>
+                          {isLogoUploading ? "업로드 중..." : "파일 업로드"}
+                        </button>
+                        <input
+                          ref={logoInputRef}
+                          type="file"
+                          accept="image/png,image/jpeg,image/webp,image/gif"
+                          onChange={handleLogoSelect}
+                          className="hidden"
+                        />
+                        {form.instreamLogoImageUrl && (
+                          <a
+                            href={form.instreamLogoImageUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-[11px] text-[var(--color-accent)] hover:underline truncate"
+                          >
+                            업로드된 로고 보기
+                          </a>
+                        )}
+                      </div>
+                    )}
                   </div>
 
                   {/* 컴패니언 배너 — 모바일 모드에서는 숨김 */}

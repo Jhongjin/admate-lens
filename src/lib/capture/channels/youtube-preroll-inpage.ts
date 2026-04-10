@@ -350,15 +350,18 @@ export function runPrerollInjectInPage(...args: unknown[]): boolean {
       const rightWrap = document.createElement("div");
       rightWrap.style.cssText = "display:flex;align-items:center;flex-shrink:0;";
       const dots = document.createElement("div");
-      dots.style.cssText = "cursor:pointer;padding:0 8px;margin-right:4px;";
+      dots.style.cssText =
+        "cursor:pointer;padding:0 8px;" + (enableCtaText ? "margin-right:4px;" : "margin-right:0;");
       dots.innerHTML =
         '<svg width="18" height="18" viewBox="0 0 24 24" fill="#fff"><path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></svg>';
-      const ctaPill = document.createElement("div");
-      ctaPill.style.cssText =
-        "background:#f1f1f1;color:#0f0f0f;font-size:14px;font-weight:500;padding:8px 16px;border-radius:18px;white-space:nowrap;font-family:Roboto,Arial,sans-serif;";
-      ctaPill.textContent = ctaBtnText;
       rightWrap.appendChild(dots);
-      rightWrap.appendChild(ctaPill);
+      if (enableCtaText) {
+        const ctaPill = document.createElement("div");
+        ctaPill.style.cssText =
+          "background:#f1f1f1;color:#0f0f0f;font-size:14px;font-weight:500;padding:8px 16px;border-radius:18px;white-space:nowrap;font-family:Roboto,Arial,sans-serif;";
+        ctaPill.textContent = ctaBtnText;
+        rightWrap.appendChild(ctaPill);
+      }
 
       mobileBar.appendChild(leftWrap);
       mobileBar.appendChild(rightWrap);
