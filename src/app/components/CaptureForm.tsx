@@ -749,7 +749,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
             form.channel === "youtube" ? form.youtubeAdType : undefined,
           // 🎬 인스트림 광고 옵션
           instreamOpts:
-            form.channel === "youtube" && form.youtubeAdType === "preroll"
+            form.channel === "youtube" && isYoutubeInstream
               ? {
                   videoUrl: form.instreamVideoUrl || undefined,
                   skipSeconds: (() => {
@@ -952,14 +952,18 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
               💡{" "}
               {form.youtubeAdType === "preroll" &&
                 "영상 시작 전 광고 이미지가 플레이어에 표시됩니다. 16:9 비율 이미지를 권장합니다."}
+              {form.youtubeAdType === "mobile-preroll-aos" &&
+                "Android 모바일(Pixel 8) 화면에서 YouTube 인스트림 광고로 표시됩니다."}
+              {form.youtubeAdType === "mobile-preroll-ios" &&
+                "iPhone 15 화면에서 YouTube 인스트림 광고로 표시됩니다."}
               {form.youtubeAdType === "display" &&
                 "영상 우측 사이드바에 300×250 컴패니언 배너로 표시됩니다."}
               {form.youtubeAdType === "overlay" &&
                 "영상 하단에 가로형 반투명 배너로 표시됩니다."}
             </p>
 
-            {/* 🎬 인스트림 광고 상세 옵션 (프리롤 전용) */}
-            {form.youtubeAdType === "preroll" && (
+            {/* 🎬 인스트림 광고 상세 옵션 (프리롤 + 모바일 인스트림 공통) */}
+            {isYoutubeInstream && (
               <div
                 className="mt-4 rounded-xl border p-4 animate-fade-in"
                 style={{
