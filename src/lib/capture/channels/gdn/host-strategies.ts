@@ -10,6 +10,7 @@ export function isGdnExcludedHost(host: string): boolean {
 
 export function getGdnScreenshotPolicy(host: string): GdnScreenshotPolicy {
   if (host === "news.sbs.co.kr") return "force_centered_viewport";
+  if (host === "www.ddaily.co.kr") return "force_centered_viewport";
   return "default";
 }
 
@@ -25,6 +26,28 @@ export function prioritizeGdnSlotsByHost(host: string, slots: DetectedSlot[]): v
   if (host === "www.ddaily.co.kr") {
     slots.sort((a, b) => calcDdailySlotScore(b) - calcDdailySlotScore(a));
     console.log("[GDN] 🧭 디지털데일리 전용 슬롯 우선순위 적용");
+  }
+}
+
+export function narrowGdnSlotsByHost(host: string, slots: DetectedSlot[]): void {
+  if (!host || slots.length <= 1) return;
+
+  if (host === "www.ddaily.co.kr") {
+    const preferred = slots.filter((s) => {
+      const sel = (s.selector || "").toLowerCase();
+      const sizeNear300x250 = s.width >= 250 && s.width <= 340 && s.height >= 220 && s.height <= 340;
+      return (
+        sel.includes("ddaily_rightcontents2_ap_300_250") ||
+        sel.includes("300_250") ||
+        sizeNear300x250
+      );
+    });
+
+    if (preferred.length > 0) {
+      slots.length = 0;
+      preferred.forEach((s) => slots.push(s));
+      console.log(`[GDN] 🎯 디지털데일리 전용 후보 축소 적용: ${preferred.length}개`);
+    }
   }
 }
 
