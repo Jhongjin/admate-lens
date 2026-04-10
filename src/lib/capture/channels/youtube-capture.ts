@@ -825,13 +825,22 @@ export class YouTubeCapture extends BaseChannel {
           ];
 
           let playerRect = null;
-          for (const sel of playerSelectors) {
-            const el = document.querySelector(sel);
-            if (el) {
-              const r = el.getBoundingClientRect();
-              if (r.width > 100 && r.height > 100) {
-                playerRect = r;
-                break;
+          const videoEl = document.querySelector('video');
+          if (videoEl) {
+            const r = videoEl.getBoundingClientRect();
+            if (r.width > 50 && r.height > 50) {
+              playerRect = r;
+            }
+          }
+          if (!playerRect) {
+            for (const sel of playerSelectors) {
+              const el = document.querySelector(sel);
+              if (el) {
+                const r = el.getBoundingClientRect();
+                if (r.width > 50 && r.height > 50) {
+                  playerRect = r;
+                  break;
+                }
               }
             }
           }
@@ -1034,27 +1043,32 @@ export class YouTubeCapture extends BaseChannel {
             mobileBar.innerHTML = htmlLeft + htmlRight;
             
             // 플레이어 하단에 부착
-            let targetNode = document.querySelector('#player-container-id') || document.querySelector('.html5-video-player');
+            let targetNode = document.querySelector('ytm-watch-metadata-app-feature') ||
+                             document.querySelector('ytm-item-section-renderer') ||
+                             document.querySelector('ytm-single-column-watch-next-results-renderer');
             if (targetNode) {
-                // ytm-item-section-renderer 등 찾기
-                let searchNode = targetNode;
-                while (searchNode.parentElement && searchNode.parentElement.tagName !== 'YTM-APP' && searchNode.parentElement.tagName !== 'BODY') {
-                    if (searchNode.parentElement.tagName.startsWith('YTM-')) {
-                        searchNode = searchNode.parentElement;
-                    } else {
-                        break;
-                    }
-                }
+                // 부모 컨테이너 내에서 안전하게 삽입하기 위해 구조 확인
                 const wrapper = document.createElement('div');
                 wrapper.appendChild(mobileBar);
-                searchNode.parentNode.insertBefore(wrapper, searchNode.nextSibling);
+                targetNode.parentNode.insertBefore(wrapper, targetNode);
             } else {
-                mobileBar.style.position = 'absolute';
-                mobileBar.style.top = (py + ph) + 'px';
-                mobileBar.style.left = px + 'px';
-                mobileBar.style.width = pw + 'px';
-                mobileBar.style.zIndex = '2147483600';
-                document.body.appendChild(mobileBar);
+                let fallbackNode = document.querySelector('.player-container, #player, ytm-player-macro, .html5-video-player');
+                if (!fallbackNode && document.querySelector('video')) {
+                   fallbackNode = document.querySelector('video').parentElement;
+                }
+                if (fallbackNode) {
+                   const wrapper = document.createElement('div');
+                   wrapper.appendChild(mobileBar);
+                   fallbackNode.parentNode.insertBefore(wrapper, fallbackNode.nextSibling);
+                } else {
+                   mobileBar.style.position = 'absolute';
+                   mobileBar.style.top = (py + ph) + 'px';
+                   mobileBar.style.left = px + 'px';
+                   mobileBar.style.width = pw + 'px';
+                   mobileBar.style.zIndex = '2147483600';
+                   document.body.appendChild(mobileBar);
+                }
+            }
             }
           }
 
@@ -2292,13 +2306,24 @@ export class YouTubeCapture extends BaseChannel {
         ];
 
         let playerEl = null;
-        for (const sel of playerSelectors) {
-          const el = document.querySelector(sel);
-          if (el) {
-            const r = el.getBoundingClientRect();
-            if (r.width > 100 && r.height > 100) {
-              playerEl = el;
-              break;
+
+        const videoEl = document.querySelector('video');
+        if (videoEl) {
+          const r = videoEl.getBoundingClientRect();
+          if (r.width > 50 && r.height > 50) {
+            playerEl = videoEl.parentElement; // usually a good container
+          }
+        }
+
+        if (!playerEl) {
+          for (const sel of playerSelectors) {
+            const el = document.querySelector(sel);
+            if (el) {
+              const r = el.getBoundingClientRect();
+              if (r.width > 50 && r.height > 50) {
+                playerEl = el;
+                break;
+              }
             }
           }
         }
