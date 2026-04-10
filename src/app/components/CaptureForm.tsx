@@ -235,7 +235,12 @@ const GDN_AD_SIZES: AdSizeInfo[] = [
 type AdSizeMode = "auto" | "manual";
 
 /** YouTube 광고 유형 */
-type YouTubeAdType = "preroll" | "display" | "overlay";
+type YouTubeAdType =
+  | "preroll"
+  | "display"
+  | "overlay"
+  | "mobile-preroll-aos"
+  | "mobile-preroll-ios";
 
 interface YouTubeAdTypeOption {
   value: YouTubeAdType;
@@ -248,10 +253,24 @@ interface YouTubeAdTypeOption {
 const YOUTUBE_AD_TYPES: YouTubeAdTypeOption[] = [
   {
     value: "preroll",
-    label: "인스트림",
+    label: "PC 인스트림",
     icon: "🎬",
-    description: "영상 재생 전 프리롤 광고",
+    description: "데스크톱 프리롤 광고",
     sizeHint: "16:9 권장",
+  },
+  {
+    value: "mobile-preroll-aos",
+    label: "AOS 인스트림",
+    icon: "📱",
+    description: "Android 모바일 (Pixel 8)",
+    sizeHint: "393×852",
+  },
+  {
+    value: "mobile-preroll-ios",
+    label: "iOS 인스트림",
+    icon: "🍎",
+    description: "iPhone 15 모바일",
+    sizeHint: "390×844",
   },
   {
     value: "display",
@@ -661,8 +680,13 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
 
   /** 폼 유효성 검증 — YouTube 채널은 게재면 자동 지정 */
   const isYouTubeChannel = form.channel === "youtube";
-  const isYoutubeInstream = isYouTubeChannel && form.youtubeAdType === "preroll";
-  
+  const isMobilePreroll =
+    form.youtubeAdType === "mobile-preroll-aos" ||
+    form.youtubeAdType === "mobile-preroll-ios";
+  const isYoutubeInstream =
+    isYouTubeChannel &&
+    (form.youtubeAdType === "preroll" || isMobilePreroll);
+
   const hasValidSource = isYoutubeInstream
     ? form.instreamVideoUrl && isValidUrl(form.instreamVideoUrl)
     : form.creativeUrl && isValidUrl(form.creativeUrl);
@@ -1274,7 +1298,8 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                     </div>
                   </div>
 
-                  {/* 컴패니언 배너 */}
+                  {/* 컴패니언 배너 — 모바일 모드에서는 숨김 */}
+                  {!isMobilePreroll && (
                   <div>
                     <div className="flex items-center mb-1 gap-2">
                       <label
@@ -1393,6 +1418,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                       </>
                     )}
                   </div>
+                  )} {/* /isMobilePreroll companion banner */}
                 </div>
               </div>
             )}

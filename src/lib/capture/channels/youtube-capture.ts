@@ -9,9 +9,20 @@
 
 import type { IPageHandle } from "../engine/browser-engine";
 import { BaseChannel, type CaptureRequest } from "./base-channel";
+import {
+  MOBILE_AOS_VIEWPORT,
+  MOBILE_IOS_VIEWPORT,
+  UA_MOBILE_AOS,
+  UA_MOBILE_IOS,
+} from "../engine/puppeteer-engine";
 
 /** YouTube 광고 유형 */
-export type YouTubeAdType = "preroll" | "display" | "overlay";
+export type YouTubeAdType =
+  | "preroll"
+  | "display"
+  | "overlay"
+  | "mobile-preroll-aos"
+  | "mobile-preroll-ios";
 
 /** YouTube 캡처 진단 정보 */
 export interface YouTubeDiagnostics {
@@ -152,16 +163,26 @@ export class YouTubeCapture extends BaseChannel {
     console.log(`[YouTube] 영상 URL: ${request.publisherUrl}`);
     console.log(`[YouTube] 광고 유형: ${adType}`);
     const instreamOpts = (request.options?.instreamOpts as InstreamOptsPayload | undefined) ?? {};
-    const prerollCaptureSeconds =
-      adType === "preroll"
+
+    // 모바일 여부 판정
+    const isMobilePlatform = adType === "mobile-preroll-aos" || adType === "mobile-preroll-ios";
+    const isAOS = adType === "mobile-preroll-aos";
+    // 모바일은 컴패니언 배너 강제 비활성화
+    if (isMobilePlatform) {
+      instreamOpts.enableCompanionBanner = false;
+    }
+
+    // preroll 계열(인스트림)은 PC/모바일 통일 로직
+    const isPrerollFamily = adType === "preroll" || isMobilePlatform;
+    const prerollCaptureSeconds = isPrerollFamily
         ? (() => {
             const sec = instreamOpts.skipSeconds;
-            return typeof sec === "number" && Number.isFinite(sec) && sec >= 0 ? sec : 5;
+            return typeof sec === "number" && Number.isFinite(sec) && sec >= 0 ? sec : 3;
           })()
         : null;
 
     console.log(`[YouTube] 소재(creative_url): ${request.creativeUrl || "(없음)"}`);
-    if (adType === "preroll" && instreamOpts.videoUrl) {
+    if (isPrerollFamily && instreamOpts.videoUrl) {
       console.log(`[YouTube] 인스트림 광고 동영상 URL: ${instreamOpts.videoUrl}`);
     }
 
@@ -187,7 +208,7 @@ export class YouTubeCapture extends BaseChannel {
     if (instreamOpts.videoUrl?.trim()) {
       prerollAdVideoId = extractVideoId(instreamOpts.videoUrl.trim());
     }
-    if (adType === "preroll") {
+    if (isPrerollFamily) {
       if (rawCreative && /youtube\.com|youtu\.be/i.test(rawCreative)) {
         const id = extractVideoId(rawCreative);
         if (id) {
@@ -202,7 +223,7 @@ export class YouTubeCapture extends BaseChannel {
     let { dataUrl: creativeDataUrl, sizeKB, ok } = creativeFetchUrl
       ? await imageUrlToDataUrl(creativeFetchUrl)
       : { dataUrl: "", sizeKB: 0, ok: false };
-    if (adType === "preroll" && !ok && prerollAdVideoId) {
+    if (isPrerollFamily && !ok && prerollAdVideoId) {
       const fb = await imageUrlToDataUrl(
         `https://img.youtube.com/vi/${prerollAdVideoId}/hqdefault.jpg`
       );
@@ -214,7 +235,7 @@ export class YouTubeCapture extends BaseChannel {
     }
     this.diagnostics.creativeDownloaded = ok;
     this.diagnostics.creativeBase64Size = sizeKB;
-    if (adType === "preroll" && !ok) {
+    if (isPrerollFamily && !ok) {
       console.error(
         `[YouTube] 인스트림 소재 이미지 확보 실패 — creativeUrl·videoUrl을 확인하세요 (fetch 시도: ${creativeFetchUrl || "(없음)"})`
       );
@@ -223,7 +244,7 @@ export class YouTubeCapture extends BaseChannel {
     // 인스트림 카드 로고: 업로드 URL이 있으면 서버에서 fetch → data URL (YouTube 페이지 CSP/CORS 회피)
     // 업로드가 없으면 companionChannelUrl에서 채널 로고 자동 추출
     let instreamAvatarDataUrl = creativeDataUrl;
-    if (adType === "preroll") {
+    if (isPrerollFamily) {
       if (instreamOpts.avatarImageUrl?.trim()) {
         // 1순위: 직접 업로드된 로고
         const av = await imageUrlToDataUrl(instreamOpts.avatarImageUrl.trim());
@@ -253,7 +274,7 @@ export class YouTubeCapture extends BaseChannel {
 
     // 컴패니언 배너 이미지: URL 파싱 -> data URL
     let instreamCompanionDataUrl: string | null = null;
-    if (adType === "preroll") {
+    if (isPrerollFamily) {
       let companionSourceUrl = instreamOpts.companionImageUrl?.trim();
       if (instreamOpts.companionUseChannelBanner && instreamOpts.companionChannelUrl?.trim()) {
         console.log(`[YouTube] 채널 배너 URL 파싱 시도: ${instreamOpts.companionChannelUrl}`);
@@ -279,7 +300,7 @@ export class YouTubeCapture extends BaseChannel {
     // 1.5) 🖼️ 비디오 ID 추출 + 썸네일 준비
     // 프리롤은 "광고주 영상(instreamVideoUrl)"을 기준으로 해야 함.
     const videoId =
-      adType === "preroll"
+      isPrerollFamily
         ? prerollAdVideoId ||
           (instreamOpts.videoUrl ? extractVideoId(instreamOpts.videoUrl) : null) ||
           extractVideoId(request.publisherUrl)
@@ -330,8 +351,17 @@ export class YouTubeCapture extends BaseChannel {
     // /embed/ URL로 먼저 접근하여 봇 감지를 우회
     const targetUrl = request.publisherUrl;
 
-    // 데스크톱 시청 레이아웃 고정 — 로컬 2560 등과 무관하게 실제 브라우저(≈1920)와 동일 비율로 캡처
-    await page.setViewport({ width: 1920, height: 1080, deviceScaleFactor: 1 });
+    // 데스크톱/모바일 뷰포트 분기 적용
+    if (isMobilePlatform) {
+      const mobileVp = isAOS ? MOBILE_AOS_VIEWPORT : MOBILE_IOS_VIEWPORT;
+      const mobileUA = isAOS ? UA_MOBILE_AOS : UA_MOBILE_IOS;
+      await page.setViewport(mobileVp);
+      await page.setUserAgent(mobileUA);
+      console.log(`[YouTube] 📱 모바일 뷰포트 적용: ${isAOS ? "AOS (Pixel 8)" : "iOS (iPhone 15)"} ${mobileVp.width}×${mobileVp.height}`);
+    } else {
+      // 데스크톱 시청 레이아웃 고정 — 로컬 2560 등과 무관하게 실제 브라우저(≈1920)와 동일 비율로 캡처
+      await page.setViewport({ width: 1920, height: 1080, deviceScaleFactor: 1 });
+    }
 
     // 📺 YouTube watch 페이지 로드 (레이아웃 확보 목적)
     await page.goto(targetUrl, {
@@ -556,7 +586,9 @@ export class YouTubeCapture extends BaseChannel {
     let injectionSuccess = false;
 
     switch (adType) {
-      case "preroll": {
+      case "preroll":
+      case "mobile-preroll-aos":
+      case "mobile-preroll-ios": {
         const prerollUiOpts = {
           videoUrl: instreamOpts.videoUrl || "",
           adTitle: instreamOpts.adTitle || "",
@@ -569,13 +601,14 @@ export class YouTubeCapture extends BaseChannel {
           avatarImageUrl: instreamAvatarDataUrl,
           progressFillPercent: prerollProgressPercent,
           enableCtaText: instreamOpts.enableCtaText,
+          isMobile: isMobilePlatform,
         };
         console.log(
-          `[YouTube] 인스트림 옵션: title="${prerollUiOpts.adTitle}" cta="${prerollUiOpts.ctaText}" landing="${prerollUiOpts.landingUrl}" enableCtaText="${prerollUiOpts.enableCtaText}"`
+          `[YouTube] 인스트림 옵션: title="${prerollUiOpts.adTitle}" cta="${prerollUiOpts.ctaText}" landing="${prerollUiOpts.landingUrl}" enableCtaText="${prerollUiOpts.enableCtaText}" mobile=${isMobilePlatform}`
         );
 
         injectionSuccess = await this.injectPrerollAd(page, prerollOverlayImageUrl, playerInfo, prerollUiOpts);
-        // 🎯 컴패니언 배너 동시 삽입
+        // 🎯 컴패니언 배너 동시 삽입 (모바일은 instreamOpts.enableCompanionBanner 이미 false로 강제됨)
         if (injectionSuccess) {
           if (instreamOpts.enableCompanionBanner !== false) {
             const companionImg = prerollUiOpts.companionImageUrl || creativeDataUrl;
@@ -625,7 +658,7 @@ export class YouTubeCapture extends BaseChannel {
     // 9.5) 기본 모드에서는 기존대로 video/canvas 숨김.
     // 캡처 시점 모드에서는 "프레임 오버레이를 확보한 경우"에만 숨김 적용(합성 불안정 회피).
     const shouldHideVideoLayers =
-      adType !== "preroll" ||
+      !isPrerollFamily ||
       prerollCaptureSeconds === null ||
       useTimedFrameOverlay;
     if (shouldHideVideoLayers) {
@@ -648,13 +681,38 @@ export class YouTubeCapture extends BaseChannel {
     // 유튜브가 헤더를 다시 그리면 로그인 버튼이 복구될 수 있음 → 캡처 직전 한 번 더 덮음
     await this.applyMastheadLoggedInLook(page, mastheadProfileDataUrl);
 
-    // 10) 전체 페이지 스크린샷
-    const screenshot = await page.screenshot({
-      fullPage: false, // YouTube는 뷰포트 캡처가 더 적합
-      type: "png",
-    });
+    // 10) 스크린샷
+    // 모바일: 뷰포트 전체 clip | 데스크탑: fullPage false (YouTube 비율 최적)
+    let screenshot: Buffer;
+    if (isMobilePlatform) {
+      const mobileVp = isAOS ? MOBILE_AOS_VIEWPORT : MOBILE_IOS_VIEWPORT;
+      screenshot = await page.screenshot({
+        fullPage: false,
+        type: "png",
+        clip: { x: 0, y: 0, width: mobileVp.width, height: mobileVp.height },
+      });
+    } else {
+      screenshot = await page.screenshot({
+        fullPage: false,
+        type: "png",
+      });
+    }
 
     console.log(`[YouTube] ===== 캡처 완료 (${adType}) =====`);
+
+    // 11) 폰 프레임 합성 (모바일은 상단/하단 상태바 없이 순수 콘텐츠만 캡처하는 방식)
+    if (isMobilePlatform) {
+      try {
+        const os = isAOS ? "aos" : "ios";
+        const { compositePhoneFrame } = await import("../utils/frame-composite");
+        const framed = await compositePhoneFrame(screenshot, os);
+        console.log(`[YouTube] 📱 폰 프레임 합성 완료 (${os})`);
+        return framed;
+      } catch (err) {
+        console.warn(`[YouTube] ⚠️ 폰 프레임 합성 실패 (원본 이미지 변환 없이 반환):`, err);
+      }
+    }
+
     return screenshot;
   }
 
@@ -683,9 +741,11 @@ export class YouTubeCapture extends BaseChannel {
       companionImageUrl?: string;
       avatarImageUrl?: string;
       progressFillPercent?: number;
+      isMobile?: boolean;
     } = {}
   ): Promise<boolean> {
-    console.log(`[YouTube] 🎬 프리롤 광고 인젝션 시작`);
+    const isMobile = instreamOpts.isMobile ?? false;
+    console.log(`[YouTube] 🎬 프리롤 광고 인젝션 시작${isMobile ? " (모바일)" : ""}`);
 
     // 표시 URL 텍스트 구성:
     // 1) 폼의 displayUrl 입력값 우선

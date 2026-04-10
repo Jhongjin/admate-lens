@@ -46,6 +46,30 @@ const VERCEL_VIEWPORT: IViewport = {
   isMobile: false,
 };
 
+/** 모바일 AOS 뷰포트 — Google Pixel 8 기준 */
+export const MOBILE_AOS_VIEWPORT: IViewport = {
+  width: 393,
+  height: 852,
+  deviceScaleFactor: 3,
+  isMobile: true,
+};
+
+/** 모바일 iOS 뷰포트 — iPhone 15 기준 */
+export const MOBILE_IOS_VIEWPORT: IViewport = {
+  width: 390,
+  height: 844,
+  deviceScaleFactor: 3,
+  isMobile: true,
+};
+
+/** AOS (Android 14, Pixel 8) Chrome User-Agent */
+export const UA_MOBILE_AOS =
+  "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Mobile Safari/537.36";
+
+/** iOS (iPhone 15, iOS 17) Safari-like User-Agent */
+export const UA_MOBILE_IOS =
+  "Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Mobile/15E148 Safari/604.1";
+
 /** Headless 스크린샷에서 HTML5 video가 GPU 합성 레이어로 DOM 오버레이를 덮는 현상 완화 */
 const VIDEO_CAPTURE_ARGS = [
   "--disable-gpu",
@@ -556,6 +580,10 @@ class PuppeteerPageHandle implements IPageHandle {
       deviceScaleFactor: viewport.deviceScaleFactor ?? 2,
       isMobile: viewport.isMobile ?? false,
     });
+  }
+
+  async setUserAgent(ua: string): Promise<void> {
+    await this.page.setUserAgent(ua);
   }
 
   async setBypassCSP(enabled: boolean): Promise<void> {

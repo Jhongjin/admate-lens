@@ -29,6 +29,7 @@ export interface IPageHandle {
   waitForSelector(selector: string, options?: { timeout?: number; visible?: boolean }): Promise<void>;
   waitForNavigation(options?: { waitUntil?: string; timeout?: number }): Promise<void>;
   setViewport(viewport: IViewport): Promise<void>;
+  setUserAgent(ua: string): Promise<void>;
   setCookie(cookie: { name: string; value: string; domain?: string; path?: string }): Promise<void>;
   url(): string;
   close(): Promise<void>;
