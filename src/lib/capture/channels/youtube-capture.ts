@@ -1067,8 +1067,6 @@ export class YouTubeCapture extends BaseChannel {
                    mobileBar.style.width = pw + 'px';
                    mobileBar.style.zIndex = '2147483600';
                    document.body.appendChild(mobileBar);
-                }
-            }
             }
           }
 
