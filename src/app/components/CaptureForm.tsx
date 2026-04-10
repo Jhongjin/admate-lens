@@ -42,6 +42,13 @@ const CHANNELS: ChannelOption[] = [
   },
 ];
 
+const MEDIA_SELECT_OPTIONS: Array<{ value: MediaMenu; label: string; enabled: boolean }> = [
+  { value: "gdn", label: "Google Ads", enabled: true },
+  { value: "youtube", label: "YouTube", enabled: true },
+  { value: "naver", label: "Naver", enabled: false },
+  { value: "kakao", label: "Kakao", enabled: false },
+];
+
 /** 게재면 프리셋 */
 interface PublisherPreset {
   name: string;
@@ -346,7 +353,10 @@ interface CaptureFormData {
   instreamCompanionChannelUrl: string;
   instreamUseChannelBanner: boolean;
   instreamEnableCompanionBanner: boolean;
+  instreamSkipMode: "skippable" | "non-skippable";
 }
+
+type MediaMenu = "gdn" | "youtube" | "naver" | "kakao";
 
 /** 캡처 결과 타입 */
 export interface CaptureResult {
@@ -426,6 +436,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
   const logoInputRef = useRef<HTMLInputElement>(null);
   const [isCompanionUploading, setIsCompanionUploading] = useState(false);
   const [isLogoUploading, setIsLogoUploading] = useState(false);
+  const [isOptionPanelExpanded, setIsOptionPanelExpanded] = useState(true);
 
   // 게재면 프리셋 관련 상태
   const [publisherMode, setPublisherMode] = useState<"preset" | "custom">(
@@ -689,6 +700,19 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
     isYouTubeChannel &&
     (form.youtubeAdType === "preroll" || isMobilePreroll);
 
+  const selectedMediaMenu = (form.channel === "youtube" ? "youtube" : "gdn") as MediaMenu;
+  const selectedProduct = selectedMediaMenu === "youtube" ? "instream" : "network-ads";
+  const selectedOptionPreset =
+    selectedMediaMenu === "youtube"
+      ? form.youtubeAdType === "mobile-preroll-ios"
+        ? form.instreamSkipMode === "non-skippable"
+          ? "ios-non-skip"
+          : "ios-skip"
+        : form.instreamSkipMode === "non-skippable"
+          ? "aos-non-skip"
+          : "aos-skip"
+      : "gdn-default";
+
   const hasValidSource = isYoutubeInstream
     ? form.instreamVideoUrl && isValidUrl(form.instreamVideoUrl)
     : form.creativeUrl && isValidUrl(form.creativeUrl);
@@ -866,112 +890,118 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
           </div>
         </div>
 
-        {/* ===== 매체 선택 ===== */}
-        <div className="mb-5">
-          <label className="form-label">매체 (Channel)</label>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-            {CHANNELS.map((ch) => (
-              <button
-                key={ch.value}
-                type="button"
-                disabled={!ch.enabled}
-                onClick={() =>
-                  setForm((prev) => ({ ...prev, channel: ch.value }))
+        {/* ===== 매체 / 상품 / 기본옵션 선택 ===== */}
+        <div className="mb-5 space-y-3">
+          <div>
+            <label className="form-label">1) 매체 선택</label>
+            <select
+              className="form-input"
+              value={selectedMediaMenu}
+              onChange={(e) => {
+                const next = e.target.value as MediaMenu;
+                setIsOptionPanelExpanded(false);
+                if (next === "youtube") {
+                  setForm((prev) => ({
+                    ...prev,
+                    channel: "youtube",
+                    youtubeAdType: "mobile-preroll-aos",
+                  }));
+                } else {
+                  setForm((prev) => ({ ...prev, channel: "gdn" }));
                 }
-                className="flex flex-col items-center gap-1 p-3 rounded-xl border text-center text-sm transition-all duration-200"
-                style={{
-                  opacity: !ch.enabled ? 0.3 : 1,
-                  cursor: !ch.enabled ? "not-allowed" : "pointer",
-                  borderColor:
-                    form.channel === ch.value && ch.enabled
-                      ? "var(--color-accent)"
-                      : "var(--color-border)",
-                  backgroundColor:
-                    form.channel === ch.value && ch.enabled
-                      ? "var(--color-accent-subtle)"
-                      : "transparent",
-                  color:
-                    form.channel === ch.value && ch.enabled
-                      ? "var(--color-accent)"
-                      : "var(--color-text-secondary)",
-                }}
-              >
-                <span className="text-xl">{ch.icon}</span>
-                <span className="font-semibold">{ch.label}</span>
-                {!ch.enabled && (
-                  <span className="text-[10px] opacity-70">준비중</span>
-                )}
-              </button>
-            ))}
+              }}
+            >
+              {MEDIA_SELECT_OPTIONS.map((m) => (
+                <option key={m.value} value={m.value} disabled={!m.enabled}>
+                  {m.label} {!m.enabled ? "(준비중)" : ""}
+                </option>
+              ))}
+            </select>
           </div>
+
+          <div>
+            <label className="form-label">2) 상품 선택</label>
+            <select
+              className="form-input"
+              value={selectedProduct}
+              onChange={(e) => {
+                const next = e.target.value;
+                setIsOptionPanelExpanded(false);
+                if (next === "instream") {
+                  setForm((prev) => ({
+                    ...prev,
+                    channel: "youtube",
+                    youtubeAdType: "mobile-preroll-aos",
+                  }));
+                } else {
+                  setForm((prev) => ({ ...prev, channel: "gdn" }));
+                }
+              }}
+            >
+              {selectedMediaMenu === "youtube" ? (
+                <option value="instream">Instream</option>
+              ) : (
+                <option value="network-ads">Network Ads</option>
+              )}
+            </select>
+          </div>
+
+          <div>
+            <label className="form-label">3) 기본 옵션</label>
+            <select
+              className="form-input"
+              value={selectedOptionPreset}
+              onChange={(e) => {
+                const preset = e.target.value;
+                setIsOptionPanelExpanded(true);
+                if (preset === "gdn-default") return;
+                if (preset.startsWith("ios")) {
+                  setForm((prev) => ({
+                    ...prev,
+                    channel: "youtube",
+                    youtubeAdType: "mobile-preroll-ios",
+                    instreamSkipMode: preset.includes("non") ? "non-skippable" : "skippable",
+                  }));
+                } else {
+                  setForm((prev) => ({
+                    ...prev,
+                    channel: "youtube",
+                    youtubeAdType: "mobile-preroll-aos",
+                    instreamSkipMode: preset.includes("non") ? "non-skippable" : "skippable",
+                  }));
+                }
+              }}
+            >
+              {selectedMediaMenu === "youtube" ? (
+                <>
+                  <option value="aos-skip">AOS Instream - Skip</option>
+                  <option value="aos-non-skip">AOS Instream - Non Skip</option>
+                  <option value="ios-skip">iOS Instream - Skip</option>
+                  <option value="ios-non-skip">iOS Instream - Non Skip</option>
+                </>
+              ) : (
+                <option value="gdn-default">Network Ads 기본</option>
+              )}
+            </select>
+          </div>
+
+          <button
+            type="button"
+            className="text-xs underline"
+            style={{ color: "var(--color-text-muted)" }}
+            onClick={() => setIsOptionPanelExpanded((v) => !v)}
+          >
+            {isOptionPanelExpanded ? "선택된 옵션 접기" : "선택된 옵션 펼치기"}
+          </button>
         </div>
 
-        {/* ===== YouTube 광고 유형 선택 (YouTube 채널 전용) ===== */}
-        {form.channel === "youtube" && (
+        {isOptionPanelExpanded && form.channel === "youtube" && (
           <div className="mb-5 animate-fade-in">
-            <label className="form-label">▶️ YouTube 광고 유형</label>
-            <div className="grid grid-cols-3 gap-2">
-              {YOUTUBE_AD_TYPES.map((yt) => (
-                <button
-                  key={yt.value}
-                  type="button"
-                  onClick={() =>
-                    setForm((prev) => ({ ...prev, youtubeAdType: yt.value }))
-                  }
-                  className="flex flex-col items-center gap-1.5 p-3 rounded-xl border text-center transition-all duration-200"
-                  style={{
-                    borderColor:
-                      form.youtubeAdType === yt.value
-                        ? "var(--color-accent)"
-                        : "var(--color-border)",
-                    backgroundColor:
-                      form.youtubeAdType === yt.value
-                        ? "var(--color-accent-subtle)"
-                        : "transparent",
-                  }}
-                >
-                  <span className="text-lg">{yt.icon}</span>
-                  <span
-                    className="text-xs font-semibold"
-                    style={{
-                      color:
-                        form.youtubeAdType === yt.value
-                          ? "var(--color-accent)"
-                          : "var(--color-text-primary)",
-                    }}
-                  >
-                    {yt.label}
-                  </span>
-                  <span
-                    className="text-[10px] leading-tight"
-                    style={{ color: "var(--color-text-muted)" }}
-                  >
-                    {yt.description}
-                  </span>
-                  <span
-                    className="text-[9px] px-1.5 py-0.5 rounded-full mt-0.5"
-                    style={{
-                      backgroundColor: "var(--color-bg-tertiary)",
-                      color: "var(--color-text-muted)",
-                    }}
-                  >
-                    {yt.sizeHint}
-                  </span>
-                </button>
-              ))}
-            </div>
             <p className="form-helper mt-1.5">
-              💡{" "}
-              {form.youtubeAdType === "preroll" &&
-                "영상 시작 전 광고 이미지가 플레이어에 표시됩니다. 16:9 비율 이미지를 권장합니다."}
-              {form.youtubeAdType === "mobile-preroll-aos" &&
+              💡 {form.youtubeAdType === "mobile-preroll-aos" &&
                 "Android 모바일(Pixel 8) 화면에서 YouTube 인스트림 광고로 표시됩니다."}
               {form.youtubeAdType === "mobile-preroll-ios" &&
                 "iPhone 15 화면에서 YouTube 인스트림 광고로 표시됩니다."}
-              {form.youtubeAdType === "display" &&
-                "영상 우측 사이드바에 300×250 컴패니언 배너로 표시됩니다."}
-              {form.youtubeAdType === "overlay" &&
-                "영상 하단에 가로형 반투명 배너로 표시됩니다."}
             </p>
 
             {/* 🎬 인스트림 광고 상세 옵션 (프리롤 + 모바일 인스트림 공통) */}
