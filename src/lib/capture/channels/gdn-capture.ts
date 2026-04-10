@@ -355,7 +355,7 @@ export class GdnCapture extends BaseChannel {
     const injectedCheck = await page.evaluate<{ found: boolean; count: number; inViewport: boolean }>(`
       (() => {
         const injected = document.querySelectorAll('[data-injected="admate"], [data-injected="admate-wrapper"]');
-        const first = injected[0] as HTMLElement | undefined;
+        const first = injected[0];
         let inViewport = false;
         if (first) {
           const rect = first.getBoundingClientRect();
