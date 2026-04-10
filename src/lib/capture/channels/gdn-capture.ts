@@ -26,6 +26,11 @@ export interface CaptureDiagnostics {
     selector: string;
     injectionResult?: InjectionResult;
   }>;
+  screenshotMode?: "fullPage" | "viewportFallback";
+  fullPageCaptureError?: string;
+  injectedElementCount?: number;
+  injectedInViewport?: boolean;
+  fallbackCenteredOnInjected?: boolean;
 }
 
 /**
@@ -347,18 +352,26 @@ export class GdnCapture extends BaseChannel {
     await new Promise((r) => setTimeout(r, 2000));
 
     // 7) 인젝션 결과 확인 + 스크롤 최상단 복원
-    const injectedCheck = await page.evaluate<{ found: boolean; count: number }>(`
+    const injectedCheck = await page.evaluate<{ found: boolean; count: number; inViewport: boolean }>(`
       (() => {
         const injected = document.querySelectorAll('[data-injected="admate"], [data-injected="admate-wrapper"]');
+        const first = injected[0] as HTMLElement | undefined;
+        let inViewport = false;
+        if (first) {
+          const rect = first.getBoundingClientRect();
+          inViewport = rect.bottom > 0 && rect.top < (window.innerHeight || 0);
+        }
         // 🔑 페이지 최상단으로 확실하게 복원 (3중 방어)
         window.scrollTo({ top: 0, behavior: 'instant' });
         window.scrollTo(0, 0);
         document.documentElement.scrollTop = 0;
         document.body.scrollTop = 0;
-        return { found: injected.length > 0, count: injected.length };
+        return { found: injected.length > 0, count: injected.length, inViewport };
       })()
     `);
     console.log(`[GDN] 인젝션 검증: ${injectedCheck.found ? '✅' : '❌'} (${injectedCheck.count}개 요소)`);
+    this.diagnostics.injectedElementCount = injectedCheck.count;
+    this.diagnostics.injectedInViewport = injectedCheck.inViewport;
 
     // 🔑 스크롤 복원 후 충분한 렌더링 안정화 (블로터 등 동적 사이트 대응)
     await new Promise((r) => setTimeout(r, 2000));
@@ -373,27 +386,64 @@ export class GdnCapture extends BaseChannel {
     console.log(`[GDN] 스크롤 위치 확인: scrollY=${scrollCheck.scrollY}, bodyH=${scrollCheck.bodyH}`);
 
     // 8) 스크린샷 캡처 (fullPage 실패 시 뷰포트 폴백)
-    const screenshot = await this.safeCaptureScreenshot(page);
+    const screenshotResult = await this.safeCaptureScreenshot(page);
+    this.diagnostics.screenshotMode = screenshotResult.mode;
+    this.diagnostics.fullPageCaptureError = screenshotResult.errorMessage;
+    this.diagnostics.fallbackCenteredOnInjected = screenshotResult.centeredOnInjected ?? false;
 
     console.log(`[GDN] ===== 캡처 완료 (전체 페이지, ${injectedCount}/${slots.length}개 슬롯 인젝션) =====`);
 
-    return screenshot;
+    return screenshotResult.buffer;
   }
 
   /** fullPage 스크린샷 실패(메모리/프로토콜) 시 뷰포트 캡처로 폴백 */
-  private async safeCaptureScreenshot(page: IPageHandle): Promise<Buffer> {
+  private async safeCaptureScreenshot(
+    page: IPageHandle
+  ): Promise<{
+    buffer: Buffer;
+    mode: "fullPage" | "viewportFallback";
+    errorMessage?: string;
+    centeredOnInjected?: boolean;
+  }> {
     try {
-      return await page.screenshot({
+      const buffer = await page.screenshot({
         fullPage: true,
         type: "png",
       });
+      return { buffer, mode: "fullPage" };
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       console.warn(`[GDN] fullPage 캡처 실패 — viewport 폴백: ${msg}`);
-      return await page.screenshot({
+
+      // fullPage 실패 시, 주입된 광고가 뷰포트 밖이면 해당 위치로 이동해서 캡처
+      const centeredOnInjected = await page.evaluate<boolean>(`
+        (() => {
+          const target = document.querySelector('[data-injected="admate"], [data-injected="admate-wrapper"]') as HTMLElement | null;
+          if (!target) return false;
+          const rect = target.getBoundingClientRect();
+          const isVisibleNow = rect.bottom > 0 && rect.top < (window.innerHeight || 0);
+          if (isVisibleNow) return false;
+
+          const absoluteTop = (window.scrollY || 0) + rect.top;
+          const viewportH = window.innerHeight || 1080;
+          const targetY = Math.max(0, Math.round(absoluteTop - viewportH * 0.35));
+
+          window.scrollTo({ top: targetY, behavior: 'instant' });
+          document.documentElement.scrollTop = targetY;
+          document.body.scrollTop = targetY;
+          return true;
+        })()
+      `);
+
+      if (centeredOnInjected) {
+        await new Promise((r) => setTimeout(r, 400));
+      }
+
+      const buffer = await page.screenshot({
         fullPage: false,
         type: "png",
       });
+      return { buffer, mode: "viewportFallback", errorMessage: msg, centeredOnInjected };
     }
   }
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 
 /** 채널 타입 */
 type ChannelOption = {
@@ -447,6 +447,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
   const [showAllPresets, setShowAllPresets] = useState(false);
   const [showSizeGuide, setShowSizeGuide] = useState(false);
   const [customUrl, setCustomUrl] = useState("");
+  const [hardBlockedPresetUrls, setHardBlockedPresetUrls] = useState<string[]>([]);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [toast, setToast] = useState<{
@@ -462,6 +463,31 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
     },
     [],
   );
+
+  // 실패 이력(metadata.shouldRemoveFromPresetList=true) 기반으로 강차단 사이트 프리셋 자동 제외
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const res = await fetch(`/api/captures?status=failed&limit=200&_t=${Date.now()}`, {
+          cache: "no-store",
+        });
+        const json = await res.json();
+        if (!res.ok || !Array.isArray(json?.data) || !mounted) return;
+        const blocked = new Set<string>();
+        for (const row of json.data as Array<{ source_url?: string | null; metadata?: Record<string, unknown> | null }>) {
+          const shouldRemove = row.metadata?.shouldRemoveFromPresetList === true;
+          if (shouldRemove && row.source_url) blocked.add(row.source_url);
+        }
+        setHardBlockedPresetUrls(Array.from(blocked));
+      } catch {
+        // 비치명: 프리셋 차단 정보 조회 실패 시 기본 목록 유지
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   /** 파일 업로드 처리 */
   const handleFileUpload = async (file: File) => {
@@ -685,8 +711,10 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
   /** 필터링된 프리셋 */
   const filteredPresets =
     presetCategory === "전체"
-      ? PUBLISHER_PRESETS
-      : PUBLISHER_PRESETS.filter((p) => p.category === presetCategory);
+      ? PUBLISHER_PRESETS.filter((p) => !hardBlockedPresetUrls.includes(p.url))
+      : PUBLISHER_PRESETS.filter(
+          (p) => p.category === presetCategory && !hardBlockedPresetUrls.includes(p.url),
+        );
 
   const visiblePresets = showAllPresets
     ? filteredPresets

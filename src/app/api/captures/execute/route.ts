@@ -44,6 +44,7 @@ export async function POST(request: NextRequest) {
     try {
       for (const captureId of captureIds) {
         const captureStart = Date.now();
+        let captureMetadata: Record<string, unknown> = {};
 
         try {
           // 1) 캡처 요청 조회
@@ -93,22 +94,27 @@ export async function POST(request: NextRequest) {
           const channel = createChannel(resolvedChannel, sharedEngine);
 
           // 5) 캡처 실행
-          const captureMetadata = (capture as any).metadata ?? {};
-          const result = await channel.execute({
-            publisherUrl: capture.source_url ?? "",
-            creativeUrl: capture.creative_url,
-            captureLanding: capture.capture_landing,
-            clickUrl: capture.click_url ?? undefined,
-            options: {
-              injectionMode: captureMetadata.injectionMode ?? "single",
-              slotCount: captureMetadata.slotCount ?? 1,
-              creativeDimensions: captureMetadata.creativeDimensions ?? undefined,
-              adSizeMode: captureMetadata.adSizeMode ?? "auto",
-              targetAdSizes: captureMetadata.targetAdSizes ?? [],
-              youtubeAdType: captureMetadata.youtubeAdType ?? "preroll",
-              instreamOpts: captureMetadata.instreamOpts,
-            },
-          });
+          captureMetadata = ((capture as any).metadata ?? {}) as Record<string, unknown>;
+          const result = await executeWithRetry(
+            () =>
+              channel.execute({
+                publisherUrl: capture.source_url ?? "",
+                creativeUrl: capture.creative_url,
+                captureLanding: capture.capture_landing,
+                clickUrl: capture.click_url ?? undefined,
+                options: {
+                  injectionMode: captureMetadata.injectionMode ?? "single",
+                  slotCount: captureMetadata.slotCount ?? 1,
+                  creativeDimensions: captureMetadata.creativeDimensions ?? undefined,
+                  adSizeMode: captureMetadata.adSizeMode ?? "auto",
+                  targetAdSizes: captureMetadata.targetAdSizes ?? [],
+                  youtubeAdType: captureMetadata.youtubeAdType ?? "preroll",
+                  instreamOpts: captureMetadata.instreamOpts,
+                },
+              }),
+            2,
+            120000
+          );
 
           // 6) Supabase Storage에 업로드
           const timestamp = Date.now();
@@ -154,6 +160,7 @@ export async function POST(request: NextRequest) {
 
           // 진단 정보 수집 (GdnCapture인 경우)
           const diagnostics = (channel as any).getDiagnostics?.() ?? null;
+          const successCategory = classifySuccessCategory(diagnostics);
 
           await supabase
             .from("vision_da_captures")
@@ -167,6 +174,7 @@ export async function POST(request: NextRequest) {
                 ...captureMetadata,
                 capturedAt: result.capturedAt,
                 durationMs,
+                resultCategory: successCategory,
                 diagnostics,
                 runtime: {
                   capturedAt: result.capturedAt,
@@ -184,12 +192,20 @@ export async function POST(request: NextRequest) {
         } catch (captureError) {
           // 개별 캡처 실패 → DB 상태 업데이트 후 다음 캡처 계속
           const errorMessage = captureError instanceof Error ? captureError.message : "알 수 없는 오류";
+          const failureInfo = classifyFailureReason(captureError);
 
           await supabase
             .from("vision_da_captures")
             .update({
               status: "failed",
               error_message: errorMessage,
+              metadata: {
+                ...captureMetadata,
+                failureCategory: failureInfo.category,
+                failureCode: failureInfo.code,
+                shouldRemoveFromPresetList: failureInfo.hardBlocked,
+                failedAt: new Date().toISOString(),
+              },
               updated_at: new Date().toISOString(),
             })
             .eq("id", captureId);
@@ -256,4 +272,82 @@ function isBrowserSessionClosedError(err: unknown): boolean {
     message.includes("most likely the page has been closed") ||
     message.includes("protocol error (page.capturescreenshot)")
   );
+}
+
+function classifySuccessCategory(diagnostics: any): "ad_capture_ok" | "ad_area_not_found" | "ad_out_of_viewport" {
+  const slotsDetected = Number(diagnostics?.slotsDetected ?? 0);
+  const slotsInjected = Number(diagnostics?.slotsInjected ?? 0);
+  const screenshotMode = diagnostics?.screenshotMode;
+  const injectedInViewport = diagnostics?.injectedInViewport;
+  const fallbackCenteredOnInjected = diagnostics?.fallbackCenteredOnInjected === true;
+
+  if (slotsDetected <= 0 || slotsInjected <= 0) {
+    return "ad_area_not_found";
+  }
+
+  if (
+    screenshotMode === "viewportFallback" &&
+    injectedInViewport === false &&
+    !fallbackCenteredOnInjected
+  ) {
+    return "ad_out_of_viewport";
+  }
+
+  return "ad_capture_ok";
+}
+
+function classifyFailureReason(err: unknown): { category: string; code: string; hardBlocked: boolean } {
+  const message = (err instanceof Error ? err.message : String(err)).toLowerCase();
+
+  if (
+    message.includes("access denied") ||
+    message.includes("forbidden") ||
+    message.includes("cloudflare") ||
+    message.includes("captcha") ||
+    message.includes("request blocked")
+  ) {
+    return { category: "blocked", code: "hard_blocked_by_site", hardBlocked: true };
+  }
+
+  if (isBrowserSessionClosedError(err)) {
+    return { category: "runtime", code: "browser_session_closed", hardBlocked: false };
+  }
+
+  if (message.includes("timeout")) {
+    return { category: "timeout", code: "capture_timeout", hardBlocked: false };
+  }
+
+  return { category: "runtime", code: "unknown_capture_error", hardBlocked: false };
+}
+
+async function executeWithRetry<T>(
+  fn: () => Promise<T>,
+  maxRetries: number,
+  timeoutMs: number
+): Promise<T> {
+  let lastErr: unknown;
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await withTimeout(fn(), timeoutMs);
+    } catch (err) {
+      lastErr = err;
+      if (attempt >= maxRetries) break;
+      console.warn(`[Execute] 재시도 ${attempt + 1}/${maxRetries} 실패 — 재시도 진행`);
+    }
+  }
+  throw lastErr instanceof Error ? lastErr : new Error(String(lastErr ?? "retry failed"));
+}
+
+async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  let timeoutHandle: ReturnType<typeof setTimeout> | null = null;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<T>((_, reject) => {
+        timeoutHandle = setTimeout(() => reject(new Error(`Capture timeout (${ms}ms)`)), ms);
+      }),
+    ]);
+  } finally {
+    if (timeoutHandle) clearTimeout(timeoutHandle);
+  }
 }

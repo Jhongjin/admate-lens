@@ -85,6 +85,24 @@ function getYoutubeMeta(metadata: Record<string, unknown> | null): {
   return { adType, captureSecond };
 }
 
+function getResultCategoryLabel(metadata: Record<string, unknown> | null): string | null {
+  const code = typeof metadata?.resultCategory === "string" ? metadata.resultCategory : null;
+  if (!code) return null;
+  if (code === "ad_capture_ok") return "광고 캡처 정상";
+  if (code === "ad_area_not_found") return "광고 캡처 영역 없음";
+  if (code === "ad_out_of_viewport") return "광고영역 하단(상단 미포함)";
+  return null;
+}
+
+function getFailureCategoryLabel(metadata: Record<string, unknown> | null): string | null {
+  const code = typeof metadata?.failureCode === "string" ? metadata.failureCode : null;
+  if (!code) return null;
+  if (code === "hard_blocked_by_site") return "사이트 강차단";
+  if (code === "browser_session_closed") return "브라우저 세션 종료";
+  if (code === "capture_timeout") return "처리 타임아웃";
+  return "실행 오류";
+}
+
 export default function CaptureList({ refreshTrigger }: CaptureListProps) {
   const [captures, setCaptures] = useState<CaptureRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -423,6 +441,16 @@ export default function CaptureList({ refreshTrigger }: CaptureListProps) {
                     {capture.status === "failed" && capture.error_message && (
                       <p className="text-xs text-[var(--color-error)] mt-1 truncate">
                         {capture.error_message}
+                      </p>
+                    )}
+                    {capture.status === "completed" && capture.metadata && typeof capture.metadata === "object" && (
+                      <p className="text-[11px] text-[var(--color-text-muted)] mt-1">
+                        {getResultCategoryLabel(capture.metadata)}
+                      </p>
+                    )}
+                    {capture.status === "failed" && capture.metadata && typeof capture.metadata === "object" && (
+                      <p className="text-[11px] text-[var(--color-text-muted)] mt-1">
+                        {getFailureCategoryLabel(capture.metadata)}
                       </p>
                     )}
                   </div>
