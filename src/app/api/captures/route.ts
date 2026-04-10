@@ -58,7 +58,7 @@ export async function POST(request: NextRequest) {
       creativeDimensions?: { width: number; height: number };
       adSizeMode?: "auto" | "manual";
       targetAdSizes?: string[];
-      youtubeAdType?: "preroll" | "display" | "overlay";
+      youtubeAdType?: "preroll" | "display" | "overlay" | "mobile-preroll-aos" | "mobile-preroll-ios";
       instreamOpts?: {
         videoUrl?: string;
         skipSeconds?: number;
@@ -84,9 +84,13 @@ export async function POST(request: NextRequest) {
         ? [publisherUrl]
         : [];
 
-    // 인스트림 광고는 creativeUrl 대신 videoUrl 사용
+    // 인스트림 광고는 creativeUrl 대신 videoUrl 사용 (PC/모바일 공통)
     const normalizedUrls = urls.filter((url) => isValidHttpUrl(url));
-    const isPreroll = channel === "youtube" && youtubeAdType === "preroll";
+    const isPreroll =
+      channel === "youtube" &&
+      (youtubeAdType === "preroll" ||
+        youtubeAdType === "mobile-preroll-aos" ||
+        youtubeAdType === "mobile-preroll-ios");
     const hasValidVideoSource = isPreroll && isValidHttpUrl(instreamOpts?.videoUrl);
     const hasValidCreativeSource = !isPreroll && isValidHttpUrl(creativeUrl);
     const hasSource = hasValidVideoSource || hasValidCreativeSource;
