@@ -13,12 +13,10 @@ import { createServerClient } from "@/lib/supabase/client";
 import { createChannel } from "@/lib/capture";
 import type { VisionDaCaptureRow, ChannelType } from "@/lib/supabase/types";
 import { PuppeteerEngine } from "@/lib/capture/engine/puppeteer-engine";
+import { isGdnExcludedHost } from "@/lib/capture/channels/gdn/host-strategies";
 
 export const maxDuration = 300; // 5분
 export const dynamic = "force-dynamic";
-const EXCLUDED_CAPTURE_HOSTS = new Set<string>([
-  "news.kbs.co.kr",
-]);
 
 export async function POST(request: NextRequest) {
   const startTime = Date.now();
@@ -77,7 +75,7 @@ export async function POST(request: NextRequest) {
           }
 
           // 운영 제외 호스트: 캡처 시도하지 않고 즉시 실패 처리 + 프리셋 제거 플래그
-          if (host && EXCLUDED_CAPTURE_HOSTS.has(host)) {
+          if (capture.channel === "gdn" && host && isGdnExcludedHost(host)) {
             await supabase
               .from("vision_da_captures")
               .update({

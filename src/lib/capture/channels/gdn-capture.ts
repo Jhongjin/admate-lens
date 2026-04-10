@@ -11,6 +11,10 @@ import type { IPageHandle } from "../engine/browser-engine";
 import { BaseChannel, type CaptureRequest } from "./base-channel";
 import { detectAdSlots, type DetectedSlot } from "../injection/ad-slot-detector";
 import { injectCreative, type InjectionResult } from "../injection/creative-injector";
+import {
+  getGdnScreenshotPolicy,
+  prioritizeGdnSlotsByHost,
+} from "./gdn/host-strategies";
 
 /** 캡처 진단 정보 */
 export interface CaptureDiagnostics {
@@ -79,9 +83,6 @@ async function imageUrlToDataUrl(imageUrl: string): Promise<{ dataUrl: string; s
 }
 
 export class GdnCapture extends BaseChannel {
-  private static readonly FORCE_CENTERED_VIEWPORT_HOSTS = new Set<string>([
-    "news.sbs.co.kr",
-  ]);
   // 진단 정보 저장용
   private diagnostics: CaptureDiagnostics | null = null;
 
@@ -355,7 +356,7 @@ export class GdnCapture extends BaseChannel {
     }
 
     // 도메인별 최종 우선순위는 정렬/필터링이 모두 끝난 뒤에 적용해야 덮어써지지 않음
-    this.prioritizeHostSpecificSlots(host, slots);
+    prioritizeGdnSlotsByHost(host, slots);
 
     // 5) 소재 인젝션 — injectionMode에 따라 동작
     const injectionMode = (request.options?.injectionMode as string) || "single";
@@ -482,7 +483,7 @@ export class GdnCapture extends BaseChannel {
     const bodyHeight = context?.bodyHeight ?? 0;
     const host = context?.host ?? "";
     const isHugePage = slotsDetected >= 200 || bodyHeight >= 7000;
-    const forceCenteredViewport = GdnCapture.FORCE_CENTERED_VIEWPORT_HOSTS.has(host);
+    const forceCenteredViewport = getGdnScreenshotPolicy(host) === "force_centered_viewport";
 
     if (forceCenteredViewport) {
       console.log(`[GDN] 📌 호스트 정책 캡처 적용: ${host} (타겟 중심 viewport)`);
@@ -694,32 +695,6 @@ export class GdnCapture extends BaseChannel {
     } catch {
       return "";
     }
-  }
-
-  private prioritizeHostSpecificSlots(host: string, slots: DetectedSlot[]): void {
-    if (!host || slots.length <= 1) return;
-
-    if (host === "news.sbs.co.kr") {
-      slots.sort((a, b) => this.calcSbsSlotScore(b) - this.calcSbsSlotScore(a));
-      console.log("[GDN] 🧭 SBS 전용 슬롯 우선순위 적용");
-    }
-  }
-
-  private calcSbsSlotScore(slot: DetectedSlot): number {
-    const sel = (slot.selector || "").toLowerCase();
-    let score = slot.confidence;
-
-    if (slot.type === "gdn-iframe") score += 120;
-    if (sel.includes("google_ads_iframe")) score += 120;
-    if (sel.includes("div-gpt-ad")) score += 100;
-    if (sel.includes("adsbygoogle")) score += 90;
-    if (sel.includes("ad_area") || sel.includes("ads-area") || sel.includes("banner")) score += 40;
-
-    // SBS에서 자주 잡히는 콘텐츠 섹션형 오탐은 강하게 감점
-    if (slot.type === "size-match" && (sel.includes("> section") || sel.includes("> article"))) score -= 120;
-    if (sel.includes("#container > div:nth-child")) score -= 70;
-
-    return score;
   }
 
   /** 최종 폴백: 광고가 있을만한 위치에 강제 오버레이 */
