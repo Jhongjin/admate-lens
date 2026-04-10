@@ -47,6 +47,7 @@ export async function POST(request: NextRequest) {
       for (const captureId of captureIds) {
         const captureStart = Date.now();
         let captureMetadata: Record<string, unknown> = {};
+        let sourceUrlForFailure: string | null = null;
 
         try {
           // 1) 캡처 요청 조회
@@ -62,6 +63,7 @@ export async function POST(request: NextRequest) {
           }
 
           const capture = data as unknown as VisionDaCaptureRow;
+          sourceUrlForFailure = capture.source_url ?? null;
           captureMetadata = ((capture as any).metadata ?? {}) as Record<string, unknown>;
           const host = getHostname(capture.source_url ?? null);
 
@@ -219,7 +221,7 @@ export async function POST(request: NextRequest) {
           // 개별 캡처 실패 → DB 상태 업데이트 후 다음 캡처 계속
           const errorMessage = captureError instanceof Error ? captureError.message : "알 수 없는 오류";
           const failureInfo = classifyFailureReason(captureError);
-          const host = getHostname((capture as any)?.source_url ?? null);
+          const host = getHostname(sourceUrlForFailure);
 
           await supabase
             .from("vision_da_captures")

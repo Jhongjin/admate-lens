@@ -184,6 +184,7 @@ async function executeBatchCaptures(captureIds: string[]): Promise<void> {
     for (const captureId of captureIds) {
       const captureStart = Date.now();
       let captureMetadata: Record<string, unknown> = {};
+      let sourceUrlForFailure: string | null = null;
 
       try {
         // 1) 캡처 요청 조회
@@ -199,6 +200,7 @@ async function executeBatchCaptures(captureIds: string[]): Promise<void> {
         }
 
         const capture = data as unknown as VisionDaCaptureRow;
+        sourceUrlForFailure = capture.source_url ?? null;
         captureMetadata = ((capture as any).metadata ?? {}) as Record<string, unknown>;
         const host = getHostname(capture.source_url ?? null);
 
@@ -339,7 +341,7 @@ async function executeBatchCaptures(captureIds: string[]): Promise<void> {
       } catch (captureError) {
         const errorMessage = captureError instanceof Error ? captureError.message : "알 수 없는 오류";
         const failureInfo = classifyFailureReason(captureError);
-        const host = getHostname((capture as any)?.source_url ?? null);
+        const host = getHostname(sourceUrlForFailure);
 
         await supabase
           .from("vision_da_captures")
