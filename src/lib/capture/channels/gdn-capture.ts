@@ -418,7 +418,7 @@ export class GdnCapture extends BaseChannel {
       // fullPage 실패 시, 주입된 광고가 뷰포트 밖이면 해당 위치로 이동해서 캡처
       const centeredOnInjected = await page.evaluate<boolean>(`
         (() => {
-          const target = document.querySelector('[data-injected="admate"], [data-injected="admate-wrapper"]') as HTMLElement | null;
+          const target = document.querySelector('[data-injected="admate"], [data-injected="admate-wrapper"]');
           if (!target) return false;
           const rect = target.getBoundingClientRect();
           const isVisibleNow = rect.bottom > 0 && rect.top < (window.innerHeight || 0);

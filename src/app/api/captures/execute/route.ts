@@ -113,7 +113,7 @@ export async function POST(request: NextRequest) {
                 },
               }),
             2,
-            120000
+            90000
           );
 
           // 6) Supabase Storage에 업로드
@@ -320,19 +320,15 @@ function classifyFailureReason(err: unknown): { category: string; code: string; 
   return { category: "runtime", code: "unknown_capture_error", hardBlocked: false };
 }
 
-async function executeWithRetry<T>(
-  fn: () => Promise<T>,
-  maxRetries: number,
-  timeoutMs: number
-): Promise<T> {
+async function executeWithRetry<T>(fn: () => Promise<T>, maxAttempts: number, timeoutMs: number): Promise<T> {
   let lastErr: unknown;
-  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
       return await withTimeout(fn(), timeoutMs);
     } catch (err) {
       lastErr = err;
-      if (attempt >= maxRetries) break;
-      console.warn(`[Execute] 재시도 ${attempt + 1}/${maxRetries} 실패 — 재시도 진행`);
+      if (attempt >= maxAttempts) break;
+      console.warn(`[Execute] 시도 ${attempt}/${maxAttempts} 실패 — 다음 시도 진행`);
     }
   }
   throw lastErr instanceof Error ? lastErr : new Error(String(lastErr ?? "retry failed"));
