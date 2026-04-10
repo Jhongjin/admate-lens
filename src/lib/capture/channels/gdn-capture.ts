@@ -33,6 +33,17 @@ export interface CaptureDiagnostics {
   fallbackCenteredOnInjected?: boolean;
 }
 
+const COMMON_GDN_SIZES = [
+  { w: 300, h: 250, tolerance: 60 },
+  { w: 336, h: 280, tolerance: 60 },
+  { w: 728, h: 90, tolerance: 70 },
+  { w: 970, h: 250, tolerance: 80 },
+  { w: 970, h: 90, tolerance: 70 },
+  { w: 320, h: 100, tolerance: 50 },
+  { w: 300, h: 600, tolerance: 80 },
+  { w: 160, h: 600, tolerance: 80 },
+];
+
 /**
  * 이미지 URL → base64 data URL 변환 (서버 측)
  */
@@ -266,6 +277,18 @@ export class GdnCapture extends BaseChannel {
       });
 
     } else if (creativeDims && creativeDims.width > 0 && creativeDims.height > 0) {
+      const oversizedCreative = creativeDims.width > 1200 || creativeDims.height > 700;
+      if (oversizedCreative) {
+        console.log(
+          `[GDN] ⚠️ 대형 소재 감지(${creativeDims.width}x${creativeDims.height}) — 표준 광고 슬롯 우선 모드로 전환`
+        );
+        slots.sort((a, b) => {
+          const scoreA = this.calcCommonGdnScore(a);
+          const scoreB = this.calcCommonGdnScore(b);
+          if (scoreB !== scoreA) return scoreB - scoreA;
+          return b.confidence - a.confidence;
+        });
+      } else {
       // ✨ 자동 모드: 업로드된 배너와 유사한 슬롯을 우선 정렬
       console.log(`[GDN] ✨ 자동 사이즈 매칭: ${creativeDims.width}x${creativeDims.height}`);
       const creativeAspect = creativeDims.width / creativeDims.height;
@@ -284,6 +307,7 @@ export class GdnCapture extends BaseChannel {
         const score = this.calcSizeMatchScore(s, creativeDims, creativeAspect);
         console.log(`[GDN]   [${i}] ${s.width}x${s.height} matchScore:${score.toFixed(1)} conf:${s.confidence}`);
       });
+      }
     }
 
     // 콘텐츠 카드로 오탐된 슬롯(특히 section 기반 size-match)은 우선 제외
@@ -586,8 +610,11 @@ export class GdnCapture extends BaseChannel {
     const contentPattern =
       sel.includes("> section") ||
       sel.includes("> article") ||
+      sel.includes("> figure") ||
       sel.includes("> li:nth-child") ||
-      sel.includes("#container > div:nth-child");
+      sel.includes("#container > div:nth-child") ||
+      sel.includes("#artwrapper") ||
+      sel.includes("#fusion-app");
     const hasAdHint =
       sel.includes("google_ads") ||
       sel.includes("div-gpt-ad") ||
@@ -597,6 +624,19 @@ export class GdnCapture extends BaseChannel {
       sel.includes("banner");
 
     return slot.type === "size-match" && contentPattern && !hasAdHint;
+  }
+
+  private calcCommonGdnScore(slot: DetectedSlot): number {
+    let best = -999;
+    for (const s of COMMON_GDN_SIZES) {
+      const wDiff = Math.abs(slot.width - s.w);
+      const hDiff = Math.abs(slot.height - s.h);
+      if (wDiff <= s.tolerance && hDiff <= s.tolerance) {
+        const score = 200 - (wDiff + hDiff);
+        if (score > best) best = score;
+      }
+    }
+    return best;
   }
 
   /** 최종 폴백: 광고가 있을만한 위치에 강제 오버레이 */
