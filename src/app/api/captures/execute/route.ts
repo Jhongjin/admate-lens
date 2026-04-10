@@ -327,6 +327,21 @@ async function executeWithRetry<T>(fn: () => Promise<T>, maxAttempts: number, ti
       return await withTimeout(fn(), timeoutMs);
     } catch (err) {
       lastErr = err;
+      // 세션 종료/연결 종료는 외부 엔진 재시작 로직에 맡김
+      if (isBrowserSessionClosedError(err)) {
+        break;
+      }
+
+      // 타임아웃 계열만 재시도
+      const msg = (err instanceof Error ? err.message : String(err)).toLowerCase();
+      const retryableTimeout =
+        msg.includes("capture timeout") ||
+        msg.includes("timeout") ||
+        msg.includes("timed out");
+      if (!retryableTimeout) {
+        break;
+      }
+
       if (attempt >= maxAttempts) break;
       console.warn(`[Execute] 시도 ${attempt}/${maxAttempts} 실패 — 다음 시도 진행`);
     }
