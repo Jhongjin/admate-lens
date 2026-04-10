@@ -57,17 +57,9 @@ export async function injectCreative(
       const slotY = ${slot.y};
       const fit = ${fitToSlot};
       const tagName = ${JSON.stringify(slot.tagName)};
-      const creativeW = ${creativeDimensions?.width ?? 0};
-      const creativeH = ${creativeDimensions?.height ?? 0};
-      const creativeAspect = creativeW > 0 && creativeH > 0 ? (creativeW / creativeH) : 0;
-      const slotAspect = slotW > 0 && slotH > 0 ? (slotW / slotH) : 0;
-      const aspectDiff = (creativeAspect > 0 && slotAspect > 0)
-        ? Math.abs(Math.log(creativeAspect) - Math.log(slotAspect))
-        : 0;
-      const oversizedCreative = creativeW > 1200 || creativeH > 700;
-      const objectFitMode = oversizedCreative
-        ? 'contain'
-        : (aspectDiff > 0.42 ? 'contain' : 'cover');
+      // 정책: 종횡비 유지 + 광고영역 꽉 채움(일부 잘림 허용)
+      // 즉, letterbox(여백) 방지를 위해 항상 cover 사용
+      const objectFitMode = 'cover';
 
       console.log('[Injector] 인젝션 시도:', selector, tagName, slotW + 'x' + slotH);
 
