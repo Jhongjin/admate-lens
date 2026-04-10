@@ -82,11 +82,20 @@ export function runPrerollInjectInPage(...args: unknown[]): boolean {
       }
     }
 
-    if (isMobile && pw < 80) {
-      pw = window.innerWidth;
-      ph = Math.round((pw * 9) / 16);
+    if (isMobile) {
+      // 모바일은 플레이어 폭이 부분적으로 감지되는 경우가 많아
+      // 오버레이를 항상 뷰포트 전체 폭에 정렬한다.
+      const headerOffset = 56;
+      const minTop = 0;
+      const maxTop = Math.max(0, window.innerHeight - 120);
+      py = Math.min(maxTop, Math.max(minTop, Math.round(py || headerOffset)));
       px = 0;
-      py = 56;
+      pw = window.innerWidth;
+      if (ph < 80) {
+        ph = Math.round((pw * 9) / 16);
+      } else {
+        ph = Math.min(ph, Math.max(120, window.innerHeight - py - 40));
+      }
     }
 
     const playerRadius = "12px";
