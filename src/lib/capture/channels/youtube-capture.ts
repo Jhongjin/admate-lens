@@ -731,8 +731,8 @@ export class YouTubeCapture extends BaseChannel {
           removePopups();
 
           const key = '__admate_popup_observer_installed__';
-          if (!(window as any)[key]) {
-            (window as any)[key] = true;
+          if (!window[key]) {
+            window[key] = true;
             const obs = new MutationObserver(() => removePopups());
             obs.observe(document.documentElement, { childList: true, subtree: true });
           }
