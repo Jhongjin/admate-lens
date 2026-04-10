@@ -15,6 +15,9 @@ import type { ChannelType, VisionDaCaptureRow } from "@/lib/supabase/types";
 
 export const maxDuration = 300; // 5분
 export const dynamic = "force-dynamic";
+const EXCLUDED_CAPTURE_HOSTS = new Set<string>([
+  "news.kbs.co.kr",
+]);
 
 function isValidHttpUrl(value?: string | null): boolean {
   if (!value) return false;
@@ -209,6 +212,28 @@ async function executeBatchCaptures(captureIds: string[]): Promise<void> {
           continue;
         }
 
+        // 운영 제외 호스트: 캡처 시도하지 않고 즉시 실패 처리 + 프리셋 제거 플래그
+        if (host && EXCLUDED_CAPTURE_HOSTS.has(host)) {
+          await supabase
+            .from("vision_da_captures")
+            .update({
+              status: "failed",
+              error_message: `운영 제외 사이트로 캡처를 건너뜀 (${host})`,
+              metadata: {
+                ...captureMetadata,
+                failureCategory: "policy",
+                failureCode: "site_excluded_policy",
+                shouldRemoveFromPresetList: true,
+                excludedHost: host,
+                failedAt: new Date().toISOString(),
+              },
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", captureId);
+          console.warn(`[BatchCapture] ⛔ 운영 제외 사이트 스킵: ${host} (${captureId})`);
+          continue;
+        }
+
         // 사이트 격리 큐: 배치 중 격리된 도메인은 즉시 스킵(실패 기록) 후 다음 작업 진행
         if (host && isolatedHosts.has(host)) {
           const isolateReason = isolatedHosts.get(host) ?? "isolated-host";
@@ -266,8 +291,8 @@ async function executeBatchCaptures(captureIds: string[]): Promise<void> {
                 instreamOpts: captureMetadata.instreamOpts,
               },
             }),
-          2,
-          90000
+          1,
+          60000
         );
 
         // 6) Storage 업로드
@@ -374,9 +399,9 @@ async function executeBatchCaptures(captureIds: string[]): Promise<void> {
           }
         }
 
-        // 브라우저 세션이 죽은 경우(타겟/연결 종료) 다음 건을 위해 엔진 재시작
-        if (isBrowserSessionClosedError(captureError)) {
-          console.warn("[BatchCapture] ♻️ 브라우저 세션 종료 감지 — 엔진 재시작");
+        // 세션 종료/타임아웃/프레임 분리 에러는 엔진 강제 재시작으로 좀비 작업 정리
+        if (isRecoverableEngineError(captureError)) {
+          console.warn("[BatchCapture] ♻️ 복구 가능 엔진 에러 감지 — 엔진 재시작");
           try {
             if (engineLaunched) {
               await sharedEngine.close();
@@ -396,6 +421,21 @@ async function executeBatchCaptures(captureIds: string[]): Promise<void> {
       }
     }
   } finally {
+    // 배치 중단/예외로 남은 processing 정리 (고착 방지)
+    try {
+      await supabase
+        .from("vision_da_captures")
+        .update({
+          status: "failed",
+          error_message: "배치 실행이 중단되어 자동 종료되었습니다.",
+          updated_at: new Date().toISOString(),
+        })
+        .in("id", captureIds)
+        .eq("status", "processing");
+    } catch (cleanupErr) {
+      console.warn("[BatchCapture] processing 정리 실패:", cleanupErr);
+    }
+
     if (engineLaunched) {
       await sharedEngine.close();
       console.log(`[BatchCapture] 🛑 Chromium 종료`);
@@ -415,6 +455,24 @@ function isBrowserSessionClosedError(err: unknown): boolean {
     message.includes("most likely the page has been closed") ||
     message.includes("protocol error (page.capturescreenshot)")
   );
+}
+
+function isCaptureTimeoutError(err: unknown): boolean {
+  const message = (err instanceof Error ? err.message : String(err)).toLowerCase();
+  return message.includes("capture timeout") || message.includes("timed out") || message.includes("timeout");
+}
+
+function isDetachedFrameError(err: unknown): boolean {
+  const message = (err instanceof Error ? err.message : String(err)).toLowerCase();
+  return (
+    message.includes("detached frame") ||
+    message.includes("navigating frame was detached") ||
+    message.includes("execution context was destroyed")
+  );
+}
+
+function isRecoverableEngineError(err: unknown): boolean {
+  return isBrowserSessionClosedError(err) || isCaptureTimeoutError(err) || isDetachedFrameError(err);
 }
 
 function getHostname(url: string | null): string | null {
@@ -535,7 +593,7 @@ export async function GET(request: NextRequest) {
   try {
     const supabase = createServerClient();
     const { searchParams } = new URL(request.url);
-    const staleThresholdIso = new Date(Date.now() - 15 * 60 * 1000).toISOString();
+    const staleThresholdIso = new Date(Date.now() - 5 * 60 * 1000).toISOString();
 
     // 오래된 processing 상태 자동 정리 (워커 중단/세션 종료 후 고착 방지)
     await supabase

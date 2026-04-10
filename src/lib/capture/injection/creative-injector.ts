@@ -64,7 +64,10 @@ export async function injectCreative(
       const aspectDiff = (creativeAspect > 0 && slotAspect > 0)
         ? Math.abs(Math.log(creativeAspect) - Math.log(slotAspect))
         : 0;
-      const objectFitMode = aspectDiff > 0.42 ? 'contain' : 'cover';
+      const oversizedCreative = creativeW > 1200 || creativeH > 700;
+      const objectFitMode = oversizedCreative
+        ? 'contain'
+        : (aspectDiff > 0.42 ? 'contain' : 'cover');
 
       console.log('[Injector] 인젝션 시도:', selector, tagName, slotW + 'x' + slotH);
 
@@ -105,8 +108,9 @@ export async function injectCreative(
           'opacity: 1 !important',
           'position: relative !important',
           'z-index: 10 !important',
-          fit ? 'width: ' + slotW + 'px !important' : '',
-          fit ? 'height: ' + slotH + 'px !important' : '',
+          fit ? 'width: 100% !important' : '',
+          fit ? 'height: 100% !important' : '',
+          fit ? 'min-height: 100% !important' : '',
         ].filter(Boolean).join('; ');
         return wrapper;
       }
@@ -202,8 +206,8 @@ export async function injectCreative(
           'opacity: 1 !important',
           'position: relative !important',
           'z-index: 10 !important',
-          fit ? 'width: ' + slotW + 'px !important' : '',
-          fit ? 'height: ' + slotH + 'px !important' : '',
+          fit ? 'width: 100% !important' : '',
+          fit ? 'height: 100% !important' : '',
           'min-height: 0 !important',
         ].filter(Boolean).join('; ');
 

@@ -16,6 +16,9 @@ import { PuppeteerEngine } from "@/lib/capture/engine/puppeteer-engine";
 
 export const maxDuration = 300; // 5분
 export const dynamic = "force-dynamic";
+const EXCLUDED_CAPTURE_HOSTS = new Set<string>([
+  "news.kbs.co.kr",
+]);
 
 export async function POST(request: NextRequest) {
   const startTime = Date.now();
@@ -70,6 +73,28 @@ export async function POST(request: NextRequest) {
           // 이미 처리 중이거나 완료된 경우 건너뛰기
           if (capture.status !== "pending") {
             results.push({ captureId, success: false, error: `이미 처리된 요청입니다 (status: ${capture.status})` });
+            continue;
+          }
+
+          // 운영 제외 호스트: 캡처 시도하지 않고 즉시 실패 처리 + 프리셋 제거 플래그
+          if (host && EXCLUDED_CAPTURE_HOSTS.has(host)) {
+            await supabase
+              .from("vision_da_captures")
+              .update({
+                status: "failed",
+                error_message: `운영 제외 사이트로 캡처를 건너뜀 (${host})`,
+                metadata: {
+                  ...captureMetadata,
+                  failureCategory: "policy",
+                  failureCode: "site_excluded_policy",
+                  shouldRemoveFromPresetList: true,
+                  excludedHost: host,
+                  failedAt: new Date().toISOString(),
+                },
+                updated_at: new Date().toISOString(),
+              })
+              .eq("id", captureId);
+            results.push({ captureId, success: false, error: `운영 제외 사이트 스킵: ${host}` });
             continue;
           }
 
@@ -140,8 +165,8 @@ export async function POST(request: NextRequest) {
                   instreamOpts: captureMetadata.instreamOpts,
                 },
               }),
-            2,
-            90000
+            1,
+            60000
           );
 
           // 6) Supabase Storage에 업로드
@@ -255,9 +280,9 @@ export async function POST(request: NextRequest) {
             }
           }
 
-          // 브라우저 세션 종료 에러면 엔진 재시작 후 다음 캡처 계속
-          if (isBrowserSessionClosedError(captureError)) {
-            console.warn("[Execute] ♻️ 브라우저 세션 종료 감지 — 엔진 재시작");
+          // 세션 종료/타임아웃/프레임 분리 에러는 엔진 강제 재시작으로 좀비 작업 정리
+          if (isRecoverableEngineError(captureError)) {
+            console.warn("[Execute] ♻️ 세션 이상/타임아웃 감지 — 엔진 재시작");
             try {
               if (engineLaunched) {
                 await sharedEngine.close();
@@ -277,6 +302,21 @@ export async function POST(request: NextRequest) {
         }
       }
     } finally {
+      // 배치 중단/예외로 남은 processing 정리 (고착 방지)
+      try {
+        await supabase
+          .from("vision_da_captures")
+          .update({
+            status: "failed",
+            error_message: "배치 실행이 중단되어 자동 종료되었습니다.",
+            updated_at: new Date().toISOString(),
+          })
+          .in("id", captureIds)
+          .eq("status", "processing");
+      } catch (cleanupErr) {
+        console.warn("[Execute] processing 정리 실패:", cleanupErr);
+      }
+
       // 🔑 모든 캡처 완료 후 브라우저 종료
       if (engineLaunched) {
         await sharedEngine.close();
@@ -314,6 +354,24 @@ function isBrowserSessionClosedError(err: unknown): boolean {
     message.includes("most likely the page has been closed") ||
     message.includes("protocol error (page.capturescreenshot)")
   );
+}
+
+function isCaptureTimeoutError(err: unknown): boolean {
+  const message = (err instanceof Error ? err.message : String(err)).toLowerCase();
+  return message.includes("capture timeout") || message.includes("timed out") || message.includes("timeout");
+}
+
+function isDetachedFrameError(err: unknown): boolean {
+  const message = (err instanceof Error ? err.message : String(err)).toLowerCase();
+  return (
+    message.includes("detached frame") ||
+    message.includes("navigating frame was detached") ||
+    message.includes("execution context was destroyed")
+  );
+}
+
+function isRecoverableEngineError(err: unknown): boolean {
+  return isBrowserSessionClosedError(err) || isCaptureTimeoutError(err) || isDetachedFrameError(err);
 }
 
 function getHostname(url: string | null): string | null {

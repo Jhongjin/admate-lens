@@ -79,6 +79,9 @@ async function imageUrlToDataUrl(imageUrl: string): Promise<{ dataUrl: string; s
 }
 
 export class GdnCapture extends BaseChannel {
+  private static readonly FORCE_CENTERED_VIEWPORT_HOSTS = new Set<string>([
+    "news.sbs.co.kr",
+  ]);
   // 진단 정보 저장용
   private diagnostics: CaptureDiagnostics | null = null;
 
@@ -223,6 +226,7 @@ export class GdnCapture extends BaseChannel {
       slots.length = 0;
       normalSlots.forEach((s) => slots.push(s));
     }
+    const host = this.getHostnameSafe(request.publisherUrl);
     this.diagnostics.slotsDetected = slots.length;
     console.log(`[GDN] 탐지된 슬롯: ${slots.length}개`);
     const hugePageLikely = slots.length >= 200;
@@ -319,6 +323,14 @@ export class GdnCapture extends BaseChannel {
       }
       slots.length = 0;
       filteredContentLike.forEach((s) => slots.push(s));
+    } else {
+      // 모두 콘텐츠성으로 판정된 경우, 광고 힌트가 있는 슬롯만 복구 선택
+      const adHintSlots = slots.filter((s) => this.hasExplicitAdHint(s));
+      if (adHintSlots.length > 0) {
+        console.log(`[GDN] 콘텐츠 슬롯 전량 제외됨 — 광고 힌트 슬롯 ${adHintSlots.length}개로 대체`);
+        slots.length = 0;
+        adHintSlots.forEach((s) => slots.push(s));
+      }
     }
     
     // 슬롯 상세 로깅 (대형 페이지는 상위 일부만 로깅해 안정성 확보)
@@ -341,6 +353,9 @@ export class GdnCapture extends BaseChannel {
       // DOM 디버깅: 광고 관련 요소 출력
       await this.debugPageDom(page);
     }
+
+    // 도메인별 최종 우선순위는 정렬/필터링이 모두 끝난 뒤에 적용해야 덮어써지지 않음
+    this.prioritizeHostSpecificSlots(host, slots);
 
     // 5) 소재 인젝션 — injectionMode에 따라 동작
     const injectionMode = (request.options?.injectionMode as string) || "single";
@@ -442,6 +457,7 @@ export class GdnCapture extends BaseChannel {
     const screenshotResult = await this.safeCaptureScreenshot(page, {
       slotsDetected: slots.length,
       bodyHeight: scrollCheck.bodyH,
+      host,
     });
     this.diagnostics.screenshotMode = screenshotResult.mode;
     this.diagnostics.fullPageCaptureError = screenshotResult.errorMessage;
@@ -455,7 +471,7 @@ export class GdnCapture extends BaseChannel {
   /** fullPage 스크린샷 실패(메모리/프로토콜) 시 뷰포트 캡처로 폴백 */
   private async safeCaptureScreenshot(
     page: IPageHandle,
-    context?: { slotsDetected?: number; bodyHeight?: number }
+    context?: { slotsDetected?: number; bodyHeight?: number; host?: string }
   ): Promise<{
     buffer: Buffer;
     mode: "fullPage" | "viewportFallback";
@@ -464,7 +480,27 @@ export class GdnCapture extends BaseChannel {
   }> {
     const slotsDetected = context?.slotsDetected ?? 0;
     const bodyHeight = context?.bodyHeight ?? 0;
+    const host = context?.host ?? "";
     const isHugePage = slotsDetected >= 200 || bodyHeight >= 7000;
+    const forceCenteredViewport = GdnCapture.FORCE_CENTERED_VIEWPORT_HOSTS.has(host);
+
+    if (forceCenteredViewport) {
+      console.log(`[GDN] 📌 호스트 정책 캡처 적용: ${host} (타겟 중심 viewport)`);
+      const centeredOnInjected = await this.centerToInjected(page, true);
+      if (centeredOnInjected) {
+        await new Promise((r) => setTimeout(r, 450));
+      }
+      const buffer = await page.screenshot({
+        fullPage: false,
+        type: "png",
+      });
+      return {
+        buffer,
+        mode: "viewportFallback",
+        errorMessage: "host_policy_centered_viewport",
+        centeredOnInjected,
+      };
+    }
 
     if (isHugePage) {
       console.warn(
@@ -627,6 +663,18 @@ export class GdnCapture extends BaseChannel {
     return slot.type === "size-match" && contentPattern && !hasAdHint;
   }
 
+  private hasExplicitAdHint(slot: DetectedSlot): boolean {
+    const sel = (slot.selector || "").toLowerCase();
+    return (
+      sel.includes("google_ads") ||
+      sel.includes("div-gpt-ad") ||
+      sel.includes("adsbygoogle") ||
+      sel.includes("#ph") ||
+      sel.includes("banner") ||
+      slot.type === "gdn-iframe"
+    );
+  }
+
   private calcCommonGdnScore(slot: DetectedSlot): number {
     let best = -999;
     for (const s of COMMON_GDN_SIZES) {
@@ -638,6 +686,40 @@ export class GdnCapture extends BaseChannel {
       }
     }
     return best;
+  }
+
+  private getHostnameSafe(url: string): string {
+    try {
+      return new URL(url).hostname.toLowerCase();
+    } catch {
+      return "";
+    }
+  }
+
+  private prioritizeHostSpecificSlots(host: string, slots: DetectedSlot[]): void {
+    if (!host || slots.length <= 1) return;
+
+    if (host === "news.sbs.co.kr") {
+      slots.sort((a, b) => this.calcSbsSlotScore(b) - this.calcSbsSlotScore(a));
+      console.log("[GDN] 🧭 SBS 전용 슬롯 우선순위 적용");
+    }
+  }
+
+  private calcSbsSlotScore(slot: DetectedSlot): number {
+    const sel = (slot.selector || "").toLowerCase();
+    let score = slot.confidence;
+
+    if (slot.type === "gdn-iframe") score += 120;
+    if (sel.includes("google_ads_iframe")) score += 120;
+    if (sel.includes("div-gpt-ad")) score += 100;
+    if (sel.includes("adsbygoogle")) score += 90;
+    if (sel.includes("ad_area") || sel.includes("ads-area") || sel.includes("banner")) score += 40;
+
+    // SBS에서 자주 잡히는 콘텐츠 섹션형 오탐은 강하게 감점
+    if (slot.type === "size-match" && (sel.includes("> section") || sel.includes("> article"))) score -= 120;
+    if (sel.includes("#container > div:nth-child")) score -= 70;
+
+    return score;
   }
 
   /** 최종 폴백: 광고가 있을만한 위치에 강제 오버레이 */
