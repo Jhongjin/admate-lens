@@ -206,6 +206,7 @@ export class GdnCapture extends BaseChannel {
     }
     this.diagnostics.slotsDetected = slots.length;
     console.log(`[GDN] 탐지된 슬롯: ${slots.length}개`);
+    const hugePageLikely = slots.length >= 200;
     
     // 📐 광고 사이즈 매칭
     const creativeDims = request.options?.creativeDimensions as { width: number; height: number } | undefined;
@@ -277,8 +278,12 @@ export class GdnCapture extends BaseChannel {
       });
     }
     
-    // 슬롯 상세 로깅
-    slots.forEach((s, i) => {
+    // 슬롯 상세 로깅 (대형 페이지는 상위 일부만 로깅해 안정성 확보)
+    const logLimit = hugePageLikely ? 60 : slots.length;
+    if (hugePageLikely) {
+      console.log(`[GDN] 슬롯 상세 로깅 제한: ${logLimit}/${slots.length}개`);
+    }
+    slots.slice(0, logLimit).forEach((s, i) => {
       console.log(`[GDN]   [${i}] ${s.type} ${s.width}x${s.height} conf:${s.confidence} sel:${s.selector.substring(0, 80)}`);
       this.diagnostics!.slots.push({
         type: s.type,
@@ -386,7 +391,10 @@ export class GdnCapture extends BaseChannel {
     console.log(`[GDN] 스크롤 위치 확인: scrollY=${scrollCheck.scrollY}, bodyH=${scrollCheck.bodyH}`);
 
     // 8) 스크린샷 캡처 (fullPage 실패 시 뷰포트 폴백)
-    const screenshotResult = await this.safeCaptureScreenshot(page);
+    const screenshotResult = await this.safeCaptureScreenshot(page, {
+      slotsDetected: slots.length,
+      bodyHeight: scrollCheck.bodyH,
+    });
     this.diagnostics.screenshotMode = screenshotResult.mode;
     this.diagnostics.fullPageCaptureError = screenshotResult.errorMessage;
     this.diagnostics.fallbackCenteredOnInjected = screenshotResult.centeredOnInjected ?? false;
@@ -398,13 +406,38 @@ export class GdnCapture extends BaseChannel {
 
   /** fullPage 스크린샷 실패(메모리/프로토콜) 시 뷰포트 캡처로 폴백 */
   private async safeCaptureScreenshot(
-    page: IPageHandle
+    page: IPageHandle,
+    context?: { slotsDetected?: number; bodyHeight?: number }
   ): Promise<{
     buffer: Buffer;
     mode: "fullPage" | "viewportFallback";
     errorMessage?: string;
     centeredOnInjected?: boolean;
   }> {
+    const slotsDetected = context?.slotsDetected ?? 0;
+    const bodyHeight = context?.bodyHeight ?? 0;
+    const isHugePage = slotsDetected >= 200 || bodyHeight >= 7000;
+
+    if (isHugePage) {
+      console.warn(
+        `[GDN] 대형 페이지 감지(slots=${slotsDetected}, bodyH=${bodyHeight}) — fullPage 생략 후 타겟 중심 캡처`
+      );
+      const centeredOnInjected = await this.centerToInjected(page);
+      if (centeredOnInjected) {
+        await new Promise((r) => setTimeout(r, 400));
+      }
+      const buffer = await page.screenshot({
+        fullPage: false,
+        type: "png",
+      });
+      return {
+        buffer,
+        mode: "viewportFallback",
+        errorMessage: "skipped_fullpage_large_page",
+        centeredOnInjected,
+      };
+    }
+
     try {
       const buffer = await page.screenshot({
         fullPage: true,
@@ -414,26 +447,7 @@ export class GdnCapture extends BaseChannel {
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       console.warn(`[GDN] fullPage 캡처 실패 — viewport 폴백: ${msg}`);
-
-      // fullPage 실패 시, 주입된 광고가 뷰포트 밖이면 해당 위치로 이동해서 캡처
-      const centeredOnInjected = await page.evaluate<boolean>(`
-        (() => {
-          const target = document.querySelector('[data-injected="admate"], [data-injected="admate-wrapper"]');
-          if (!target) return false;
-          const rect = target.getBoundingClientRect();
-          const isVisibleNow = rect.bottom > 0 && rect.top < (window.innerHeight || 0);
-          if (isVisibleNow) return false;
-
-          const absoluteTop = (window.scrollY || 0) + rect.top;
-          const viewportH = window.innerHeight || 1080;
-          const targetY = Math.max(0, Math.round(absoluteTop - viewportH * 0.35));
-
-          window.scrollTo({ top: targetY, behavior: 'instant' });
-          document.documentElement.scrollTop = targetY;
-          document.body.scrollTop = targetY;
-          return true;
-        })()
-      `);
+      const centeredOnInjected = await this.centerToInjected(page);
 
       if (centeredOnInjected) {
         await new Promise((r) => setTimeout(r, 400));
@@ -445,6 +459,27 @@ export class GdnCapture extends BaseChannel {
       });
       return { buffer, mode: "viewportFallback", errorMessage: msg, centeredOnInjected };
     }
+  }
+
+  private async centerToInjected(page: IPageHandle): Promise<boolean> {
+    return await page.evaluate<boolean>(`
+      (() => {
+        const target = document.querySelector('[data-injected="admate"], [data-injected="admate-wrapper"]');
+        if (!target) return false;
+        const rect = target.getBoundingClientRect();
+        const isVisibleNow = rect.bottom > 0 && rect.top < (window.innerHeight || 0);
+        if (isVisibleNow) return false;
+
+        const absoluteTop = (window.scrollY || 0) + rect.top;
+        const viewportH = window.innerHeight || 1080;
+        const targetY = Math.max(0, Math.round(absoluteTop - viewportH * 0.35));
+
+        window.scrollTo({ top: targetY, behavior: 'instant' });
+        document.documentElement.scrollTop = targetY;
+        document.body.scrollTop = targetY;
+        return true;
+      })()
+    `);
   }
 
   private async detectAccessDenied(page: IPageHandle): Promise<boolean> {

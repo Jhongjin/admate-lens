@@ -66,9 +66,11 @@ export async function injectCreative(
         img.setAttribute('data-injected', 'admate');
         img.style.cssText = [
           'display: block !important',
-          fit ? 'width: ' + slotW + 'px !important' : '',
-          fit ? 'height: ' + slotH + 'px !important' : '',
-          'object-fit: cover !important',
+          fit ? 'width: 100% !important' : '',
+          fit ? 'height: 100% !important' : '',
+          'object-fit: contain !important',
+          'object-position: center center !important',
+          'background: transparent !important',
           'border: none !important',
           'margin: 0 !important',
           'padding: 0 !important',
