@@ -705,7 +705,9 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
   const selectedProduct = selectedMediaMenu === "youtube" ? "instream" : "network-ads";
   const selectedOptionPreset =
     selectedMediaMenu === "youtube"
-      ? form.youtubeAdType === "mobile-preroll-ios"
+      ? form.youtubeAdType === "preroll"
+        ? "pc-skip"
+        : form.youtubeAdType === "mobile-preroll-ios"
         ? form.instreamSkipMode === "non-skippable"
           ? "ios-non-skip"
           : "ios-skip"
@@ -956,6 +958,15 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                 const preset = e.target.value;
                 setIsOptionPanelExpanded(true);
                 if (preset === "gdn-default") return;
+                if (preset === "pc-skip") {
+                  setForm((prev) => ({
+                    ...prev,
+                    channel: "youtube",
+                    youtubeAdType: "preroll",
+                    instreamSkipMode: "skippable",
+                  }));
+                  return;
+                }
                 if (preset.startsWith("ios")) {
                   setForm((prev) => ({
                     ...prev,
@@ -975,6 +986,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
             >
               {selectedMediaMenu === "youtube" ? (
                 <>
+                  <option value="pc-skip">PC Instream (Skip)</option>
                   <option value="aos-skip">AOS Instream - Skip</option>
                   <option value="aos-non-skip">AOS Instream - Non Skip</option>
                   <option value="ios-skip">iOS Instream - Skip</option>
