@@ -37,26 +37,34 @@ export interface CaptureDiagnostics {
  * 이미지 URL → base64 data URL 변환 (서버 측)
  */
 async function imageUrlToDataUrl(imageUrl: string): Promise<{ dataUrl: string; sizeKB: number; ok: boolean }> {
-  try {
-    console.log(`[GDN] 소재 이미지 다운로드 시작: ${imageUrl}`);
+  console.log(`[GDN] 소재 이미지 다운로드 시작: ${imageUrl}`);
+  const maxAttempts = 2;
+  let lastErr: Error | null = null;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      const response = await fetch(imageUrl, { cache: "no-store" as RequestCache });
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
 
-    const response = await fetch(imageUrl);
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      const contentType = response.headers.get("content-type") || "image/png";
+      const arrayBuffer = await response.arrayBuffer();
+      const sizeKB = Math.round(arrayBuffer.byteLength / 1024);
+      const base64 = Buffer.from(arrayBuffer).toString("base64");
+      const dataUrl = `data:${contentType};base64,${base64}`;
+
+      console.log(`[GDN] 소재 이미지 변환 완료 (${contentType}, ${sizeKB}KB, base64길이: ${dataUrl.length})`);
+      return { dataUrl, sizeKB, ok: true };
+    } catch (err) {
+      lastErr = err instanceof Error ? err : new Error(String(err));
+      if (attempt < maxAttempts) {
+        console.warn(`[GDN] 소재 다운로드 재시도 ${attempt}/${maxAttempts} 실패: ${lastErr.message}`);
+        await new Promise((r) => setTimeout(r, 300));
+      }
     }
-
-    const contentType = response.headers.get("content-type") || "image/png";
-    const arrayBuffer = await response.arrayBuffer();
-    const sizeKB = Math.round(arrayBuffer.byteLength / 1024);
-    const base64 = Buffer.from(arrayBuffer).toString("base64");
-    const dataUrl = `data:${contentType};base64,${base64}`;
-
-    console.log(`[GDN] 소재 이미지 변환 완료 (${contentType}, ${sizeKB}KB, base64길이: ${dataUrl.length})`);
-    return { dataUrl, sizeKB, ok: true };
-  } catch (err) {
-    console.error(`[GDN] 소재 이미지 다운로드 실패:`, err);
-    return { dataUrl: imageUrl, sizeKB: 0, ok: false };
   }
+  console.error(`[GDN] 소재 이미지 다운로드 실패:`, lastErr);
+  return { dataUrl: imageUrl, sizeKB: 0, ok: false };
 }
 
 export class GdnCapture extends BaseChannel {
@@ -194,7 +202,7 @@ export class GdnCapture extends BaseChannel {
     }
 
     // 4) 광고 슬롯 탐지
-    const slots = await detectAdSlots(page);
+    const slots = await this.runWithFrameRetry(() => detectAdSlots(page), "detect-slots");
     const viewport = await page.evaluate<{ width: number; height: number }>(`
       (() => ({ width: window.innerWidth || 1920, height: window.innerHeight || 1080 }))()
     `);
@@ -317,11 +325,15 @@ export class GdnCapture extends BaseChannel {
       try {
         console.log(`[GDN] 인젝션 시도 [${i + 1}/${maxAttempts}]: ${slot.type}(${slot.width}x${slot.height})`);
         
-        const result = await injectCreative(page, slot, {
-          creativeUrl: creativeDataUrl,
-          fitToSlot: true,
-          removeObstructions: i === 0,
-        });
+        const result = await this.runWithFrameRetry(
+          () =>
+            injectCreative(page, slot, {
+              creativeUrl: creativeDataUrl,
+              fitToSlot: true,
+              removeObstructions: i === 0,
+            }),
+          "inject-creative"
+        );
 
         this.diagnostics.slots[i].injectionResult = result;
 
@@ -481,6 +493,27 @@ export class GdnCapture extends BaseChannel {
         return true;
       })()
     `);
+  }
+
+  private async runWithFrameRetry<T>(op: () => Promise<T>, phase: string): Promise<T> {
+    const maxAttempts = 2;
+    let lastErr: unknown;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        return await op();
+      } catch (err) {
+        lastErr = err;
+        const msg = (err instanceof Error ? err.message : String(err)).toLowerCase();
+        const retryable =
+          msg.includes("detached frame") ||
+          msg.includes("navigating frame was detached") ||
+          msg.includes("execution context was destroyed");
+        if (!retryable || attempt >= maxAttempts) break;
+        console.warn(`[GDN] ${phase} 재시도 ${attempt}/${maxAttempts}: ${msg}`);
+        await new Promise((r) => setTimeout(r, 250));
+      }
+    }
+    throw lastErr instanceof Error ? lastErr : new Error(String(lastErr ?? `${phase} failed`));
   }
 
   private async detectAccessDenied(page: IPageHandle): Promise<boolean> {

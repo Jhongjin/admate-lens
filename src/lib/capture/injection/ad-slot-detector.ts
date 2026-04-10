@@ -226,7 +226,11 @@ export async function detectAdSlots(page: IPageHandle): Promise<DetectedSlot[]> 
   );
 
   console.log(`[AdSlotDetector] 원본 ${rawSlots.length}개 → 필터 후 ${filteredSlots.length}개 슬롯:`);
-  filteredSlots.forEach((s, i) => {
+  const maxLog = filteredSlots.length > 120 ? 120 : filteredSlots.length;
+  if (filteredSlots.length > maxLog) {
+    console.log(`[AdSlotDetector] 상세 로그 제한: ${maxLog}/${filteredSlots.length}`);
+  }
+  filteredSlots.slice(0, maxLog).forEach((s, i) => {
     console.log(`  [${i}] ${s.type} ${s.width}x${s.height} conf:${s.confidence} fixed:${s.isFixed}`);
   });
 
