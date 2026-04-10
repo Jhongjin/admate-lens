@@ -612,7 +612,7 @@ export class GdnCapture extends BaseChannel {
           if (!badge) {
             badge = document.createElement('div');
             badge.setAttribute('data-injected', 'admate-badge');
-            badge.textContent = '광고';
+            badge.textContent = 'AD';
             host.appendChild(badge);
           }
 

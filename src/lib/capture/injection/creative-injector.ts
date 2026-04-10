@@ -111,7 +111,7 @@ export async function injectCreative(
       function addAdBadge(container) {
         const badge = document.createElement('div');
         badge.setAttribute('data-injected', 'admate-badge');
-        badge.textContent = '광고';
+        badge.textContent = 'AD';
         badge.style.cssText = [
           'position: absolute !important',
           'top: 4px !important',
