@@ -412,6 +412,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
     instreamDisplayUrl: "",
     instreamDisplayPath1: "",
     instreamDisplayPath2: "",
+    instreamSkipMode: "skippable",
     instreamLogoSource: "channel",
     instreamLogoImageUrl: "",
     instreamCompanionImageUrl: "",
