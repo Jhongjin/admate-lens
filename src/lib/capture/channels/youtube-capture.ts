@@ -700,6 +700,25 @@ export class YouTubeCapture extends BaseChannel {
 
     // 유튜브가 헤더를 다시 그리면 로그인 버튼이 복구될 수 있음 → 캡처 직전 한 번 더 덮음
     await this.applyMastheadLoggedInLook(page, mastheadProfileDataUrl);
+    if (isMobilePlatform) {
+      await page.evaluate<void>(`
+        (() => {
+          document
+            .querySelectorAll(
+              'ytm-mobile-topbar-renderer, ytm-app-header, ytm-header, #header, .mobile-topbar-header-content, .ytm-header-bar'
+            )
+            .forEach((el) => {
+              if (el instanceof HTMLElement) el.style.display = 'none';
+            });
+          document
+            .querySelectorAll(
+              'ytm-popup-container, tp-yt-paper-dialog, ytm-confirm-dialog-renderer, ytm-single-option-survey-renderer'
+            )
+            .forEach((el) => el.remove());
+        })()
+      `);
+      await new Promise((r) => setTimeout(r, 150));
+    }
 
     // 10) 스크린샷
     // 모바일: 뷰포트 전체 clip | 데스크탑: fullPage false (YouTube 비율 최적)
