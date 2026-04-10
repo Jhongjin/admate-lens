@@ -172,6 +172,19 @@ export class YouTubeCapture extends BaseChannel {
       instreamOpts.enableCompanionBanner = false;
     }
 
+    // 🌟 데스크톱/모바일 뷰포트 및 User-Agent 초기 강제 설정 (어떤 네트워크 요청보다도 먼저 실행)
+    if (isMobilePlatform) {
+      const mobileVp = isAOS ? MOBILE_AOS_VIEWPORT : MOBILE_IOS_VIEWPORT;
+      const mobileUA = isAOS ? UA_MOBILE_AOS : UA_MOBILE_IOS;
+      await page.setViewport(mobileVp);
+      await page.setUserAgent(mobileUA);
+      console.log(`[YouTube] 📱 초기 모바일 뷰포트/UA 적용: ${isAOS ? "AOS (Pixel 8)" : "iOS (iPhone 15)"} ${mobileVp.width}×${mobileVp.height}`);
+    } else {
+      // 데스크톱 시청 레이아웃 고정
+      await page.setViewport({ width: 1920, height: 1080, deviceScaleFactor: 1 });
+    }
+
+
     // preroll 계열(인스트림)은 PC/모바일 통일 로직
     const isPrerollFamily = adType === "preroll" || isMobilePlatform;
     const prerollCaptureSeconds = isPrerollFamily
@@ -349,19 +362,20 @@ export class YouTubeCapture extends BaseChannel {
     // 3) YouTube 페이지 로드 — 🔑 embed-first 전략
     // YouTube /watch 페이지는 봇 감지가 매우 강력하므로
     // /embed/ URL로 먼저 접근하여 봇 감지를 우회
-    const targetUrl = request.publisherUrl;
-
-    // 데스크톱/모바일 뷰포트 분기 적용
+    let targetUrl = request.publisherUrl;
     if (isMobilePlatform) {
-      const mobileVp = isAOS ? MOBILE_AOS_VIEWPORT : MOBILE_IOS_VIEWPORT;
-      const mobileUA = isAOS ? UA_MOBILE_AOS : UA_MOBILE_IOS;
-      await page.setViewport(mobileVp);
-      await page.setUserAgent(mobileUA);
-      console.log(`[YouTube] 📱 모바일 뷰포트 적용: ${isAOS ? "AOS (Pixel 8)" : "iOS (iPhone 15)"} ${mobileVp.width}×${mobileVp.height}`);
-    } else {
-      // 데스크톱 시청 레이아웃 고정 — 로컬 2560 등과 무관하게 실제 브라우저(≈1920)와 동일 비율로 캡처
-      await page.setViewport({ width: 1920, height: 1080, deviceScaleFactor: 1 });
+      if (targetUrl.includes('youtu.be/')) {
+        const vid = extractVideoId(targetUrl);
+        if (vid) targetUrl = `https://m.youtube.com/watch?v=${vid}`;
+      } else if (targetUrl.includes('www.youtube.com') || targetUrl.includes('youtube.com')) {
+        targetUrl = targetUrl.replace('www.youtube.com', 'm.youtube.com').replace('youtube.com', 'm.youtube.com');
+      }
+      // Clean up duplication if any
+      targetUrl = targetUrl.replace('m.m.youtube.com', 'm.youtube.com');
     }
+
+    // (뷰포트 및 UA는 captureAdPlacement 시작 시점에 이미 설정됨)
+
 
     // 📺 YouTube watch 페이지 로드 (레이아웃 확보 목적)
     await page.goto(targetUrl, {
