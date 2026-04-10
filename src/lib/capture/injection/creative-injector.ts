@@ -19,6 +19,8 @@ export interface InjectionOptions {
   fitToSlot?: boolean;
   /** 방해요소(쿠키 배너, 팝업 등) 제거 여부 */
   removeObstructions?: boolean;
+  /** 업로드 소재 원본 크기 (비율 기반 fit 판단용) */
+  creativeDimensions?: { width: number; height: number };
 }
 
 /** 인젝션 결과 상세 */
@@ -37,7 +39,7 @@ export async function injectCreative(
   slot: DetectedSlot,
   options: InjectionOptions
 ): Promise<InjectionResult> {
-  const { creativeUrl, fitToSlot = true, removeObstructions = true } = options;
+  const { creativeUrl, fitToSlot = true, removeObstructions = true, creativeDimensions } = options;
 
   if (removeObstructions) {
     await removePageObstructions(page);
@@ -55,6 +57,14 @@ export async function injectCreative(
       const slotY = ${slot.y};
       const fit = ${fitToSlot};
       const tagName = ${JSON.stringify(slot.tagName)};
+      const creativeW = ${creativeDimensions?.width ?? 0};
+      const creativeH = ${creativeDimensions?.height ?? 0};
+      const creativeAspect = creativeW > 0 && creativeH > 0 ? (creativeW / creativeH) : 0;
+      const slotAspect = slotW > 0 && slotH > 0 ? (slotW / slotH) : 0;
+      const aspectDiff = (creativeAspect > 0 && slotAspect > 0)
+        ? Math.abs(Math.log(creativeAspect) - Math.log(slotAspect))
+        : 0;
+      const objectFitMode = aspectDiff > 0.42 ? 'contain' : 'cover';
 
       console.log('[Injector] 인젝션 시도:', selector, tagName, slotW + 'x' + slotH);
 
@@ -68,7 +78,7 @@ export async function injectCreative(
           'display: block !important',
           fit ? 'width: 100% !important' : '',
           fit ? 'height: 100% !important' : '',
-          'object-fit: cover !important',
+          'object-fit: ' + objectFitMode + ' !important',
           'object-position: center center !important',
           'background: transparent !important',
           'border: none !important',

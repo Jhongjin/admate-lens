@@ -535,6 +535,18 @@ export async function GET(request: NextRequest) {
   try {
     const supabase = createServerClient();
     const { searchParams } = new URL(request.url);
+    const staleThresholdIso = new Date(Date.now() - 15 * 60 * 1000).toISOString();
+
+    // 오래된 processing 상태 자동 정리 (워커 중단/세션 종료 후 고착 방지)
+    await supabase
+      .from("vision_da_captures")
+      .update({
+        status: "failed",
+        error_message: "처리 시간 초과로 자동 종료되었습니다.",
+        updated_at: new Date().toISOString(),
+      })
+      .eq("status", "processing")
+      .lt("updated_at", staleThresholdIso);
 
     const status = searchParams.get("status");
     const limit = parseInt(searchParams.get("limit") ?? "20", 10);

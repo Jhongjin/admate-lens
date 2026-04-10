@@ -366,6 +366,7 @@ export class GdnCapture extends BaseChannel {
               creativeUrl: creativeDataUrl,
               fitToSlot: true,
               removeObstructions: i === 0,
+              creativeDimensions: creativeDims,
             }),
           "inject-creative"
         );
