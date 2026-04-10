@@ -68,7 +68,7 @@ export async function injectCreative(
           'display: block !important',
           fit ? 'width: 100% !important' : '',
           fit ? 'height: 100% !important' : '',
-          'object-fit: contain !important',
+          'object-fit: cover !important',
           'object-position: center center !important',
           'background: transparent !important',
           'border: none !important',

@@ -422,7 +422,7 @@ export class GdnCapture extends BaseChannel {
       console.warn(
         `[GDN] 대형 페이지 감지(slots=${slotsDetected}, bodyH=${bodyHeight}) — fullPage 생략 후 타겟 중심 캡처`
       );
-      const centeredOnInjected = await this.centerToInjected(page);
+      const centeredOnInjected = await this.centerToInjected(page, true);
       if (centeredOnInjected) {
         await new Promise((r) => setTimeout(r, 400));
       }
@@ -447,7 +447,7 @@ export class GdnCapture extends BaseChannel {
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       console.warn(`[GDN] fullPage 캡처 실패 — viewport 폴백: ${msg}`);
-      const centeredOnInjected = await this.centerToInjected(page);
+      const centeredOnInjected = await this.centerToInjected(page, false);
 
       if (centeredOnInjected) {
         await new Promise((r) => setTimeout(r, 400));
@@ -461,14 +461,15 @@ export class GdnCapture extends BaseChannel {
     }
   }
 
-  private async centerToInjected(page: IPageHandle): Promise<boolean> {
+  private async centerToInjected(page: IPageHandle, forceCenter: boolean): Promise<boolean> {
     return await page.evaluate<boolean>(`
       (() => {
         const target = document.querySelector('[data-injected="admate"], [data-injected="admate-wrapper"]');
         if (!target) return false;
         const rect = target.getBoundingClientRect();
         const isVisibleNow = rect.bottom > 0 && rect.top < (window.innerHeight || 0);
-        if (isVisibleNow) return false;
+        const force = ${forceCenter ? "true" : "false"};
+        if (!force && isVisibleNow) return false;
 
         const absoluteTop = (window.scrollY || 0) + rect.top;
         const viewportH = window.innerHeight || 1080;
