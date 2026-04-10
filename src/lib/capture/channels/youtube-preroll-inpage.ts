@@ -13,6 +13,8 @@ export interface PrerollInjectPagePayload {
   enableCtaText: boolean;
   ctaBtnText: string;
   progressFillPct: number;
+  /** Node에서 측정한 플레이어 박스(인페이지 재탐색과 불일치 시 흰 영역·찢어짐 방지) */
+  serverPlayerBox?: { left: number; top: number; width: number; height: number };
 }
 
 export function runPrerollInjectInPage(...args: unknown[]): boolean {
@@ -42,31 +44,45 @@ export function runPrerollInjectInPage(...args: unknown[]): boolean {
       ".player-container",
     ];
 
+    const srv = p.serverPlayerBox;
+    let px = 0;
+    let py = 56;
+    let pw = window.innerWidth * 0.7;
+    let ph = window.innerHeight * 0.6;
     let playerRect: DOMRect | null = null;
-    const videoEl = document.querySelector("video");
-    if (videoEl) {
-      const r = videoEl.getBoundingClientRect();
-      if (r.width > 50 && r.height > 50) playerRect = r;
-    }
-    if (!playerRect) {
-      for (const sel of playerSelectors) {
-        const el = document.querySelector(sel);
-        if (el) {
-          const r = el.getBoundingClientRect();
-          if (r.width > 80 && r.height > 80) {
-            playerRect = r;
-            break;
+
+    if (srv && srv.width > 80 && srv.height > 80) {
+      px = srv.left;
+      py = srv.top;
+      pw = srv.width;
+      ph = srv.height;
+    } else {
+      const videoEl = document.querySelector("video");
+      if (videoEl) {
+        const r = videoEl.getBoundingClientRect();
+        if (r.width > 50 && r.height > 50) playerRect = r;
+      }
+      if (!playerRect) {
+        for (const sel of playerSelectors) {
+          const el = document.querySelector(sel);
+          if (el) {
+            const r = el.getBoundingClientRect();
+            if (r.width > 80 && r.height > 80) {
+              playerRect = r;
+              break;
+            }
           }
         }
       }
+      if (playerRect) {
+        px = playerRect.left;
+        py = playerRect.top;
+        pw = playerRect.width;
+        ph = playerRect.height;
+      }
     }
 
-    let px = playerRect ? playerRect.left : 0;
-    let py = playerRect ? playerRect.top : 56;
-    let pw = playerRect ? playerRect.width : window.innerWidth * 0.7;
-    let ph = playerRect ? playerRect.height : window.innerHeight * 0.6;
-
-    if (isMobile && (!playerRect || pw < 80)) {
+    if (isMobile && pw < 80) {
       pw = window.innerWidth;
       ph = Math.round((pw * 9) / 16);
       px = 0;
@@ -95,7 +111,7 @@ export function runPrerollInjectInPage(...args: unknown[]): boolean {
     ].join(" !important;") + " !important";
 
     if (imgUrl) {
-      overlay.style.background = "transparent !important";
+      overlay.style.background = "#000 !important";
       const img = document.createElement("img");
       img.src = imgUrl;
       img.setAttribute("data-injected", "admate");

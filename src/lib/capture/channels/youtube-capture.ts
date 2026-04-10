@@ -342,7 +342,7 @@ export class YouTubeCapture extends BaseChannel {
     // 1.6) 광고주 영상에서 캡처 시점 프레임을 선추출 (퍼블리셔 페이지와 분리)
     let timedFrameDataUrl: string | null = null;
     let timedFrameDurationSec = 0;
-    if (adType === "preroll" && instreamOpts.videoUrl?.trim() && prerollCaptureSeconds !== null) {
+    if (isPrerollFamily && instreamOpts.videoUrl?.trim() && prerollCaptureSeconds !== null) {
       const timedFrame = await this.captureTimedFrameFromInstreamVideo(
         page,
         instreamOpts.videoUrl.trim(),
@@ -819,6 +819,15 @@ export class YouTubeCapture extends BaseChannel {
       enableCtaText: instreamOpts.enableCtaText !== false,
       ctaBtnText: ctaText,
       progressFillPct: Math.min(100, Math.max(0, instreamOpts.progressFillPercent ?? 33)),
+      serverPlayerBox:
+        playerInfo.found && playerInfo.width > 80 && playerInfo.height > 80
+          ? {
+              left: playerInfo.left,
+              top: playerInfo.top,
+              width: playerInfo.width,
+              height: playerInfo.height,
+            }
+          : undefined,
     };
     const result = await page.evaluate(runPrerollInjectInPage, prerollPayload);
 
