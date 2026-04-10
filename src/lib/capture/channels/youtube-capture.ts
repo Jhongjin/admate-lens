@@ -700,18 +700,7 @@ export class YouTubeCapture extends BaseChannel {
 
     console.log(`[YouTube] ===== 캡처 완료 (${adType}) =====`);
 
-    // 11) 폰 프레임 합성 (모바일은 상단/하단 상태바 없이 순수 콘텐츠만 캡처하는 방식)
-    if (isMobilePlatform) {
-      try {
-        const os = isAOS ? "aos" : "ios";
-        const { compositePhoneFrame } = await import("../utils/frame-composite");
-        const framed = await compositePhoneFrame(screenshot, os);
-        console.log(`[YouTube] 📱 폰 프레임 합성 완료 (${os})`);
-        return framed;
-      } catch (err) {
-        console.warn(`[YouTube] ⚠️ 폰 프레임 합성 실패 (원본 이미지 변환 없이 반환):`, err);
-      }
-    }
+    // 11) 폰 프레임 합성 제거: 사용자는 순수 모바일 웹 UI 캡처를 원함
 
     return screenshot;
   }
@@ -804,6 +793,7 @@ export class YouTubeCapture extends BaseChannel {
       (() => {
         try {
           const imgUrl = ${JSON.stringify(imgDataUrl)};
+          const isMobile = ${JSON.stringify(instreamOpts.isMobile ?? false)};
           const avatarImgUrl = ${JSON.stringify(instreamOpts.avatarImageUrl || "")};
           const domainText = ${JSON.stringify(displayUrlCard)};
           const sponsorDomainText = ${JSON.stringify(displayUrlSponsor)};
@@ -874,120 +864,185 @@ export class YouTubeCapture extends BaseChannel {
             overlay.style.background = 'transparent !important';
           }
 
-          // ─── 좌상단: "광고" 라벨 (실제 YouTube처럼 극히 미세하게) ───
-          const adLabel = document.createElement('div');
-          adLabel.style.cssText = "position:absolute;top:10px;left:10px;color:rgba(255,255,255,0.5);font-size:10px;font-family:Roboto,Arial,sans-serif;font-weight:400;letter-spacing:0.2px;z-index:10";
-          adLabel.textContent = '광고';
-          overlay.appendChild(adLabel);
+          // ─── Desktop vs Mobile UI 분기 ───
+          if (isMobile) {
+            const adLabel = document.createElement('div');
+            adLabel.style.cssText = "position:absolute;bottom:10px;left:10px;color:rgba(255,255,255,0.8);font-size:12px;font-family:Roboto,Arial,sans-serif;font-weight:500;z-index:10;display:flex;align-items:center;gap:4px;";
+            adLabel.innerHTML = '스폰서 <svg width="12" height="12" viewBox="0 0 16 16" fill="white"><path d="M8 15A7 7 0 1 0 8 1a7 7 0 0 0 0 14zm0 1A8 8 0 1 1 8 0a8 8 0 0 1 0 16z"/><path d="M8.93 6.588l-2.29.287-.082.38.45.083c.294.07.352.176.288.469l-.738 3.468c-.194.897.105 1.319.808 1.319.545 0 1.178-.252 1.465-.598l.088-.416c-.2.176-.492.246-.686.246-.275 0-.375-.193-.304-.533L8.93 6.588zM9 4.5a1 1 0 1 1-2 0 1 1 0 0 1 2 0z"/></svg>';
+            overlay.appendChild(adLabel);
 
-          // ═══ 좌하단: CTA 카드 + 스폰서 줄 (한 스택으로 묶어 좌측 정렬·세로 간격 고정) ═══
-          const adLowerStack = document.createElement('div');
-          adLowerStack.id = 'admate-preroll-lower-stack';
-          adLowerStack.setAttribute('data-injected', 'admate-youtube-preroll');
-          adLowerStack.style.cssText = [
-            'position: absolute',
-            'left: 16px',
-            'bottom: 16px',
-            'z-index: 20',
-            'display: flex',
-            'flex-direction: column',
-            'align-items: flex-start',
-            'justify-content: flex-end',
-            'gap: 8px',
-            'margin: 0',
-            'padding: 0',
-            'pointer-events: none',
-          ].join(' !important;') + ' !important';
-
-          const ctaCard = document.createElement('div');
-          ctaCard.style.cssText = [
-            'position: relative',
-            'display: flex',
-            'align-items: center',
-            'background: rgba(0,0,0,0.65)',
-            'border-radius: 8px',
-            'padding: 8px 12px',
-            'max-width: 100%',
-            'z-index: 10',
-            'overflow: hidden',
-            'cursor: pointer',
-            'pointer-events: auto',
-            'flex-shrink: 0',
-          ].join(' !important;') + ' !important';
-
-          // 원형 아이콘 (ytp-ad-avatar--size-m = 40px)
-          if (avatarImgUrl) {
-            const ctaIcon = document.createElement('img');
-            ctaIcon.src = avatarImgUrl;
-            ctaIcon.style.cssText = 'width:38px !important;height:38px !important;border-radius:50% !important;object-fit:cover !important;flex-shrink:0 !important;margin-right:12px !important';
-            ctaCard.appendChild(ctaIcon);
+            const visitLabel = document.createElement('div');
+            visitLabel.style.cssText = "position:absolute;top:10px;right:10px;color:rgba(255,255,255,0.9);font-size:12px;font-family:Roboto,Arial,sans-serif;font-weight:500;z-index:10;display:flex;align-items:center;gap:4px;text-shadow:0 1px 2px rgba(0,0,0,0.5);";
+            visitLabel.innerHTML = '광고주 페이지 방문 <svg width="12" height="12" viewBox="0 0 24 24" fill="white"><path d="M19 19H5V5h7V3H5a2 2 0 00-2 2v14a2 2 0 002 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"/></svg>';
+            overlay.appendChild(visitLabel);
           } else {
-            // 이미지가 없으면 기본 아이콘 표시 (사용자 아바타 느낌)
-            const ctaIconFallback = document.createElement('div');
-            ctaIconFallback.style.cssText = 'width:38px !important;height:38px !important;border-radius:50% !important;background:#555 !important;display:flex;align-items:center;justify-content:center;flex-shrink:0 !important;margin-right:12px !important;color:#fff;font-size:20px;';
-            ctaIconFallback.textContent = titleText.charAt(0) || '선';
-            ctaCard.appendChild(ctaIconFallback);
+            // ─── 좌상단: "광고" 라벨 (실제 YouTube처럼 극히 미세하게) ───
+            const adLabel = document.createElement('div');
+            adLabel.style.cssText = "position:absolute;top:10px;left:10px;color:rgba(255,255,255,0.5);font-size:10px;font-family:Roboto,Arial,sans-serif;font-weight:400;letter-spacing:0.2px;z-index:10";
+            adLabel.textContent = '광고';
+            overlay.appendChild(adLabel);
           }
 
-          // 텍스트 영역 (광고제목 + 도메인)
-          const ctaTextDiv = document.createElement('div');
-          ctaTextDiv.style.cssText = 'flex:1;min-width:0;margin-right:12px';
-          // font-family에 작은따옴표를 쓰면 evaluate 문자열이 깨져 SyntaxError 남 → HTML 엔티티 사용
-          ctaTextDiv.innerHTML = [
-            '<div style="font-size:14px;font-weight:500;color:#fff;font-family:&quot;YouTube Noto&quot;,Roboto,Arial,Helvetica,sans-serif;white-space:nowrap;line-height:20px;letter-spacing:normal;word-break:keep-all">' + titleText + '</div>',
-            '<div style="font-size:12px;color:rgba(255,255,255,0.7);font-family:&quot;YouTube Noto&quot;,Roboto,Arial,Helvetica,sans-serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px;line-height:16px;letter-spacing:normal">' + domainText + '</div>',
-          ].join('');
-          ctaCard.appendChild(ctaTextDiv);
+          if (!isMobile) {
+            // ═══ 좌하단: CTA 카드 + 스폰서 줄 (한 스택으로 묶어 좌측 정렬·세로 간격 고정) ═══
+            const adLowerStack = document.createElement('div');
+            adLowerStack.id = 'admate-preroll-lower-stack';
+            adLowerStack.setAttribute('data-injected', 'admate-youtube-preroll');
+            adLowerStack.style.cssText = [
+              'position: absolute',
+              'left: 16px',
+              'bottom: 16px',
+              'z-index: 20',
+              'display: flex',
+              'flex-direction: column',
+              'align-items: flex-start',
+              'justify-content: flex-end',
+              'gap: 8px',
+              'margin: 0',
+              'padding: 0',
+              'pointer-events: none',
+            ].join(' !important;') + ' !important';
 
-          // ✅ CTA 버튼 (ytp-ad-button-vm--style-filled-white)
-          // YouTube CSS: --yt-spec-white-3: #f1f1f1
-          const ctaBtn = document.createElement('div');
-          ctaBtn.style.cssText = "background:#f1f1f1;color:rgb(15,15,15);font-size:14px;font-weight:500;line-height:36px;letter-spacing:normal;font-family:Roboto,Arial,sans-serif;padding:0 16px;border-radius:18px;height:36px;white-space:nowrap;cursor:pointer;flex-shrink:0;display:inline-flex;align-items:center";
-          ctaBtn.textContent = ctaBtnText;
-          ctaCard.appendChild(ctaBtn);
+            const ctaCard = document.createElement('div');
+            ctaCard.style.cssText = [
+              'position: relative',
+              'display: flex',
+              'align-items: center',
+              'background: rgba(0,0,0,0.65)',
+              'border-radius: 8px',
+              'padding: 8px 12px',
+              'max-width: 100%',
+              'z-index: 10',
+              'overflow: hidden',
+              'cursor: pointer',
+              'pointer-events: auto',
+              'flex-shrink: 0',
+            ].join(' !important;') + ' !important';
 
-          const sponsorText = document.createElement('div');
-          sponsorText.id = 'admate-preroll-sponsor';
-          sponsorText.setAttribute('data-injected', 'admate-youtube-preroll');
-          sponsorText.style.cssText = [
-            'position: relative',
-            'display: flex',
-            'align-items: center',
-            'margin: 0',
-            'padding: 0',
-            'font-size: 13px',
-            'font-weight: 700',
-            'color: #ffffff',
-            'filter: drop-shadow(0px 1px 2px rgba(0,0,0,0.75))',
-            '-webkit-font-smoothing: antialiased',
-            'font-family: "YouTube Noto", "Noto Sans KR", "Malgun Gothic", Roboto, Arial, sans-serif',
-            'pointer-events: auto',
-            'flex-shrink: 0',
-            'box-sizing: border-box',
-          ].join(' !important;') + ' !important';
-          sponsorText.innerHTML = [
-            '<span style="margin-right:6px">스폰서</span>',
-            '<svg width="13" height="13" viewBox="0 0 13 13" fill="none" xmlns="http://www.w3.org/2000/svg" style="margin-right:10px; flex-shrink: 0;"><circle cx="6.5" cy="6.5" r="5.5" stroke="white" stroke-width="1.2"/><rect x="5.9" y="3.3" width="1.2" height="1.2" fill="white"/><rect x="5.9" y="5.7" width="1.2" height="4.2" fill="white"/></svg>',
-            '<span style="display:inline-block;max-width:280px;font-weight:500;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;vertical-align:bottom;">' + sponsorDomainText + '</span>'
-          ].join('');
-          if (enableCtaText) {
-            adLowerStack.appendChild(ctaCard);
+            // 원형 아이콘 (ytp-ad-avatar--size-m = 40px)
+            if (avatarImgUrl) {
+              const ctaIcon = document.createElement('img');
+              ctaIcon.src = avatarImgUrl;
+              ctaIcon.style.cssText = 'width:38px !important;height:38px !important;border-radius:50% !important;object-fit:cover !important;flex-shrink:0 !important;margin-right:12px !important';
+              ctaCard.appendChild(ctaIcon);
+            } else {
+              // 이미지가 없으면 기본 아이콘 표시 (사용자 아바타 느낌)
+              const ctaIconFallback = document.createElement('div');
+              ctaIconFallback.style.cssText = 'width:38px !important;height:38px !important;border-radius:50% !important;background:#555 !important;display:flex;align-items:center;justify-content:center;flex-shrink:0 !important;margin-right:12px !important;color:#fff;font-size:20px;';
+              ctaIconFallback.textContent = titleText.charAt(0) || '선';
+              ctaCard.appendChild(ctaIconFallback);
+            }
+
+            // 텍스트 영역 (광고제목 + 도메인)
+            const ctaTextDiv = document.createElement('div');
+            ctaTextDiv.style.cssText = 'flex:1;min-width:0;margin-right:12px';
+            // font-family에 작은따옴표를 쓰면 evaluate 문자열이 깨져 SyntaxError 남 → HTML 엔티티 사용
+            ctaTextDiv.innerHTML = [
+              '<div style="font-size:14px;font-weight:500;color:#fff;font-family:&quot;YouTube Noto&quot;,Roboto,Arial,Helvetica,sans-serif;white-space:nowrap;line-height:20px;letter-spacing:normal;word-break:keep-all">' + titleText + '</div>',
+              '<div style="font-size:12px;color:rgba(255,255,255,0.7);font-family:&quot;YouTube Noto&quot;,Roboto,Arial,Helvetica,sans-serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px;line-height:16px;letter-spacing:normal">' + domainText + '</div>',
+            ].join('');
+            ctaCard.appendChild(ctaTextDiv);
+
+            // ✅ CTA 버튼 (ytp-ad-button-vm--style-filled-white)
+            // YouTube CSS: --yt-spec-white-3: #f1f1f1
+            const ctaBtn = document.createElement('div');
+            ctaBtn.style.cssText = "background:#f1f1f1;color:rgb(15,15,15);font-size:14px;font-weight:500;line-height:36px;letter-spacing:normal;font-family:Roboto,Arial,sans-serif;padding:0 16px;border-radius:18px;height:36px;white-space:nowrap;cursor:pointer;flex-shrink:0;display:inline-flex;align-items:center";
+            ctaBtn.textContent = ctaBtnText;
+            ctaCard.appendChild(ctaBtn);
+
+            const sponsorText = document.createElement('div');
+            sponsorText.id = 'admate-preroll-sponsor';
+            sponsorText.setAttribute('data-injected', 'admate-youtube-preroll');
+            sponsorText.style.cssText = [
+              'position: relative',
+              'display: flex',
+              'align-items: center',
+              'margin: 0',
+              'padding: 0',
+              'font-size: 13px',
+              'font-weight: 700',
+              'color: #ffffff',
+              'filter: drop-shadow(0px 1px 2px rgba(0,0,0,0.75))',
+              '-webkit-font-smoothing: antialiased',
+              'font-family: "YouTube Noto", "Noto Sans KR", "Malgun Gothic", Roboto, Arial, sans-serif',
+              'pointer-events: auto',
+              'flex-shrink: 0',
+              'box-sizing: border-box',
+            ].join(' !important;') + ' !important';
+            sponsorText.innerHTML = [
+              '<span style="margin-right:6px">스폰서</span>',
+              '<svg width="13" height="13" viewBox="0 0 13 13" fill="none" xmlns="http://www.w3.org/2000/svg" style="margin-right:10px; flex-shrink: 0;"><circle cx="6.5" cy="6.5" r="5.5" stroke="white" stroke-width="1.2"/><rect x="5.9" y="3.3" width="1.2" height="1.2" fill="white"/><rect x="5.9" y="5.7" width="1.2" height="4.2" fill="white"/></svg>',
+              '<span style="display:inline-block;max-width:280px;font-weight:500;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;vertical-align:bottom;">' + sponsorDomainText + '</span>'
+            ].join('');
+            if (enableCtaText) {
+              adLowerStack.appendChild(ctaCard);
+            }
+            adLowerStack.appendChild(sponsorText);
+            overlay.appendChild(adLowerStack);
+
+            // ─── 하단: 노란색 프로그레스 바 ───
+            const timerBg = document.createElement('div');
+            timerBg.style.cssText = 'position:absolute;bottom:0;left:0;width:100%;height:3px;background:rgba(255,255,255,0.15);z-index:10;border-radius:0 0 12px 12px';
+            overlay.appendChild(timerBg);
+
+            const timerBar = document.createElement('div');
+            const barRadius = progressFillPct >= 99.5 ? '0 0 12px 12px' : '0 0 0 12px';
+            timerBar.style.cssText = 'position:absolute;bottom:0;left:0;width:' + progressFillPct + '%;height:3px;background:#f2bc42;z-index:11;border-radius:' + barRadius;
+            overlay.appendChild(timerBar);
           }
-          adLowerStack.appendChild(sponsorText);
-          overlay.appendChild(adLowerStack);
-
-          // ─── 하단: 노란색 프로그레스 바 ───
-          const timerBg = document.createElement('div');
-          timerBg.style.cssText = 'position:absolute;bottom:0;left:0;width:100%;height:3px;background:rgba(255,255,255,0.15);z-index:10;border-radius:0 0 12px 12px';
-          overlay.appendChild(timerBg);
-
-          const timerBar = document.createElement('div');
-          const barRadius = progressFillPct >= 99.5 ? '0 0 12px 12px' : '0 0 0 12px';
-          timerBar.style.cssText = 'position:absolute;bottom:0;left:0;width:' + progressFillPct + '%;height:3px;background:#f2bc42;z-index:11;border-radius:' + barRadius;
-          overlay.appendChild(timerBar);
 
           // body에 오버레이 추가
           document.body.appendChild(overlay);
+
+          if (isMobile) {
+            // [모바일] 동영상 바로 밑에 모바일 전용 CTA 바 삽입
+            const mobileBar = document.createElement('div');
+            mobileBar.style.cssText = "display:flex;align-items:center;justify-content:space-between;background:#0f0f0f;padding:12px 16px;border-bottom:1px solid rgba(255,255,255,0.1);width:100%;box-sizing:border-box;";
+            
+            let htmlAvatar = avatarImgUrl ? '<img src="' + avatarImgUrl + '" style="width:36px;height:36px;border-radius:50%;object-fit:cover;margin-right:12px;">' 
+                                          : '<div style="width:36px;height:36px;border-radius:50%;background:#555;margin-right:12px;flex-shrink:0;"></div>';
+                                          
+            const htmlLeft = '<div style="display:flex;align-items:center;flex:1;min-width:0;margin-right:8px;">' +
+                                htmlAvatar + 
+                                '<div style="display:flex;flex-direction:column;min-width:0;">' +
+                                  '<div style="color:#fff;font-size:14px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-family:Roboto,Arial,sans-serif;">' + titleText + '</div>' + 
+                                  '<div style="color:#aaa;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-family:Roboto,Arial,sans-serif;margin-top:2px;">스폰서 · ' + domainText + '</div>' +
+                                '</div>' +
+                             '</div>';
+                             
+            const htmlRight = '<div style="display:flex;align-items:center;flex-shrink:0;">' +
+                                '<div style="cursor:pointer;padding:0 8px;margin-right:4px;">' +
+                                  '<svg width="18" height="18" viewBox="0 0 24 24" fill="#fff"><path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></svg>' +
+                                '</div>' +
+                                '<div style="background:#f1f1f1;color:#0f0f0f;font-size:14px;font-weight:500;padding:8px 16px;border-radius:18px;white-space:nowrap;font-family:Roboto,Arial,sans-serif;">' + ctaBtnText + '</div>' +
+                              '</div>';
+                              
+            mobileBar.innerHTML = htmlLeft + htmlRight;
+            
+            // 플레이어 하단에 부착
+            let targetNode = document.querySelector('#player-container-id') || document.querySelector('.html5-video-player');
+            if (targetNode) {
+                // ytm-item-section-renderer 등 찾기
+                let searchNode = targetNode;
+                while (searchNode.parentElement && searchNode.parentElement.tagName !== 'YTM-APP' && searchNode.parentElement.tagName !== 'BODY') {
+                    if (searchNode.parentElement.tagName.startsWith('YTM-')) {
+                        searchNode = searchNode.parentElement;
+                    } else {
+                        break;
+                    }
+                }
+                const wrapper = document.createElement('div');
+                wrapper.appendChild(mobileBar);
+                searchNode.parentNode.insertBefore(wrapper, searchNode.nextSibling);
+            } else {
+                mobileBar.style.position = 'absolute';
+                mobileBar.style.top = (py + ph) + 'px';
+                mobileBar.style.left = px + 'px';
+                mobileBar.style.width = pw + 'px';
+                mobileBar.style.zIndex = '2147483600';
+                document.body.appendChild(mobileBar);
+            }
+          }
 
           // ═══════════════════════════════════════════════════
           // 🔑 "건너뛰기" 버튼 — 실제 YouTube 둥근 알약형 (pill shape)
