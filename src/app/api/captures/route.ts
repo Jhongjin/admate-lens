@@ -315,6 +315,26 @@ async function executeBatchCaptures(captureIds: string[]): Promise<void> {
           .eq("id", captureId);
 
         console.error(`[BatchCapture] ❌ 실패: ${captureId}`, captureError);
+
+        // 브라우저 세션이 죽은 경우(타겟/연결 종료) 다음 건을 위해 엔진 재시작
+        if (isBrowserSessionClosedError(captureError)) {
+          console.warn("[BatchCapture] ♻️ 브라우저 세션 종료 감지 — 엔진 재시작");
+          try {
+            if (engineLaunched) {
+              await sharedEngine.close();
+            }
+          } catch {
+            // 이미 닫혔으면 무시
+          }
+          engineLaunched = false;
+          try {
+            await sharedEngine.launch();
+            engineLaunched = true;
+            console.log("[BatchCapture] ♻️ Chromium 재시작 완료");
+          } catch (relaunchErr) {
+            console.error("[BatchCapture] ❌ Chromium 재시작 실패", relaunchErr);
+          }
+        }
       }
     }
   } finally {
@@ -326,6 +346,17 @@ async function executeBatchCaptures(captureIds: string[]): Promise<void> {
 
   const totalMs = Date.now() - startTime;
   console.log(`[BatchCapture] 📊 배치 완료 (${totalMs}ms)`);
+}
+
+function isBrowserSessionClosedError(err: unknown): boolean {
+  const message = (err instanceof Error ? err.message : String(err)).toLowerCase();
+  return (
+    message.includes("connection closed") ||
+    message.includes("target closed") ||
+    message.includes("session closed") ||
+    message.includes("most likely the page has been closed") ||
+    message.includes("protocol error (page.capturescreenshot)")
+  );
 }
 
 /** GET: 캡처 목록 조회 */

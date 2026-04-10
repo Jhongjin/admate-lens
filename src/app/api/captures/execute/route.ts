@@ -196,6 +196,26 @@ export async function POST(request: NextRequest) {
 
           console.error(`[Execute] ❌ 캡처 실패: ${captureId}`, captureError);
           results.push({ captureId, success: false, error: errorMessage });
+
+          // 브라우저 세션 종료 에러면 엔진 재시작 후 다음 캡처 계속
+          if (isBrowserSessionClosedError(captureError)) {
+            console.warn("[Execute] ♻️ 브라우저 세션 종료 감지 — 엔진 재시작");
+            try {
+              if (engineLaunched) {
+                await sharedEngine.close();
+              }
+            } catch {
+              // 이미 닫힌 경우 무시
+            }
+            engineLaunched = false;
+            try {
+              await sharedEngine.launch();
+              engineLaunched = true;
+              console.log("[Execute] ♻️ Chromium 재시작 완료");
+            } catch (relaunchErr) {
+              console.error("[Execute] ❌ Chromium 재시작 실패", relaunchErr);
+            }
+          }
         }
       }
     } finally {
@@ -225,4 +245,15 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
+}
+
+function isBrowserSessionClosedError(err: unknown): boolean {
+  const message = (err instanceof Error ? err.message : String(err)).toLowerCase();
+  return (
+    message.includes("connection closed") ||
+    message.includes("target closed") ||
+    message.includes("session closed") ||
+    message.includes("most likely the page has been closed") ||
+    message.includes("protocol error (page.capturescreenshot)")
+  );
 }
