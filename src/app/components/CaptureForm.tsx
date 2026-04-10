@@ -448,6 +448,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
   const [showSizeGuide, setShowSizeGuide] = useState(false);
   const [customUrl, setCustomUrl] = useState("");
   const [hardBlockedPresetUrls, setHardBlockedPresetUrls] = useState<string[]>([]);
+  const [persistentlyFailedPresetUrls, setPersistentlyFailedPresetUrls] = useState<string[]>([]);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [toast, setToast] = useState<{
@@ -482,6 +483,42 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
         setHardBlockedPresetUrls(Array.from(blocked));
       } catch {
         // 비치명: 프리셋 차단 정보 조회 실패 시 기본 목록 유지
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  // 지속 실패 사이트(성공 0, 실패 3회 이상) 자동 제외
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const res = await fetch(`/api/captures?limit=500&_t=${Date.now()}`, {
+          cache: "no-store",
+        });
+        const json = await res.json();
+        if (!res.ok || !Array.isArray(json?.data) || !mounted) return;
+
+        const stats = new Map<string, { ok: number; fail: number }>();
+        for (const row of json.data as Array<{ source_url?: string | null; status?: string }>) {
+          if (!row.source_url) continue;
+          const cur = stats.get(row.source_url) ?? { ok: 0, fail: 0 };
+          if (row.status === "completed") cur.ok += 1;
+          if (row.status === "failed") cur.fail += 1;
+          stats.set(row.source_url, cur);
+        }
+
+        const persistentFails: string[] = [];
+        for (const [url, s] of stats.entries()) {
+          if (s.ok === 0 && s.fail >= 3) {
+            persistentFails.push(url);
+          }
+        }
+        setPersistentlyFailedPresetUrls(persistentFails);
+      } catch {
+        // 비치명
       }
     })();
     return () => {
@@ -711,9 +748,16 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
   /** 필터링된 프리셋 */
   const filteredPresets =
     presetCategory === "전체"
-      ? PUBLISHER_PRESETS.filter((p) => !hardBlockedPresetUrls.includes(p.url))
+      ? PUBLISHER_PRESETS.filter(
+          (p) =>
+            !hardBlockedPresetUrls.includes(p.url) &&
+            !persistentlyFailedPresetUrls.includes(p.url),
+        )
       : PUBLISHER_PRESETS.filter(
-          (p) => p.category === presetCategory && !hardBlockedPresetUrls.includes(p.url),
+          (p) =>
+            p.category === presetCategory &&
+            !hardBlockedPresetUrls.includes(p.url) &&
+            !persistentlyFailedPresetUrls.includes(p.url),
         );
 
   const visiblePresets = showAllPresets

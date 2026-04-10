@@ -285,6 +285,17 @@ export class GdnCapture extends BaseChannel {
         console.log(`[GDN]   [${i}] ${s.width}x${s.height} matchScore:${score.toFixed(1)} conf:${s.confidence}`);
       });
     }
+
+    // 콘텐츠 카드로 오탐된 슬롯(특히 section 기반 size-match)은 우선 제외
+    const filteredContentLike = slots.filter((s) => !this.isLikelyContentSlot(s));
+    if (filteredContentLike.length > 0) {
+      const removed = slots.length - filteredContentLike.length;
+      if (removed > 0) {
+        console.log(`[GDN] 콘텐츠성 슬롯 제외: ${removed}개`);
+      }
+      slots.length = 0;
+      filteredContentLike.forEach((s) => slots.push(s));
+    }
     
     // 슬롯 상세 로깅 (대형 페이지는 상위 일부만 로깅해 안정성 확보)
     const logLimit = hugePageLikely ? 60 : slots.length;
@@ -568,6 +579,24 @@ export class GdnCapture extends BaseChannel {
     const sizeScore = ((widthRatio + heightRatio) / 2) * 60;
 
     return Math.round((aspectScore + sizeScore) * 10) / 10;
+  }
+
+  private isLikelyContentSlot(slot: DetectedSlot): boolean {
+    const sel = (slot.selector || "").toLowerCase();
+    const contentPattern =
+      sel.includes("> section") ||
+      sel.includes("> article") ||
+      sel.includes("> li:nth-child") ||
+      sel.includes("#container > div:nth-child");
+    const hasAdHint =
+      sel.includes("google_ads") ||
+      sel.includes("div-gpt-ad") ||
+      sel.includes("adsbygoogle") ||
+      sel.includes("ad-") ||
+      sel.includes("_ad") ||
+      sel.includes("banner");
+
+    return slot.type === "size-match" && contentPattern && !hasAdHint;
   }
 
   /** 최종 폴백: 광고가 있을만한 위치에 강제 오버레이 */
