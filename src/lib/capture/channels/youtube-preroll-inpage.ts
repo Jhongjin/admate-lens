@@ -87,15 +87,13 @@ export function runPrerollInjectInPage(...args: unknown[]): boolean {
       // 오버레이를 항상 뷰포트 전체 폭에 정렬한다.
       const headerOffset = 56;
       const minTop = 0;
-      const maxTop = Math.max(0, window.innerHeight - 120);
+      const mobileVideoHeight = Math.round((window.innerWidth * 9) / 16);
+      const maxTop = Math.max(0, window.innerHeight - mobileVideoHeight - 40);
       py = Math.min(maxTop, Math.max(minTop, Math.round(py || headerOffset)));
       px = 0;
       pw = window.innerWidth;
-      if (ph < 80) {
-        ph = Math.round((pw * 9) / 16);
-      } else {
-        ph = Math.min(ph, Math.max(120, window.innerHeight - py - 40));
-      }
+      // 실제 모바일 유튜브 플레이어 비율(16:9) 고정
+      ph = Math.round((pw * 9) / 16);
     }
 
     const playerRadius = "12px";
@@ -124,8 +122,11 @@ export function runPrerollInjectInPage(...args: unknown[]): boolean {
       const img = document.createElement("img");
       img.src = imgUrl;
       img.setAttribute("data-injected", "admate");
+      const objectFit = isMobile ? "contain" : "cover";
       img.style.cssText =
-        "width:calc(100% + 1px) !important;height:calc(100% + 1px) !important;object-fit:cover !important;display:block !important;position:absolute !important;top:-0.5px !important;left:-0.5px !important;z-index:1 !important;border-radius:inherit !important;transform:translateZ(0) !important;backface-visibility:hidden !important";
+        "width:calc(100% + 1px) !important;height:calc(100% + 1px) !important;object-fit:" +
+        objectFit +
+        " !important;display:block !important;position:absolute !important;top:-0.5px !important;left:-0.5px !important;z-index:1 !important;border-radius:inherit !important;transform:translateZ(0) !important;backface-visibility:hidden !important;background:#000 !important";
       overlay.appendChild(img);
     } else {
       overlay.style.background = "transparent !important";
