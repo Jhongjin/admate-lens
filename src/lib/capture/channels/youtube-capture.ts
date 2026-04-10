@@ -705,10 +705,29 @@ export class YouTubeCapture extends BaseChannel {
         (() => {
           const popupSelectors =
             'ytm-popup-container, tp-yt-paper-dialog, ytm-confirm-dialog-renderer, ytm-single-option-survey-renderer,' +
-            'ytm-bottom-sheet-renderer, ytm-subscribe-button-renderer tp-yt-paper-dialog';
+            'ytm-bottom-sheet-renderer, ytm-subscribe-button-renderer tp-yt-paper-dialog, tp-yt-iron-overlay-backdrop,' +
+            '[role="dialog"], ytm-action-sheet-renderer';
 
           const removePopups = () => {
-            document.querySelectorAll(popupSelectors).forEach((el) => el.remove());
+            // 닫기/취소 버튼 우선 클릭
+            document.querySelectorAll('button, tp-yt-paper-button').forEach((el) => {
+              const text = (el.textContent || '').trim();
+              if (text === '취소' || text === '닫기' || text === '나중에') {
+                if (el instanceof HTMLElement) {
+                  try { el.click(); } catch {}
+                }
+              }
+            });
+
+            // 팝업 노드를 숨기고 제거
+            document.querySelectorAll(popupSelectors).forEach((el) => {
+              if (el instanceof HTMLElement) {
+                el.style.setProperty('display', 'none', 'important');
+                el.style.setProperty('visibility', 'hidden', 'important');
+                el.style.setProperty('opacity', '0', 'important');
+              }
+              el.remove();
+            });
             document
               .querySelectorAll('*')
               .forEach((el) => {
@@ -718,6 +737,9 @@ export class YouTubeCapture extends BaseChannel {
                   if (dialog) dialog.remove();
                 }
               });
+
+            document.body.style.setProperty('overflow', 'auto', 'important');
+            document.documentElement.style.setProperty('overflow', 'auto', 'important');
           };
 
           document
@@ -739,6 +761,17 @@ export class YouTubeCapture extends BaseChannel {
         })()
       `);
       await new Promise((r) => setTimeout(r, 300));
+      await page.evaluate<void>(`
+        (() => {
+          const popupSelectors =
+            'ytm-popup-container, tp-yt-paper-dialog, ytm-confirm-dialog-renderer, ytm-single-option-survey-renderer,' +
+            'ytm-bottom-sheet-renderer, tp-yt-iron-overlay-backdrop, [role="dialog"], ytm-action-sheet-renderer';
+          document.querySelectorAll(popupSelectors).forEach((el) => el.remove());
+          document.body.style.setProperty('overflow', 'auto', 'important');
+          document.documentElement.style.setProperty('overflow', 'auto', 'important');
+        })()
+      `);
+      await new Promise((r) => setTimeout(r, 120));
     }
 
     // 10) 스크린샷
