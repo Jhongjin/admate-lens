@@ -88,7 +88,7 @@ export async function injectCreative(
       }
 
       // 헬퍼: 컨테이너 래퍼 생성
-      function createWrapper() {
+      function createWrapper(useFixedSlotSize = false) {
         const wrapper = document.createElement('div');
         wrapper.setAttribute('data-injected', 'admate-wrapper');
         wrapper.style.cssText = [
@@ -100,9 +100,9 @@ export async function injectCreative(
           'opacity: 1 !important',
           'position: relative !important',
           'z-index: 10 !important',
-          fit ? 'width: 100% !important' : '',
-          fit ? 'height: 100% !important' : '',
-          fit ? 'min-height: 100% !important' : '',
+          fit ? (useFixedSlotSize ? ('width: ' + slotW + 'px !important') : 'width: 100% !important') : '',
+          fit ? (useFixedSlotSize ? ('height: ' + slotH + 'px !important') : 'height: 100% !important') : '',
+          fit ? (useFixedSlotSize ? ('min-height: ' + slotH + 'px !important') : 'min-height: 100% !important') : '',
         ].filter(Boolean).join('; ');
         return wrapper;
       }
@@ -114,14 +114,14 @@ export async function injectCreative(
         badge.textContent = '광고';
         badge.style.cssText = [
           'position: absolute !important',
-          'top: 6px !important',
-          'right: 6px !important',
+          'top: 4px !important',
+          'right: 4px !important',
           'z-index: 2147483647 !important',
-          'font-size: 11px !important',
+          'font-size: 12px !important',
           'line-height: 1 !important',
           'font-weight: 700 !important',
           'letter-spacing: 0 !important',
-          'padding: 3px 6px !important',
+          'padding: 4px 7px !important',
           'border-radius: 4px !important',
           'color: #ffffff !important',
           'background: rgba(0, 0, 0, 0.65) !important',
@@ -186,7 +186,7 @@ export async function injectCreative(
       if (tagName === 'iframe') {
         console.log('[Injector] iframe 대체 전략 사용');
         try {
-          const wrapper = createWrapper();
+          const wrapper = createWrapper(true);
           const img = createImgElement();
           wrapper.appendChild(img);
           addAdBadge(wrapper);

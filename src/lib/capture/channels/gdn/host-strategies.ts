@@ -56,6 +56,8 @@ function calcDdailySlotScore(slot: DetectedSlot): number {
   if (sel.includes("div-gpt-ad")) score += 90;
   if (sel.includes("adsbygoogle")) score += 80;
   if (sel.includes("mainadbanner")) score += 60;
+  if (sel.includes("ddaily_rightcontents2_ap_300_250")) score += 180;
+  if (sel.includes("300_250")) score += 120;
 
   // 표준 직사각형/스퀘어 사이즈 우선
   if ((slot.width >= 230 && slot.width <= 340) && (slot.height >= 230 && slot.height <= 340)) score += 55;
@@ -63,6 +65,9 @@ function calcDdailySlotScore(slot: DetectedSlot): number {
   // 과대 슬롯 감점 (실제 광고보다 과장된 헤더 영역 오탐 방지)
   if (slot.width >= 900 || area >= 180000) score -= 140;
   if (slot.width >= 1100 || area >= 240000) score -= 180;
+  // ddaily에서는 상단 와이드 슬롯보다 300x250 실광고를 우선
+  if (slot.width >= 700 && slot.height <= 120) score -= 220;
+  if (slot.width >= 900 && slot.height <= 120) score -= 260;
 
   return score;
 }
