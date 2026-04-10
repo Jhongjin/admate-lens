@@ -444,6 +444,9 @@ export class GdnCapture extends BaseChannel {
     this.diagnostics.injectedElementCount = injectedCheck.count;
     this.diagnostics.injectedInViewport = injectedCheck.inViewport;
 
+    // 캡처 직전 고정 배지 보정: 사이트 CSS로 배지가 가려지는 경우를 방지
+    await this.ensureAdDisclosureBadge(page);
+
     // 🔑 스크롤 복원 후 충분한 렌더링 안정화 (블로터 등 동적 사이트 대응)
     await new Promise((r) => setTimeout(r, 2000));
 
@@ -589,6 +592,54 @@ export class GdnCapture extends BaseChannel {
       }
     }
     throw lastErr instanceof Error ? lastErr : new Error(String(lastErr ?? `${phase} failed`));
+  }
+
+  private async ensureAdDisclosureBadge(page: IPageHandle): Promise<void> {
+    await page.evaluate<void>(`
+      (() => {
+        const targets = Array.from(document.querySelectorAll('[data-injected="admate"], [data-injected="admate-wrapper"]'));
+        if (targets.length === 0) return;
+
+        function ensureBadgeForTarget(target) {
+          const host = target.closest('[data-injected="admate-wrapper"]') || target.parentElement || target;
+          if (!host) return;
+          const hostStyle = window.getComputedStyle(host);
+          if (hostStyle.position === 'static') {
+            host.style.setProperty('position', 'relative', 'important');
+          }
+
+          let badge = host.querySelector(':scope > [data-injected="admate-badge"]');
+          if (!badge) {
+            badge = document.createElement('div');
+            badge.setAttribute('data-injected', 'admate-badge');
+            badge.textContent = '광고';
+            host.appendChild(badge);
+          }
+
+          badge.style.cssText = [
+            'position: absolute !important',
+            'top: 4px !important',
+            'right: 4px !important',
+            'z-index: 2147483647 !important',
+            'display: inline-block !important',
+            'font-size: 12px !important',
+            'line-height: 1 !important',
+            'font-weight: 700 !important',
+            'padding: 4px 7px !important',
+            'border-radius: 4px !important',
+            'color: #fff !important',
+            'background: rgba(0,0,0,0.72) !important',
+            'border: 1px solid rgba(255,255,255,0.38) !important',
+            'text-shadow: 0 1px 1px rgba(0,0,0,0.45) !important',
+            'pointer-events: none !important',
+            'user-select: none !important',
+            'font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif !important',
+          ].join('; ');
+        }
+
+        targets.forEach(ensureBadgeForTarget);
+      })()
+    `);
   }
 
   private async detectAccessDenied(page: IPageHandle): Promise<boolean> {
