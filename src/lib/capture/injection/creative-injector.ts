@@ -107,6 +107,32 @@ export async function injectCreative(
         return wrapper;
       }
 
+      // 헬퍼: 우상단 "광고" 배지 추가 (공통 UI)
+      function addAdBadge(container) {
+        const badge = document.createElement('div');
+        badge.setAttribute('data-injected', 'admate-badge');
+        badge.textContent = '광고';
+        badge.style.cssText = [
+          'position: absolute !important',
+          'top: 6px !important',
+          'right: 6px !important',
+          'z-index: 2147483647 !important',
+          'font-size: 11px !important',
+          'line-height: 1 !important',
+          'font-weight: 700 !important',
+          'letter-spacing: 0 !important',
+          'padding: 3px 6px !important',
+          'border-radius: 4px !important',
+          'color: #ffffff !important',
+          'background: rgba(0, 0, 0, 0.65) !important',
+          'border: 1px solid rgba(255,255,255,0.3) !important',
+          'pointer-events: none !important',
+          'user-select: none !important',
+          'font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif !important',
+        ].join('; ');
+        container.appendChild(badge);
+      }
+
       // 이미지 로드 대기 함수
       function waitForImageLoad(img, timeoutMs = 8000) {
         return new Promise((resolve) => {
@@ -130,6 +156,7 @@ export async function injectCreative(
         overlay.style.zIndex = '99999';
         const img = createImgElement();
         overlay.appendChild(img);
+        addAdBadge(overlay);
         document.body.appendChild(overlay);
         await waitForImageLoad(img);
         return { success: true, method: 'overlay', error: 'empty-selector-fallback' };
@@ -148,6 +175,7 @@ export async function injectCreative(
         overlay.style.zIndex = '99999';
         const img = createImgElement();
         overlay.appendChild(img);
+        addAdBadge(overlay);
         document.body.appendChild(overlay);
 
         await waitForImageLoad(img);
@@ -161,6 +189,7 @@ export async function injectCreative(
           const wrapper = createWrapper();
           const img = createImgElement();
           wrapper.appendChild(img);
+          addAdBadge(wrapper);
 
           el.replaceWith(wrapper);
           await waitForImageLoad(img);
@@ -176,6 +205,7 @@ export async function injectCreative(
           overlay.style.zIndex = '99999';
           const img2 = createImgElement();
           overlay.appendChild(img2);
+          addAdBadge(overlay);
           document.body.appendChild(overlay);
           await waitForImageLoad(img2);
           return { success: true, method: 'overlay', error: err.message };
@@ -205,6 +235,7 @@ export async function injectCreative(
 
         const img = createImgElement();
         el.appendChild(img);
+        addAdBadge(el);
 
         await waitForImageLoad(img);
         console.log('[Injector] 내용 교체 성공');
