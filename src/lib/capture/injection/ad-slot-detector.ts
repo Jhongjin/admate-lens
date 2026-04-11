@@ -8,7 +8,7 @@
  * 4. IAB 표준 사이즈 기반 탐지 (폴백)
  *
  * v3 개선:
- * - 최소 크기 필터 (200x80 미만 제외)
+ * - 최소 크기 필터 (200x80 미만 제외, 단 120~199폭×400+ 높이 스카이는 예외)
  * - fixed/sticky 포지션 슬롯 감점 (하단 스티키 배너 우선도 낮춤)
  * - 면적 기반 보너스 점수 (큰 슬롯 우선)
  * - 뷰포트 내 가시성 체크
@@ -176,6 +176,8 @@ export async function detectAdSlots(page: IPageHandle): Promise<DetectedSlot[]> 
         '.ads-area', '.ad-area', '#ad-area',
         // Google DFP/GAM 광고
         '[id*="div-gpt-ad"]',
+        // 머니투데이 등: 좌우 wing + 동적 광고 영역
+        '[id*="right-wing"]', '[id*="left-wing"]', '.aside_ads', '.dynamic-ad',
         // 국내 광고 네트워크 (ZDNet, 블로터 등)
         '[class*="zc-banner"]', '[class*="zdk"]',
         '[class*="mobon"]', '[class*="cauly"]', '[class*="dable"]',
@@ -220,10 +222,13 @@ export async function detectAdSlots(page: IPageHandle): Promise<DetectedSlot[]> 
     })()
   `);
 
-  // 서버 측 필터: 최소 크기 미달 슬롯 제거
-  const filteredSlots = rawSlots.filter(s => 
-    s.width >= MIN_SLOT_WIDTH && s.height >= MIN_SLOT_HEIGHT
-  );
+  // 서버 측 필터: 최소 크기 미달 슬롯 제거 (단, IAB 스카이 120/160×600은 허용)
+  const filteredSlots = rawSlots.filter((s) => {
+    if (s.width >= MIN_SLOT_WIDTH && s.height >= MIN_SLOT_HEIGHT) return true;
+    const skyscraperNarrow =
+      s.width >= 120 && s.width < MIN_SLOT_WIDTH && s.height >= 400 && s.height <= 800;
+    return skyscraperNarrow;
+  });
 
   console.log(`[AdSlotDetector] 원본 ${rawSlots.length}개 → 필터 후 ${filteredSlots.length}개 슬롯:`);
   const maxLog = filteredSlots.length > 120 ? 120 : filteredSlots.length;
