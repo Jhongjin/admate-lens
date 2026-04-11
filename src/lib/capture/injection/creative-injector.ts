@@ -109,30 +109,77 @@ export async function injectCreative(
 
       // 헬퍼: 우상단 "광고" 배지 추가 (공통 UI)
       function addAdBadge(container) {
-        const badge = document.createElement('div');
+        const uid = 'spr_' + Math.random().toString(16).slice(2);
+
+        const badge = document.createElement('label');
         badge.setAttribute('data-injected', 'admate-badge');
         badge.setAttribute('aria-hidden', 'true');
         badge.setAttribute('dir', 'ltr');
         badge.className = 'cbb';
-        badge.innerHTML = '<div class="il-icon"><svg fill="none" height="15" viewBox="0 0 15 15" width="15" xmlns="http://www.w3.org/2000/svg"><circle cx="7.5" cy="11.5" fill="#00aecd" r="1.5"></circle><circle cx="7.5" cy="7.5" fill="#00aecd" r="1.5"></circle><circle cx="7.5" cy="3.5" fill="#00aecd" r="1.5"></circle></svg></div>';
+        badge.setAttribute('for', uid);
+        badge.id = uid + '_lbl';
+
+        // 구글 광고 우상단 UI(AdChoices + 메뉴)와 동일한 형태로 맞춤
+        const text = document.createElement('div');
+        text.className = 'il-text il-text-leading';
+
+        const icon = document.createElement('div');
+        icon.className = 'il-icon';
+        icon.innerHTML =
+          '<svg fill="none" height="15" viewBox="0 0 15 15" width="15" xmlns="http://www.w3.org/2000/svg">' +
+            '<circle cx="7.5" cy="11.5" fill="#00aecd" r="1.5"></circle>' +
+            '<circle cx="7.5" cy="7.5" fill="#00aecd" r="1.5"></circle>' +
+            '<circle cx="7.5" cy="3.5" fill="#00aecd" r="1.5"></circle>' +
+          '</svg>';
+
+        const hidden = document.createElement('input');
+        hidden.id = uid;
+        hidden.type = 'checkbox';
+        hidden.style.cssText = 'display:none !important';
+        hidden.setAttribute('tabindex', '-1');
+
         badge.style.cssText = [
           'position: absolute !important',
           'top: 4px !important',
           'right: 4px !important',
           'z-index: 2147483647 !important',
-          'width: 20px !important',
-          'height: 20px !important',
-          'display: flex !important',
+          'display: inline-flex !important',
           'align-items: center !important',
-          'justify-content: center !important',
+          'gap: 2px !important',
           'padding: 0 !important',
-          'border-radius: 4px !important',
-          'background: #ffffff !important',
-          'border: 1px solid rgba(0,0,0,0.12) !important',
-          'box-shadow: 0 1px 2px rgba(0,0,0,0.18) !important',
+          'margin: 0 !important',
+          'background: transparent !important',
+          'border: none !important',
           'pointer-events: none !important',
           'user-select: none !important',
         ].join('; ');
+
+        // 좌측 AdChoices(i) 아이콘(원형 테두리 + 청록 i)
+        const info = document.createElement('span');
+        info.setAttribute('data-injected', 'admate-adchoices');
+        info.style.cssText = [
+          'display: inline-flex !important',
+          'align-items: center !important',
+          'justify-content: center !important',
+          'width: 15px !important',
+          'height: 15px !important',
+          'background: transparent !important',
+          'border: none !important',
+          'box-shadow: none !important',
+        ].join('; ');
+        info.innerHTML =
+          '<svg width="15" height="15" viewBox="0 0 15 15" xmlns="http://www.w3.org/2000/svg">' +
+            '<circle cx="7.5" cy="7.5" r="6.25" fill="none" stroke="#00aecd" stroke-width="1"></circle>' +
+            '<circle cx="7.5" cy="4.35" r="0.95" fill="#00aecd"></circle>' +
+            '<rect x="6.85" y="5.9" width="1.3" height="5.2" rx="0.65" fill="#00aecd"></rect>' +
+          '</svg>';
+
+        // DOM 순서: i → (빈 텍스트 영역) → 점(메뉴) → hidden input
+        badge.appendChild(info);
+        badge.appendChild(text);
+        badge.appendChild(icon);
+        badge.appendChild(hidden);
+
         container.appendChild(badge);
       }
 
