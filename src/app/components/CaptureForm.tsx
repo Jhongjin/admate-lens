@@ -49,7 +49,10 @@ const MEDIA_SELECT_OPTIONS: Array<{ value: MediaMenu; label: string; enabled: bo
   { value: "kakao", label: "Kakao", enabled: false },
 ];
 
-/** 게재면 프리셋 */
+/**
+ * 게재면 프리셋 — GDN 캡처용 URL 목록.
+ * 호스트별 캡처 튜닝(제외·lazy·슬롯·모달 등)은 `src/lib/capture/channels/gdn/host-strategies.ts` 상단 체크리스트.
+ */
 interface PublisherPreset {
   name: string;
   url: string;
@@ -151,14 +154,6 @@ const PUBLISHER_PRESETS: PublisherPreset[] = [
     icon: "📺",
     adSizes: ["300x250", "728x90"],
     description: "SBS 뉴스 포털",
-  },
-  {
-    name: "KBS 뉴스",
-    url: "https://news.kbs.co.kr/",
-    category: "방송",
-    icon: "📺",
-    adSizes: ["300x250", "728x90"],
-    description: "KBS 뉴스 포털",
   },
 ];
 

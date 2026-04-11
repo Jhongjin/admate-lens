@@ -5,6 +5,9 @@
  * - 소재 이미지를 base64 data URL로 변환 (CSP 완전 우회)
  * - 슬롯별 인젝션 결과를 메타데이터에 기록 (디버깅)
  * - iframe 대체, 오버레이 등 다중 전략
+ *
+ * 호스트(매체)별 분기·정책은 `gdn/host-strategies.ts` 한 파일에 모음.
+ * 신규 게재면 추가 시 그 파일 상단 체크리스트와 `CaptureForm.tsx` 의 PUBLISHER_PRESETS 를 함께 갱신.
  */
 
 import type { IPageHandle } from "../engine/browser-engine";

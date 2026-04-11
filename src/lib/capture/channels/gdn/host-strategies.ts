@@ -1,3 +1,19 @@
+/**
+ * GDN 게재면(호스트)별 정책 — 분기는 이 파일과 `gdn-capture.ts`(페이지 DOM 전용)로 나눔.
+ *
+ * ## 신규 매체(게재면) 추가 체크리스트
+ * 1. **UI 프리셋**: `src/app/components/CaptureForm.tsx` 의 `PUBLISHER_PRESETS` 에
+ *    `name`, `url`, `category`, `icon`, `adSizes`, `description` 추가.
+ * 2. **기본만으로 충분한 경우**: 이 파일 수정 없이도 동작할 수 있음(범용 슬롯 탐지·인젝션).
+ * 3. **사이트 이슈가 있을 때만** 아래 훅을 선택적으로 추가(이미 있는 패턴 복붙 후 호스트만 교체).
+ *    - `GDN_EXCLUDED_HOSTS`: 캡처 불가·정책 제외. API 배치에서 즉시 실패 처리(`isGdnExcludedHost`).
+ *    - `getGdnLazyLoadMode` → `"light"`: 대형 뉴스지면에서 lazy 이미지 일괄 복원 시 Chromium OOM 방지.
+ *    - 조선일보처럼 **모달이 광고를 가림**: `isChosunHost` 패턴으로 `gdn-capture.ts` 의 `dismissChosunPromoLayer` 호출 연결.
+ *    - **인젝션은 됐는데 스샷이 어색**: `getGdnScreenshotPolicy` → `force_centered_viewport`(SBS·디지털데일리·ZDNet 참고).
+ *    - **슬롯 오탐·우선순위**: `prioritizeGdnSlotsByHost`, `narrowGdnSlotsByHost` 에 호스트 분기 + 점수 함수.
+ * 4. **검증**: `npx tsc --noEmit` 후 커밋·`main` 푸시(프로젝트 Cursor 규칙).
+ */
+
 import type { DetectedSlot } from "@/lib/capture/injection/ad-slot-detector";
 
 export type GdnScreenshotPolicy = "default" | "force_centered_viewport";
@@ -5,12 +21,15 @@ export type GdnScreenshotPolicy = "default" | "force_centered_viewport";
 /** Lazy-load 강제: full은 data-src 일괄 복원+스크롤, light는 loading만+짧은 스크롤(대형 뉴스지면 OOM 방지) */
 export type GdnLazyLoadMode = "full" | "light";
 
+// --- 정책 제외: 캡처 시도 안 함(API에서 즉시 failed, 직접 URL도 차단) ---
 const GDN_EXCLUDED_HOSTS = new Set<string>([
   "news.kbs.co.kr",
   "mt.co.kr",
   "www.mt.co.kr",
   "m.mt.co.kr",
 ]);
+
+// --- 호스트 감지(내부) ---
 
 function isZdnetHost(host: string): boolean {
   return host === "zdnet.co.kr" || host === "www.zdnet.co.kr";
@@ -21,13 +40,14 @@ function isMkHost(host: string): boolean {
   return h === "www.mk.co.kr" || h === "mk.co.kr" || h === "m.mk.co.kr";
 }
 
-/** 조선일보 멤버십/프로모션 레이어가 광고 슬롯을 가리는 경우가 있어 캡처 전 정리 */
+/** 조선일보: `gdn-capture.dismissChosunPromoLayer` 와 짝. 신규 사이트는 별도 `isXxxHost` + dismiss 연결. */
 export function isChosunHost(host: string): boolean {
   const h = host.toLowerCase();
   return h === "www.chosun.com" || h === "chosun.com" || h === "m.chosun.com";
 }
 
-/** 이미지·스크롤 부하가 큰 지면에서 Chromium 타깃 종료(OOM 등)를 줄이기 위한 경량 모드 */
+// --- Lazy-load (gdn-capture에서 evaluate 스크립트 분기) ---
+
 export function getGdnLazyLoadMode(host: string): GdnLazyLoadMode {
   if (isMkHost(host)) return "light";
   return "full";
@@ -37,12 +57,16 @@ export function isGdnExcludedHost(host: string): boolean {
   return GDN_EXCLUDED_HOSTS.has(host);
 }
 
+// --- 스크린샷(인젝션 후 뷰포트 정책, gdn-capture safeCaptureScreenshot 경로) ---
+
 export function getGdnScreenshotPolicy(host: string): GdnScreenshotPolicy {
   if (host === "news.sbs.co.kr") return "force_centered_viewport";
   if (host === "www.ddaily.co.kr") return "force_centered_viewport";
   if (isZdnetHost(host)) return "force_centered_viewport";
   return "default";
 }
+
+// --- 슬롯 후보: 정렬(우선) / 필터(축소) — detectAdSlots 이후 gdn-capture에서 호출 ---
 
 export function prioritizeGdnSlotsByHost(host: string, slots: DetectedSlot[]): void {
   if (!host || slots.length <= 1) return;
