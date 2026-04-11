@@ -21,6 +21,8 @@ export interface InjectionOptions {
   removeObstructions?: boolean;
   /** 업로드 소재 원본 크기 (비율 기반 fit 판단용) */
   creativeDimensions?: { width: number; height: number };
+  /** 슬롯 내 소재 표시: contain(여백 가능) | cover(크롭 가능) */
+  objectFit?: "contain" | "cover";
 }
 
 /** 인젝션 결과 상세 */
@@ -40,6 +42,7 @@ export async function injectCreative(
   options: InjectionOptions
 ): Promise<InjectionResult> {
   const { creativeUrl, fitToSlot = true, removeObstructions = true, creativeDimensions } = options;
+  const objectFitMode: "contain" | "cover" = options.objectFit === "cover" ? "cover" : "contain";
 
   if (removeObstructions) {
     await removePageObstructions(page);
@@ -57,8 +60,7 @@ export async function injectCreative(
       const slotY = ${slot.y};
       const fit = ${fitToSlot};
       const tagName = ${JSON.stringify(slot.tagName)};
-      // 정책: 실제 게재면과 동일하게 종횡비 유지 + 슬롯 안에 맞춤(레터박스 허용, 크롭 없음)
-      const objectFitMode = 'contain';
+      const objectFitMode = ${JSON.stringify(objectFitMode)};
 
       console.log('[Injector] 인젝션 시도:', selector, tagName, slotW + 'x' + slotH);
 

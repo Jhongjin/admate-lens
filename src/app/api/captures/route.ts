@@ -46,6 +46,7 @@ export async function POST(request: NextRequest) {
       creativeDimensions,        // 📐 배너 사이즈 {width, height}
       adSizeMode = "auto",       // 📐 "auto" | "manual"
       targetAdSizes = [],        // 📐 수동 선택한 사이즈 배열
+      creativeObjectFit = "contain", // 📐 슬롯 내 소재: contain | cover
       youtubeAdType,             // 🎬 YouTube 광고 유형
       instreamOpts,              // 🎬 인스트림 광고 옵션
     } = body as {
@@ -60,6 +61,7 @@ export async function POST(request: NextRequest) {
       creativeDimensions?: { width: number; height: number };
       adSizeMode?: "auto" | "manual";
       targetAdSizes?: string[];
+      creativeObjectFit?: "contain" | "cover";
       youtubeAdType?: "preroll" | "display" | "overlay" | "mobile-preroll-aos" | "mobile-preroll-ios";
       instreamOpts?: {
         videoUrl?: string;
@@ -104,6 +106,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const normalizedCreativeObjectFit =
+      creativeObjectFit === "cover" ? "cover" : "contain";
+
     const supabase = createServerClient();
     const createdCaptures: any[] = [];
 
@@ -115,6 +120,7 @@ export async function POST(request: NextRequest) {
         creativeDimensions,
         adSizeMode,
         targetAdSizes,
+        creativeObjectFit: normalizedCreativeObjectFit,
         youtubeAdType,
         instreamOpts,
       };
@@ -309,6 +315,8 @@ async function executeBatchCaptures(captureIds: string[]): Promise<void> {
                 creativeDimensions: captureMetadata.creativeDimensions ?? undefined,
                 adSizeMode: captureMetadata.adSizeMode ?? "auto",
                 targetAdSizes: captureMetadata.targetAdSizes ?? [],
+                creativeObjectFit:
+                  captureMetadata.creativeObjectFit === "cover" ? "cover" : "contain",
                 youtubeAdType: captureMetadata.youtubeAdType ?? "preroll",
                 instreamOpts: captureMetadata.instreamOpts,
                 publisherGotoRelaxed: multiBatch && capture.channel === "gdn",

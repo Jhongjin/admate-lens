@@ -265,6 +265,8 @@ export class GdnCapture extends BaseChannel {
     const creativeDims = request.options?.creativeDimensions as { width: number; height: number } | undefined;
     const adSizeMode = (request.options?.adSizeMode as string) || "auto";
     const targetAdSizes = (request.options?.targetAdSizes as string[]) || [];
+    const creativeObjectFit =
+      request.options?.creativeObjectFit === "cover" ? "cover" : "contain";
 
     if (adSizeMode === "manual" && targetAdSizes.length > 0) {
       // 🎯 수동 모드: 선택한 사이즈에 실제로 맞는 슬롯만 남김 (±50px)
@@ -420,6 +422,7 @@ export class GdnCapture extends BaseChannel {
               fitToSlot: true,
               removeObstructions: i === 0,
               creativeDimensions: creativeDims,
+              objectFit: creativeObjectFit,
             }),
           "inject-creative"
         );
@@ -451,7 +454,7 @@ export class GdnCapture extends BaseChannel {
     if (injectedCount === 0) {
       console.warn("[GDN] 모든 인젝션 실패 — 폴백: 페이지 상단에 배너 오버레이");
       // 최종 폴백: 화면에 직접 오버레이
-      await this.injectOverlayFallback(page, creativeDataUrl);
+      await this.injectOverlayFallback(page, creativeDataUrl, creativeObjectFit);
     }
 
     // 6) 렌더링 안정화 대기
@@ -1147,10 +1150,16 @@ export class GdnCapture extends BaseChannel {
   }
 
   /** 최종 폴백: 광고가 있을만한 위치에 강제 오버레이 */
-  private async injectOverlayFallback(page: IPageHandle, imgDataUrl: string): Promise<void> {
+  private async injectOverlayFallback(
+    page: IPageHandle,
+    imgDataUrl: string,
+    objectFit: "contain" | "cover"
+  ): Promise<void> {
+    const fit = objectFit === "cover" ? "cover" : "contain";
     await page.evaluate<void>(`
       (() => {
         const imgUrl = ${JSON.stringify(imgDataUrl)};
+        const objectFitMode = ${JSON.stringify(fit)};
         
         // 아이프레임들을 찾아서 첫 번째로 교체 시도
         const iframes = document.querySelectorAll('iframe');
@@ -1167,7 +1176,7 @@ export class GdnCapture extends BaseChannel {
             const img = document.createElement('img');
             img.src = imgUrl;
             img.setAttribute('data-injected', 'admate');
-            img.style.cssText = 'display:block !important; width:' + Math.round(rect.width) + 'px !important; height:' + Math.round(rect.height) + 'px !important; object-fit:contain !important; object-position:center center !important; border:none !important;';
+            img.style.cssText = 'display:block !important; width:' + Math.round(rect.width) + 'px !important; height:' + Math.round(rect.height) + 'px !important; object-fit:' + objectFitMode + ' !important; object-position:center center !important; border:none !important;';
             
             wrapper.appendChild(img);
             iframe.replaceWith(wrapper);
@@ -1185,7 +1194,7 @@ export class GdnCapture extends BaseChannel {
             if (rect.width >= 250 && rect.height >= 50 && rect.width <= 1200 && rect.height <= 400) {
               existingImg.src = imgUrl;
               existingImg.setAttribute('data-injected', 'admate');
-              existingImg.style.cssText += ';object-fit:contain !important;object-position:center center !important;';
+              existingImg.style.cssText += ';object-fit:' + objectFitMode + ' !important;object-position:center center !important;';
               console.log('[Injector] 폴백: 배너 크기 이미지 교체 (' + Math.round(rect.width) + 'x' + Math.round(rect.height) + ')');
               replaced = true;
               break;

@@ -228,6 +228,9 @@ const GDN_AD_SIZES: AdSizeInfo[] = [
 /** 광고 사이즈 모드 */
 type AdSizeMode = "auto" | "manual";
 
+/** 자동 매칭 시 슬롯 안 소재 표시 방식 */
+type CreativeObjectFitMode = "contain" | "cover";
+
 /** YouTube 광고 유형 */
 type YouTubeAdType =
   | "preroll"
@@ -315,6 +318,8 @@ interface CaptureFormData {
   injectionMode: InjectionMode;
   slotCount: number;
   adSizeMode: AdSizeMode;
+  /** 자동 매칭일 때 슬롯 내 소재 맞춤(contain=여백 가능, cover=크롭) */
+  creativeObjectFit: CreativeObjectFitMode;
   targetAdSizes: string[]; // 수동 모드에서 선택한 사이즈 (예: ["300x250", "728x90"])
   youtubeAdType: YouTubeAdType; // YouTube 광고 유형
   // 🎬 인스트림 광고 옵션
@@ -381,6 +386,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
     injectionMode: "single",
     slotCount: 2,
     adSizeMode: "auto",
+    creativeObjectFit: "contain",
     targetAdSizes: [],
     youtubeAdType: "preroll",
     instreamVideoUrl: "",
@@ -825,6 +831,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
               : undefined,
           // 📐 사이즈 선택 모드 & 타겟 사이즈
           adSizeMode: form.adSizeMode,
+          creativeObjectFit: form.creativeObjectFit,
           targetAdSizes: form.adSizeMode === "manual" ? form.targetAdSizes : [],
           // 🎬 YouTube 광고 유형
           youtubeAdType:
@@ -2253,37 +2260,117 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
             </div>
 
             {form.adSizeMode === "auto" ? (
-              /* 자동 매칭 모드 설명 */
-              <div
-                className="flex items-start gap-2 p-2.5 rounded-lg animate-fade-in"
-                style={{ backgroundColor: "var(--color-accent-subtle)" }}
-              >
-                <span className="text-sm mt-0.5">✨</span>
-                <div>
+              <div className="space-y-2.5 animate-fade-in">
+                {/* 자동 매칭 모드 설명 */}
+                <div
+                  className="flex items-start gap-2 p-2.5 rounded-lg"
+                  style={{ backgroundColor: "var(--color-accent-subtle)" }}
+                >
+                  <span className="text-sm mt-0.5">✨</span>
+                  <div>
+                    <p
+                      className="text-xs font-semibold"
+                      style={{ color: "var(--color-accent)" }}
+                    >
+                      자동 사이즈 매핑
+                    </p>
+                    <p
+                      className="text-[11px] mt-0.5"
+                      style={{ color: "var(--color-text-secondary)" }}
+                    >
+                      {uploadedFile?.width && uploadedFile?.height ? (
+                        <>
+                          업로드한{" "}
+                          <strong>
+                            {uploadedFile.width}×{uploadedFile.height}
+                          </strong>{" "}
+                          이미지와 가장 유사한 슬롯을 자동으로 우선 선택합니다.
+                        </>
+                      ) : (
+                        <>
+                          소재 이미지를 업로드하면, 해당 크기와 가장 유사한 광고
+                          슬롯에 우선 배치됩니다.
+                        </>
+                      )}
+                    </p>
+                  </div>
+                </div>
+
+                {/* 슬롯 내 소재 맞춤 방식 */}
+                <div
+                  className="rounded-lg border p-2.5"
+                  style={{
+                    borderColor: "var(--color-border)",
+                    backgroundColor: "var(--color-bg-secondary)",
+                  }}
+                >
                   <p
-                    className="text-xs font-semibold"
-                    style={{ color: "var(--color-accent)" }}
+                    className="text-[11px] font-semibold mb-2"
+                    style={{ color: "var(--color-text-primary)" }}
                   >
-                    자동 사이즈 매핑
+                    슬롯 안에 소재 넣는 방식
                   </p>
+                  <div className="flex gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setForm((prev) => ({
+                          ...prev,
+                          creativeObjectFit: "contain",
+                        }))
+                      }
+                      className="flex-1 px-2 py-1.5 rounded-md text-[11px] font-medium transition-all border"
+                      style={{
+                        borderColor:
+                          form.creativeObjectFit === "contain"
+                            ? "var(--color-accent)"
+                            : "var(--color-border)",
+                        backgroundColor:
+                          form.creativeObjectFit === "contain"
+                            ? "var(--color-accent-subtle)"
+                            : "transparent",
+                        color:
+                          form.creativeObjectFit === "contain"
+                            ? "var(--color-accent)"
+                            : "var(--color-text-muted)",
+                      }}
+                    >
+                      비율 유지
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setForm((prev) => ({
+                          ...prev,
+                          creativeObjectFit: "cover",
+                        }))
+                      }
+                      className="flex-1 px-2 py-1.5 rounded-md text-[11px] font-medium transition-all border"
+                      style={{
+                        borderColor:
+                          form.creativeObjectFit === "cover"
+                            ? "var(--color-accent)"
+                            : "var(--color-border)",
+                        backgroundColor:
+                          form.creativeObjectFit === "cover"
+                            ? "var(--color-accent-subtle)"
+                            : "transparent",
+                        color:
+                          form.creativeObjectFit === "cover"
+                            ? "var(--color-accent)"
+                            : "var(--color-text-muted)",
+                      }}
+                    >
+                      슬롯 꽉 채움
+                    </button>
+                  </div>
                   <p
-                    className="text-[11px] mt-0.5"
-                    style={{ color: "var(--color-text-secondary)" }}
+                    className="text-[10px] mt-2 leading-relaxed"
+                    style={{ color: "var(--color-text-muted)" }}
                   >
-                    {uploadedFile?.width && uploadedFile?.height ? (
-                      <>
-                        업로드한{" "}
-                        <strong>
-                          {uploadedFile.width}×{uploadedFile.height}
-                        </strong>{" "}
-                        이미지와 가장 유사한 슬롯을 자동으로 우선 선택합니다.
-                      </>
-                    ) : (
-                      <>
-                        소재 이미지를 업로드하면, 해당 크기와 가장 유사한 광고
-                        슬롯에 우선 배치됩니다.
-                      </>
-                    )}
+                    {form.creativeObjectFit === "contain"
+                      ? "원본 비율을 유지한 채 슬롯 안에 맞춥니다. 슬롯 비율과 다르면 좌우·상하에 빈 여백이 생길 수 있습니다."
+                      : "슬롯을 가득 채우도록 맞추며, 비율 차이는 잘림으로 처리됩니다. 이미지 가장자리가 잘려 보일 수 있습니다."}
                   </p>
                 </div>
               </div>

@@ -187,6 +187,8 @@ export async function POST(request: NextRequest) {
                   creativeDimensions: captureMetadata.creativeDimensions ?? undefined,
                   adSizeMode: captureMetadata.adSizeMode ?? "auto",
                   targetAdSizes: captureMetadata.targetAdSizes ?? [],
+                  creativeObjectFit:
+                    captureMetadata.creativeObjectFit === "cover" ? "cover" : "contain",
                   youtubeAdType: captureMetadata.youtubeAdType ?? "preroll",
                   instreamOpts: captureMetadata.instreamOpts,
                   publisherGotoRelaxed: multiBatch && resolvedChannel === "gdn",
