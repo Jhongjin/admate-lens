@@ -106,6 +106,61 @@ export async function injectCreative(
         return wrapper;
       }
 
+      // object-fit:contain + 레터박스일 때 배지를 '그려진 소재' 우상단에 붙임 (래퍼 모서리가 아님)
+      function syncBadgeToCreativeCorner(host, img) {
+        const badge = host.querySelector(':scope > [data-injected="admate-badge"]');
+        if (!badge || !img || img.tagName !== 'IMG') return;
+        const nw = img.naturalWidth, nh = img.naturalHeight;
+        if (!nw || !nh) return;
+
+        const fit = (getComputedStyle(img).objectFit || 'fill').toLowerCase();
+        if (fit !== 'contain') {
+          badge.style.setProperty('top', '4px', 'important');
+          badge.style.setProperty('right', '4px', 'important');
+          badge.style.setProperty('left', 'auto', 'important');
+          badge.style.setProperty('bottom', 'auto', 'important');
+          return;
+        }
+
+        const W = img.clientWidth, H = img.clientHeight;
+        if (!W || !H) return;
+
+        const scale = Math.min(W / nw, H / nh);
+        const dw = nw * scale, dh = nh * scale;
+
+        const op = (getComputedStyle(img).objectPosition || '50% 50%').trim().split(/\\s+/);
+        const px = op[0] || '50%';
+        const py = op[1] || op[0] || '50%';
+
+        function align(pos, gap) {
+          if (pos === 'left' || pos === 'top') return 0;
+          if (pos === 'right' || pos === 'bottom') return Math.max(0, gap);
+          if (pos === 'center') return gap / 2;
+          if (pos.endsWith('%')) return gap * ((parseFloat(pos) || 50) / 100);
+          return gap / 2;
+        }
+
+        const ox = align(px, W - dw);
+        const oy = align(py, H - dh);
+
+        const hr = host.getBoundingClientRect();
+        const ir = img.getBoundingClientRect();
+        const sx = ir.width / W || 1;
+        const sy = ir.height / H || 1;
+        const fitLeft = ir.left + ox * sx;
+        const fitTop = ir.top + oy * sy;
+        const fitW = dw * sx;
+
+        const bw = badge.offsetWidth || 40;
+        const left = fitLeft + fitW - bw - 4 - hr.left;
+        const top = fitTop + 4 - hr.top;
+
+        badge.style.setProperty('top', top + 'px', 'important');
+        badge.style.setProperty('left', left + 'px', 'important');
+        badge.style.setProperty('right', 'auto', 'important');
+        badge.style.setProperty('bottom', 'auto', 'important');
+      }
+
       // 헬퍼: 우상단 "광고" 배지 추가 (공통 UI)
       function addAdBadge(container) {
         const uid = 'spr_' + Math.random().toString(16).slice(2);
@@ -208,6 +263,7 @@ export async function injectCreative(
         addAdBadge(overlay);
         document.body.appendChild(overlay);
         await waitForImageLoad(img);
+        syncBadgeToCreativeCorner(overlay, img);
         return { success: true, method: 'overlay', error: 'empty-selector-fallback' };
       }
 
@@ -228,6 +284,7 @@ export async function injectCreative(
         document.body.appendChild(overlay);
 
         await waitForImageLoad(img);
+        syncBadgeToCreativeCorner(overlay, img);
         return { success: true, method: 'overlay', error: undefined };
       }
 
@@ -242,6 +299,7 @@ export async function injectCreative(
 
           el.replaceWith(wrapper);
           await waitForImageLoad(img);
+          syncBadgeToCreativeCorner(wrapper, img);
           console.log('[Injector] iframe 대체 성공');
           return { success: true, method: 'replace-iframe', error: undefined };
         } catch (err) {
@@ -257,6 +315,7 @@ export async function injectCreative(
           addAdBadge(overlay);
           document.body.appendChild(overlay);
           await waitForImageLoad(img2);
+          syncBadgeToCreativeCorner(overlay, img2);
           return { success: true, method: 'overlay', error: err.message };
         }
       }
@@ -287,6 +346,7 @@ export async function injectCreative(
         addAdBadge(el);
 
         await waitForImageLoad(img);
+        syncBadgeToCreativeCorner(el, img);
         console.log('[Injector] 내용 교체 성공');
         return { success: true, method: 'replace-content', error: undefined };
       } catch (err) {

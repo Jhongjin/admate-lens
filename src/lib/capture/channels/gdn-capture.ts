@@ -600,6 +600,60 @@ export class GdnCapture extends BaseChannel {
         const targets = Array.from(document.querySelectorAll('[data-injected="admate"], [data-injected="admate-wrapper"]'));
         if (targets.length === 0) return;
 
+        function syncBadgeToCreativeCorner(host, img) {
+          const badge = host.querySelector(':scope > [data-injected="admate-badge"]');
+          if (!badge || !img || img.tagName !== 'IMG') return;
+          const nw = img.naturalWidth, nh = img.naturalHeight;
+          if (!nw || !nh) return;
+
+          const fit = (getComputedStyle(img).objectFit || 'fill').toLowerCase();
+          if (fit !== 'contain') {
+            badge.style.setProperty('top', '4px', 'important');
+            badge.style.setProperty('right', '4px', 'important');
+            badge.style.setProperty('left', 'auto', 'important');
+            badge.style.setProperty('bottom', 'auto', 'important');
+            return;
+          }
+
+          const W = img.clientWidth, H = img.clientHeight;
+          if (!W || !H) return;
+
+          const scale = Math.min(W / nw, H / nh);
+          const dw = nw * scale, dh = nh * scale;
+
+          const op = (getComputedStyle(img).objectPosition || '50% 50%').trim().split(/\\s+/);
+          const px = op[0] || '50%';
+          const py = op[1] || op[0] || '50%';
+
+          function align(pos, gap) {
+            if (pos === 'left' || pos === 'top') return 0;
+            if (pos === 'right' || pos === 'bottom') return Math.max(0, gap);
+            if (pos === 'center') return gap / 2;
+            if (pos.endsWith('%')) return gap * ((parseFloat(pos) || 50) / 100);
+            return gap / 2;
+          }
+
+          const ox = align(px, W - dw);
+          const oy = align(py, H - dh);
+
+          const hr = host.getBoundingClientRect();
+          const ir = img.getBoundingClientRect();
+          const sx = ir.width / W || 1;
+          const sy = ir.height / H || 1;
+          const fitLeft = ir.left + ox * sx;
+          const fitTop = ir.top + oy * sy;
+          const fitW = dw * sx;
+
+          const bw = badge.offsetWidth || 40;
+          const left = fitLeft + fitW - bw - 4 - hr.left;
+          const top = fitTop + 4 - hr.top;
+
+          badge.style.setProperty('top', top + 'px', 'important');
+          badge.style.setProperty('left', left + 'px', 'important');
+          badge.style.setProperty('right', 'auto', 'important');
+          badge.style.setProperty('bottom', 'auto', 'important');
+        }
+
         function ensureBadgeForTarget(target) {
           const host = target.closest('[data-injected="admate-wrapper"]') || target.parentElement || target;
           if (!host) return;
@@ -679,6 +733,9 @@ export class GdnCapture extends BaseChannel {
             'pointer-events: none !important',
             'user-select: none !important',
           ].join('; ');
+
+          const img = host.querySelector('img[data-injected="admate"]');
+          if (img) syncBadgeToCreativeCorner(host, img);
         }
 
         targets.forEach(ensureBadgeForTarget);
