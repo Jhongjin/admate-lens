@@ -122,8 +122,8 @@ export async function injectCreative(
 
         const fit = (getComputedStyle(img).objectFit || 'fill').toLowerCase();
         if (fit !== 'contain') {
-          badge.style.setProperty('top', '4px', 'important');
-          badge.style.setProperty('right', '4px', 'important');
+          badge.style.setProperty('top', '1px', 'important');
+          badge.style.setProperty('right', '17px', 'important');
           badge.style.setProperty('left', 'auto', 'important');
           badge.style.setProperty('bottom', 'auto', 'important');
           return;
@@ -159,8 +159,8 @@ export async function injectCreative(
         const fitW = dw * sx;
 
         const bw = badge.offsetWidth || 40;
-        const left = fitLeft + fitW - bw - 4 - hr.left;
-        const top = fitTop + 4 - hr.top;
+        const left = fitLeft + fitW - bw - 17 - hr.left;
+        const top = fitTop + 1 - hr.top;
 
         badge.style.setProperty('top', top + 'px', 'important');
         badge.style.setProperty('left', left + 'px', 'important');
@@ -168,58 +168,51 @@ export async function injectCreative(
         badge.style.setProperty('bottom', 'auto', 'important');
       }
 
-      // 헬퍼: 우상단 "광고" 배지 추가 (공통 UI)
+      // AdChoices: Google AdChoices DOM (.abgc / .il-wrap / .cbb) — right:17px, top:1px
       function addAdBadge(container) {
         const uid = 'spr_' + Math.random().toString(16).slice(2);
 
-        const badge = document.createElement('label');
+        const badge = document.createElement('div');
         badge.setAttribute('data-injected', 'admate-badge');
         badge.setAttribute('aria-hidden', 'true');
         badge.setAttribute('dir', 'ltr');
-        badge.className = 'cbb';
-        badge.setAttribute('for', uid);
-        badge.id = uid + '_lbl';
+        badge.className = 'abgc';
+        badge.style.cssText = [
+          'display: block !important',
+          'height: 15px !important',
+          'position: absolute !important',
+          'right: 17px !important',
+          'top: 1px !important',
+          'text-rendering: geometricPrecision !important',
+          'z-index: 2147483646 !important',
+          'cursor: pointer !important',
+          'padding: 0 !important',
+          'margin: 0 !important',
+          'border: none !important',
+          'pointer-events: none !important',
+          'user-select: none !important',
+        ].join('; ');
 
-        const icon = document.createElement('div');
-        icon.className = 'il-icon';
-        icon.innerHTML =
-          '<svg fill="none" height="15" viewBox="0 0 15 15" width="15" xmlns="http://www.w3.org/2000/svg">' +
-            '<circle cx="7.5" cy="11.5" fill="#00aecd" r="1.5"></circle>' +
-            '<circle cx="7.5" cy="7.5" fill="#00aecd" r="1.5"></circle>' +
-            '<circle cx="7.5" cy="3.5" fill="#00aecd" r="1.5"></circle>' +
-          '</svg>';
+        const ilWrap = document.createElement('span');
+        ilWrap.className = 'il-wrap';
+        ilWrap.setAttribute('data-injected', 'admate-badge-row');
+        ilWrap.style.cssText = [
+          'background-color: #ffffff !important',
+          'height: 15px !important',
+          'white-space: nowrap !important',
+          'display: inline-flex !important',
+          'align-items: center !important',
+          'vertical-align: top !important',
+          'padding: 0 !important',
+          'margin: 0 !important',
+          'gap: 2px !important',
+        ].join('; ');
 
         const hidden = document.createElement('input');
         hidden.id = uid;
         hidden.type = 'checkbox';
         hidden.style.cssText = 'display:none !important';
         hidden.setAttribute('tabindex', '-1');
-
-        badge.style.cssText = [
-          'position: absolute !important',
-          'top: 4px !important',
-          'right: 4px !important',
-          'z-index: 2147483647 !important',
-          'display: inline-block !important',
-          'padding: 0 !important',
-          'margin: 0 !important',
-          'background: transparent !important',
-          'border: none !important',
-          'pointer-events: none !important',
-          'user-select: none !important',
-        ].join('; ');
-
-        const row = document.createElement('span');
-        row.setAttribute('data-injected', 'admate-badge-row');
-        row.style.cssText = [
-          'display: inline-flex !important',
-          'align-items: center !important',
-          'gap: 2px !important',
-          'padding: 0 !important',
-          'margin: 0 !important',
-          'background: transparent !important',
-          'border: none !important',
-        ].join('; ');
 
         const cellCss =
           'display:inline-flex !important;align-items:center !important;justify-content:center !important;' +
@@ -232,34 +225,49 @@ export async function injectCreative(
         cellInfo.setAttribute('data-injected', 'admate-adchoices-cell');
         cellInfo.style.cssText = cellCss;
 
-        const info = document.createElement('span');
-        info.setAttribute('data-injected', 'admate-adchoices');
-        info.style.cssText = [
-          'display: inline-flex !important',
-          'align-items: center !important',
-          'justify-content: center !important',
-          'width: 15px !important',
-          'height: 15px !important',
-          'background: transparent !important',
-          'border: none !important',
-          'box-shadow: none !important',
-        ].join('; ');
-        info.innerHTML =
-          '<svg width="15" height="15" viewBox="0 0 15 15" xmlns="http://www.w3.org/2000/svg">' +
-            '<circle cx="7.5" cy="7.5" r="6.25" fill="none" stroke="#00aecd" stroke-width="1"></circle>' +
-            '<circle cx="7.5" cy="4.35" r="0.95" fill="#00aecd"></circle>' +
-            '<rect x="6.85" y="5.9" width="1.3" height="5.2" rx="0.65" fill="#00aecd"></rect>' +
+        const ilIconInfo = document.createElement('div');
+        ilIconInfo.className = 'il-icon';
+        ilIconInfo.style.cssText =
+          'line-height:0 !important;display:inline-block !important;height:15px !important;width:auto !important;vertical-align:top !important;';
+        ilIconInfo.innerHTML =
+          '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 15 15" width="15" height="15">' +
+            '<path fill="#00aecd" d="M7.5 1.5a6 6 0 100 12 6 6 0 100-12m0 1a5 5 0 110 10 5 5 0 110-10zM6.625 11h1.75V6.5h-1.75zM7.5 3.75a1 1 0 100 2 1 1 0 100-2z"></path>' +
           '</svg>';
-        cellInfo.appendChild(info);
+        cellInfo.appendChild(ilIconInfo);
 
-        const cellMenu = document.createElement('span');
-        cellMenu.setAttribute('data-injected', 'admate-adchoices-cell');
-        cellMenu.style.cssText = cellCss;
-        cellMenu.appendChild(icon);
+        const cbb = document.createElement('label');
+        cbb.className = 'cbb';
+        cbb.setAttribute('for', uid);
+        cbb.id = uid + '_lbl';
+        cbb.style.cssText = [
+          'cursor: pointer !important',
+          'height: 15px !important',
+          'width: 15px !important',
+          'z-index: 2147483646 !important',
+          'background-color: #ffffff !important',
+          'display: inline-flex !important',
+          'position: relative !important',
+          'padding: 0 !important',
+          'margin: 0 !important',
+          'line-height: 0 !important',
+        ].join('; ');
 
-        row.appendChild(cellInfo);
-        row.appendChild(cellMenu);
-        badge.appendChild(row);
+        const ilIconMenu = document.createElement('div');
+        ilIconMenu.className = 'il-icon';
+        ilIconMenu.style.cssText =
+          'line-height:0 !important;display:inline-block !important;height:15px !important;width:15px !important;vertical-align:top !important;position:relative !important;';
+        ilIconMenu.innerHTML =
+          '<svg fill="none" height="15" viewBox="0 0 15 15" width="15" xmlns="http://www.w3.org/2000/svg" ' +
+            'style="position:absolute !important;top:0 !important;right:0 !important;height:15px !important;width:15px !important;">' +
+            '<circle cx="7.5" cy="3.5" fill="#00aecd" r="1.5"></circle>' +
+            '<circle cx="7.5" cy="7.5" fill="#00aecd" r="1.5"></circle>' +
+            '<circle cx="7.5" cy="11.5" fill="#00aecd" r="1.5"></circle>' +
+          '</svg>';
+        cbb.appendChild(ilIconMenu);
+
+        ilWrap.appendChild(cellInfo);
+        ilWrap.appendChild(cbb);
+        badge.appendChild(ilWrap);
         badge.appendChild(hidden);
 
         container.appendChild(badge);
