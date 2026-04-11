@@ -353,6 +353,7 @@ export async function injectCreative(
       }
 
       // 전략 2: 일반 요소 → 내용 교체
+      // width/height 100%만 주면 부모(메인 컬럼 등)가 늘어나며 뷰포트 전체를 덮는 사이트가 있음 → 탐지된 슬롯 픽셀로 고정
       console.log('[Injector] 내용 교체 전략 사용');
       try {
         // 슬롯 내용 비우기
@@ -368,8 +369,11 @@ export async function injectCreative(
           'opacity: 1 !important',
           'position: relative !important',
           'z-index: 10 !important',
-          fit ? 'width: 100% !important' : '',
-          fit ? 'height: 100% !important' : '',
+          'box-sizing: border-box !important',
+          fit ? ('width: ' + Math.max(1, Math.round(slotW)) + 'px !important') : '',
+          fit ? ('height: ' + Math.max(1, Math.round(slotH)) + 'px !important') : '',
+          fit ? ('max-width: ' + Math.max(1, Math.round(slotW)) + 'px !important') : '',
+          fit ? ('max-height: ' + Math.max(1, Math.round(slotH)) + 'px !important') : '',
           'min-height: 0 !important',
         ].filter(Boolean).join('; ');
 
