@@ -103,14 +103,6 @@ const PUBLISHER_PRESETS: PublisherPreset[] = [
     description: "경제전문지",
   },
   {
-    name: "머니투데이",
-    url: "https://www.mt.co.kr/",
-    category: "경제",
-    icon: "💰",
-    adSizes: ["300x250", "728x90"],
-    description: "종합 경제미디어",
-  },
-  {
     name: "헤럴드경제",
     url: "https://biz.heraldcorp.com/",
     category: "경제",

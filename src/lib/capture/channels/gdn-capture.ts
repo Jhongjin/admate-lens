@@ -12,7 +12,6 @@ import { BaseChannel, type CaptureRequest } from "./base-channel";
 import { detectAdSlots, type DetectedSlot } from "../injection/ad-slot-detector";
 import { injectCreative, type InjectionResult } from "../injection/creative-injector";
 import {
-  finalizeGdnSlotsForHost,
   getGdnScreenshotPolicy,
   narrowGdnSlotsByHost,
   prioritizeGdnSlotsByHost,
@@ -360,7 +359,6 @@ export class GdnCapture extends BaseChannel {
     // 도메인별 최종 우선순위는 정렬/필터링이 모두 끝난 뒤에 적용해야 덮어써지지 않음
     prioritizeGdnSlotsByHost(host, slots);
     narrowGdnSlotsByHost(host, slots);
-    finalizeGdnSlotsForHost(host, slots, viewport.width);
 
     // 5) 소재 인젝션 — injectionMode에 따라 동작
     const injectionMode = (request.options?.injectionMode as string) || "single";
@@ -556,10 +554,6 @@ export class GdnCapture extends BaseChannel {
   private async centerToInjected(page: IPageHandle, forceCenter: boolean, host = ""): Promise<boolean> {
     return await page.evaluate<boolean>(`
       (() => {
-        const hostStr = ${JSON.stringify(host)};
-        const isMt = hostStr.indexOf("mt.co.kr") !== -1;
-        const vw = window.innerWidth || 1280;
-
         const anchored = document.querySelector('[data-admate-scroll-anchor="1"]');
         const candidates = anchored
           ? [anchored]
@@ -576,14 +570,8 @@ export class GdnCapture extends BaseChannel {
             const el = candidates[i];
             const r = el.getBoundingClientRect();
             const area = r.width * r.height;
-            const cx = r.left + r.width / 2;
             let s = area;
             if (r.width < 120 || r.height < 50) s -= 1e12;
-            if (isMt) {
-              if (cx >= vw * 0.36) s += 6e6;
-              if (r.width <= 200 && r.height >= 400) s -= 4e6;
-              if (cx < vw * 0.2 && r.height >= 400) s -= 3e6;
-            }
             if (s > bestScore) {
               bestScore = s;
               best = el;

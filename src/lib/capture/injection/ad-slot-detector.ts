@@ -176,7 +176,7 @@ export async function detectAdSlots(page: IPageHandle): Promise<DetectedSlot[]> 
         '.ads-area', '.ad-area', '#ad-area',
         // Google DFP/GAM 광고
         '[id*="div-gpt-ad"]',
-        // 머니투데이 등: 좌우 wing + 동적 광고 영역
+        // 좌우 고정 wing / 동적 광고 컨테이너
         '[id*="right-wing"]', '[id*="left-wing"]', '.aside_ads', '.dynamic-ad',
         // 국내 광고 네트워크 (ZDNet, 블로터 등)
         '[class*="zc-banner"]', '[class*="zdk"]',
