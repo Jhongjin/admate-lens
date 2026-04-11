@@ -11,6 +11,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@/lib/supabase/client";
 import { createChannel } from "@/lib/capture";
+import { resolveBatchPerCaptureTimeoutMs } from "@/lib/capture/batch-serverless";
 import type { VisionDaCaptureRow, ChannelType } from "@/lib/supabase/types";
 import { PuppeteerEngine } from "@/lib/capture/engine/puppeteer-engine";
 import { isGdnExcludedHost } from "@/lib/capture/channels/gdn/host-strategies";
@@ -39,8 +40,9 @@ export async function POST(request: NextRequest) {
     const results: Array<{ captureId: string; success: boolean; error?: string; durationMs?: number }> = [];
     const isolatedHosts = new Map<string, string>();
     const hostFailureCounts = new Map<string, number>();
+    const multiBatch = captureIds.length > 1;
 
-    // 🔑 핵심: 하나의 브라우저 엔진을 공유하여 순차 실행
+    // 🔑 핵심: 순차 실행. 다건이면 사이트마다 Chromium을 끊어 세션 분리
     const sharedEngine = new PuppeteerEngine();
     let engineLaunched = false;
 
@@ -119,6 +121,32 @@ export async function POST(request: NextRequest) {
             continue;
           }
 
+          const perCaptureTimeoutMs = resolveBatchPerCaptureTimeoutMs(multiBatch, startTime);
+          if (perCaptureTimeoutMs === null) {
+            await supabase
+              .from("vision_da_captures")
+              .update({
+                status: "failed",
+                error_message:
+                  "배치 서버 시간 한도(남은 시간 부족)로 건너뜁니다. 사이트를 나눠 다시 실행해 주세요.",
+                metadata: {
+                  ...captureMetadata,
+                  failureCategory: "timeout",
+                  failureCode: "batch_serverless_budget_exhausted",
+                  failedAt: new Date().toISOString(),
+                },
+                updated_at: new Date().toISOString(),
+              })
+              .eq("id", captureId);
+            results.push({
+              captureId,
+              success: false,
+              error: "배치 서버 시간 한도(남은 시간 부족)",
+            });
+            console.warn(`[Execute] ⏭️ 서버 시간 한도로 스킵: ${captureId}`);
+            continue;
+          }
+
           // 2) 상태 업데이트 → processing
           await supabase
             .from("vision_da_captures")
@@ -161,11 +189,22 @@ export async function POST(request: NextRequest) {
                   targetAdSizes: captureMetadata.targetAdSizes ?? [],
                   youtubeAdType: captureMetadata.youtubeAdType ?? "preroll",
                   instreamOpts: captureMetadata.instreamOpts,
+                  publisherGotoRelaxed: multiBatch && resolvedChannel === "gdn",
                 },
               }),
             1,
-            60000
+            perCaptureTimeoutMs
           );
+
+          if (multiBatch && engineLaunched) {
+            try {
+              await sharedEngine.close();
+              console.log("[Execute] 🔄 Chromium 종료 (다건·사이트별 세션 분리)");
+            } catch {
+              /* ignore */
+            }
+            engineLaunched = false;
+          }
 
           // 6) Supabase Storage에 업로드
           const timestamp = Date.now();
@@ -278,9 +317,9 @@ export async function POST(request: NextRequest) {
             }
           }
 
-          // 세션 종료/타임아웃/프레임 분리 에러는 엔진 강제 재시작으로 좀비 작업 정리
+          // 세션 이상/타임아웃: 단건 배치는 즉시 재기동, 다건은 다음 사이트에서 새 Chromium
           if (isRecoverableEngineError(captureError)) {
-            console.warn("[Execute] ♻️ 세션 이상/타임아웃 감지 — 엔진 재시작");
+            console.warn("[Execute] ♻️ 세션 이상/타임아웃 감지 — 엔진 정리");
             try {
               if (engineLaunched) {
                 await sharedEngine.close();
@@ -289,13 +328,25 @@ export async function POST(request: NextRequest) {
               // 이미 닫힌 경우 무시
             }
             engineLaunched = false;
-            try {
-              await sharedEngine.launch();
-              engineLaunched = true;
-              console.log("[Execute] ♻️ Chromium 재시작 완료");
-            } catch (relaunchErr) {
-              console.error("[Execute] ❌ Chromium 재시작 실패", relaunchErr);
+            if (!multiBatch) {
+              try {
+                await sharedEngine.launch();
+                engineLaunched = true;
+                console.log("[Execute] ♻️ Chromium 재시작 완료");
+              } catch (relaunchErr) {
+                console.error("[Execute] ❌ Chromium 재시작 실패", relaunchErr);
+              }
+            } else {
+              console.log("[Execute] (다건) 다음 사이트에서 Chromium을 새로 시작합니다.");
             }
+          } else if (multiBatch && engineLaunched) {
+            try {
+              await sharedEngine.close();
+              console.log("[Execute] 🔄 Chromium 종료 (다건·오류 후 세션 분리)");
+            } catch {
+              /* ignore */
+            }
+            engineLaunched = false;
           }
         }
       }

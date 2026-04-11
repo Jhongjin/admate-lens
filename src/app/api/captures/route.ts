@@ -10,6 +10,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { after } from "next/server";
 import { createServerClient } from "@/lib/supabase/client";
 import { createChannel } from "@/lib/capture";
+import { resolveBatchPerCaptureTimeoutMs } from "@/lib/capture/batch-serverless";
 import { PuppeteerEngine } from "@/lib/capture/engine/puppeteer-engine";
 import { isGdnExcludedHost } from "@/lib/capture/channels/gdn/host-strategies";
 import type { ChannelType, VisionDaCaptureRow } from "@/lib/supabase/types";
@@ -168,7 +169,8 @@ export async function POST(request: NextRequest) {
 }
 
 /**
- * 배치 캡처 실행 — 하나의 Chromium 브라우저에서 순차 처리
+ * 배치 캡처 실행 — 다건일 때는 사이트(캡처 1건)마다 Chromium을 종료해 세션을 분리하고,
+ * 서버리스 남은 시간에 맞춰 건당 타임아웃을 줄입니다.
  * (after() 콜백 또는 /api/captures/execute에서 호출)
  */
 async function executeBatchCaptures(captureIds: string[]): Promise<void> {
@@ -178,6 +180,7 @@ async function executeBatchCaptures(captureIds: string[]): Promise<void> {
   let engineLaunched = false;
   const isolatedHosts = new Map<string, string>();
   const hostFailureCounts = new Map<string, number>();
+  const multiBatch = captureIds.length > 1;
 
   console.log(`[BatchCapture] 🎬 배치 시작: ${captureIds.length}건`);
 
@@ -255,6 +258,27 @@ async function executeBatchCaptures(captureIds: string[]): Promise<void> {
           continue;
         }
 
+        const perCaptureTimeoutMs = resolveBatchPerCaptureTimeoutMs(multiBatch, startTime);
+        if (perCaptureTimeoutMs === null) {
+          await supabase
+            .from("vision_da_captures")
+            .update({
+              status: "failed",
+              error_message:
+                "배치 서버 시간 한도(남은 시간 부족)로 건너뜁니다. 사이트를 나눠 다시 실행해 주세요.",
+              metadata: {
+                ...captureMetadata,
+                failureCategory: "timeout",
+                failureCode: "batch_serverless_budget_exhausted",
+                failedAt: new Date().toISOString(),
+              },
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", captureId);
+          console.warn(`[BatchCapture] ⏭️ 서버 시간 한도로 스킵: ${captureId}`);
+          continue;
+        }
+
         // 2) 상태 → processing
         await supabase
           .from("vision_da_captures")
@@ -287,11 +311,22 @@ async function executeBatchCaptures(captureIds: string[]): Promise<void> {
                 targetAdSizes: captureMetadata.targetAdSizes ?? [],
                 youtubeAdType: captureMetadata.youtubeAdType ?? "preroll",
                 instreamOpts: captureMetadata.instreamOpts,
+                publisherGotoRelaxed: multiBatch && capture.channel === "gdn",
               },
             }),
           1,
-          60000
+          perCaptureTimeoutMs
         );
+
+        if (multiBatch && engineLaunched) {
+          try {
+            await sharedEngine.close();
+            console.log("[BatchCapture] 🔄 Chromium 종료 (다건·사이트별 세션 분리)");
+          } catch {
+            /* ignore */
+          }
+          engineLaunched = false;
+        }
 
         // 6) Storage 업로드
         const timestamp = Date.now();
@@ -397,9 +432,9 @@ async function executeBatchCaptures(captureIds: string[]): Promise<void> {
           }
         }
 
-        // 세션 종료/타임아웃/프레임 분리 에러는 엔진 강제 재시작으로 좀비 작업 정리
+        // 세션 종료/타임아웃/프레임 분리: 엔진 정리. 단건 배치는 즉시 재기동, 다건은 다음 사이트에서 새로 시작
         if (isRecoverableEngineError(captureError)) {
-          console.warn("[BatchCapture] ♻️ 복구 가능 엔진 에러 감지 — 엔진 재시작");
+          console.warn("[BatchCapture] ♻️ 복구 가능 엔진 에러 감지 — 엔진 정리");
           try {
             if (engineLaunched) {
               await sharedEngine.close();
@@ -408,13 +443,25 @@ async function executeBatchCaptures(captureIds: string[]): Promise<void> {
             // 이미 닫혔으면 무시
           }
           engineLaunched = false;
-          try {
-            await sharedEngine.launch();
-            engineLaunched = true;
-            console.log("[BatchCapture] ♻️ Chromium 재시작 완료");
-          } catch (relaunchErr) {
-            console.error("[BatchCapture] ❌ Chromium 재시작 실패", relaunchErr);
+          if (!multiBatch) {
+            try {
+              await sharedEngine.launch();
+              engineLaunched = true;
+              console.log("[BatchCapture] ♻️ Chromium 재시작 완료");
+            } catch (relaunchErr) {
+              console.error("[BatchCapture] ❌ Chromium 재시작 실패", relaunchErr);
+            }
+          } else {
+            console.log("[BatchCapture] (다건) 다음 사이트에서 Chromium을 새로 시작합니다.");
           }
+        } else if (multiBatch && engineLaunched) {
+          try {
+            await sharedEngine.close();
+            console.log("[BatchCapture] 🔄 Chromium 종료 (다건·오류 후 세션 분리)");
+          } catch {
+            /* ignore */
+          }
+          engineLaunched = false;
         }
       }
     }
@@ -591,7 +638,7 @@ export async function GET(request: NextRequest) {
   try {
     const supabase = createServerClient();
     const { searchParams } = new URL(request.url);
-    const staleThresholdIso = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+    const staleThresholdIso = new Date(Date.now() - 3 * 60 * 1000).toISOString();
 
     // 오래된 processing 상태 자동 정리 (워커 중단/세션 종료 후 고착 방지)
     await supabase

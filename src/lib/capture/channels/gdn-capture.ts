@@ -117,11 +117,18 @@ export class GdnCapture extends BaseChannel {
     this.diagnostics.creativeBase64Size = sizeKB;
     console.log(`[GDN] 소재 다운로드: ${ok ? '성공' : '실패'} (${sizeKB}KB)`);
 
-    // 2) 페이지 로드
+    // 2) 페이지 로드 (배치·다수 사이트 연속 시 networkidle2가 과도하게 길어질 수 있어 완화 옵션 지원)
+    const gotoRelaxed = Boolean(request.options?.publisherGotoRelaxed);
+    if (gotoRelaxed) {
+      console.log("[GDN] 게재면 로드: 완화 모드(domcontentloaded, 배치/느린 지면 대응)");
+    }
     await page.goto(request.publisherUrl, {
-      waitUntil: "networkidle2",
-      timeout: 45000,
+      waitUntil: gotoRelaxed ? "domcontentloaded" : "networkidle2",
+      timeout: gotoRelaxed ? 60000 : 45000,
     });
+    if (gotoRelaxed) {
+      await new Promise((r) => setTimeout(r, 3500));
+    }
 
     // 2.0) 🔤 한글 폰트 로딩 대기 (Vercel 서버리스 Chromium에 CJK 폰트 없음)
     //    PuppeteerEngine에서 evaluateOnNewDocument로 주입된 폰트가 로드될 시간 확보
@@ -260,48 +267,55 @@ export class GdnCapture extends BaseChannel {
     const targetAdSizes = (request.options?.targetAdSizes as string[]) || [];
 
     if (adSizeMode === "manual" && targetAdSizes.length > 0) {
-      // 🎯 수동 모드: 사용자가 선택한 사이즈의 슬롯만 타겟팅
+      // 🎯 수동 모드: 선택한 사이즈에 실제로 맞는 슬롯만 남김 (±50px)
       console.log(`[GDN] 🎯 수동 사이즈 선택 모드: ${targetAdSizes.join(", ")}`);
 
-      // 선택된 사이즈를 파싱 (예: "300x250" → {w:300, h:250})
       const parsedSizes = targetAdSizes.map((s) => {
         const [w, h] = s.split("x").map(Number);
         return { w, h };
       }).filter((s) => s.w > 0 && s.h > 0);
 
-      // 각 슬롯에 대해 선택된 사이즈와의 매칭 점수 계산
-      const TOLERANCE = 50; // ±50px 허용 오차
-      const scoredSlots = slots.map((slot) => {
-        let bestMatch = 0;
-        for (const target of parsedSizes) {
-          const wDiff = Math.abs(slot.width - target.w);
-          const hDiff = Math.abs(slot.height - target.h);
-          if (wDiff <= TOLERANCE && hDiff <= TOLERANCE) {
-            // 정확할수록 높은 점수 (100이 완벽 매치)
-            const score = 100 - (wDiff + hDiff);
-            bestMatch = Math.max(bestMatch, score);
+      if (parsedSizes.length === 0) {
+        console.warn("[GDN] ⚠️ 수동 사이즈 파싱 실패 — 자동 슬롯 목록 유지");
+      } else {
+        const slotsBeforeManual = slots.slice();
+        const TOLERANCE = 50;
+        const scoredSlots = slots.map((slot) => {
+          let bestMatch = 0;
+          for (const target of parsedSizes) {
+            const wDiff = Math.abs(slot.width - target.w);
+            const hDiff = Math.abs(slot.height - target.h);
+            if (wDiff <= TOLERANCE && hDiff <= TOLERANCE) {
+              const score = 100 - (wDiff + hDiff);
+              bestMatch = Math.max(bestMatch, score);
+            }
           }
+          return { slot, matchScore: bestMatch };
+        });
+
+        scoredSlots.sort((a, b) => {
+          if (b.matchScore !== a.matchScore) return b.matchScore - a.matchScore;
+          return b.slot.confidence - a.slot.confidence;
+        });
+
+        const matched = scoredSlots.filter((s) => s.matchScore > 0);
+        if (matched.length === 0) {
+          console.warn(
+            `[GDN] ⚠️ 수동 사이즈(${targetAdSizes.join(", ")})에 맞는 슬롯 없음 — 자동 슬롯 목록 유지 (${slotsBeforeManual.length}개)`
+          );
+        } else {
+          slots.length = 0;
+          matched.forEach((s) => slots.push(s.slot));
+          console.log(
+            `[GDN] 🎯 사이즈 매칭 필터: ${matched.length}개 슬롯만 유지 (원본 ${slotsBeforeManual.length}개 중)`
+          );
+          matched.slice(0, 5).forEach((s, i) => {
+            console.log(
+              `[GDN]   [${i}] ${s.slot.width}x${s.slot.height} matchScore:${s.matchScore} conf:${s.slot.confidence}`
+            );
+          });
         }
-        return { slot, matchScore: bestMatch };
-      });
-
-      // 매칭 슬롯을 우선 정렬 (매칭 점수 > confidence 순)
-      scoredSlots.sort((a, b) => {
-        if (b.matchScore !== a.matchScore) return b.matchScore - a.matchScore;
-        return b.slot.confidence - a.slot.confidence;
-      });
-
-      // 정렬된 슬롯으로 교체
-      slots.length = 0;
-      scoredSlots.forEach((s) => slots.push(s.slot));
-
-      const matchedCount = scoredSlots.filter((s) => s.matchScore > 0).length;
-      console.log(`[GDN] 🎯 사이즈 매칭 결과: ${matchedCount}/${slots.length}개 슬롯 매칭`);
-
-      slots.slice(0, 5).forEach((s, i) => {
-        const scored = scoredSlots[i];
-        console.log(`[GDN]   [${i}] ${s.width}x${s.height} matchScore:${scored.matchScore} conf:${s.confidence}`);
-      });
+      }
 
     } else if (creativeDims && creativeDims.width > 0 && creativeDims.height > 0) {
       const oversizedCreative = creativeDims.width > 1200 || creativeDims.height > 700;
