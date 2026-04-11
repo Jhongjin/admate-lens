@@ -2,6 +2,9 @@ import type { DetectedSlot } from "@/lib/capture/injection/ad-slot-detector";
 
 export type GdnScreenshotPolicy = "default" | "force_centered_viewport";
 
+/** Lazy-load 강제: full은 data-src 일괄 복원+스크롤, light는 loading만+짧은 스크롤(대형 뉴스지면 OOM 방지) */
+export type GdnLazyLoadMode = "full" | "light";
+
 const GDN_EXCLUDED_HOSTS = new Set<string>([
   "news.kbs.co.kr",
   "mt.co.kr",
@@ -11,6 +14,23 @@ const GDN_EXCLUDED_HOSTS = new Set<string>([
 
 function isZdnetHost(host: string): boolean {
   return host === "zdnet.co.kr" || host === "www.zdnet.co.kr";
+}
+
+function isMkHost(host: string): boolean {
+  const h = host.toLowerCase();
+  return h === "www.mk.co.kr" || h === "mk.co.kr" || h === "m.mk.co.kr";
+}
+
+/** 조선일보 멤버십/프로모션 레이어가 광고 슬롯을 가리는 경우가 있어 캡처 전 정리 */
+export function isChosunHost(host: string): boolean {
+  const h = host.toLowerCase();
+  return h === "www.chosun.com" || h === "chosun.com" || h === "m.chosun.com";
+}
+
+/** 이미지·스크롤 부하가 큰 지면에서 Chromium 타깃 종료(OOM 등)를 줄이기 위한 경량 모드 */
+export function getGdnLazyLoadMode(host: string): GdnLazyLoadMode {
+  if (isMkHost(host)) return "light";
+  return "full";
 }
 
 export function isGdnExcludedHost(host: string): boolean {

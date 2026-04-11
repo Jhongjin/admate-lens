@@ -12,7 +12,9 @@ import { BaseChannel, type CaptureRequest } from "./base-channel";
 import { detectAdSlots, type DetectedSlot } from "../injection/ad-slot-detector";
 import { injectCreative, type InjectionResult } from "../injection/creative-injector";
 import {
+  getGdnLazyLoadMode,
   getGdnScreenshotPolicy,
+  isChosunHost,
   narrowGdnSlotsByHost,
   prioritizeGdnSlotsByHost,
 } from "./gdn/host-strategies";
@@ -145,62 +147,79 @@ export class GdnCapture extends BaseChannel {
       console.warn(`[GDN] ⚠️ Cloudflare 챌린지 통과 실패 — 그래도 진행 시도`);
     }
 
+    const host = this.getHostnameSafe(request.publisherUrl);
+    if (isChosunHost(host)) {
+      await this.dismissChosunPromoLayer(page);
+    }
+    const lazyLoadMode = getGdnLazyLoadMode(host);
+
     // 2.5) 🔑 Lazy Loading 이미지 강제 로드
-    // — 콘텐츠 영역만 제한적 스크롤 (뷰포트 5배까지)
-    // — loading="lazy" 속성을 eager로 변경
-    // — data-src, data-lazy-src 등을 src로 복원
-    console.log("[GDN] 🔄 Lazy Loading 이미지 강제 로드 시작...");
+    // — full: data-src 일괄 복원 + 뷰포트 5배 스크롤
+    // — light(매일경제 등): loading만 eager + 짧은 스크롤 — 대량 img.src 유발로 Chromium 타깃 종료 방지
+    console.log(
+      `[GDN] 🔄 Lazy Loading 이미지 강제 로드 시작... (${lazyLoadMode === "light" ? "경량" : "표준"} 모드)`
+    );
+    const lazyCfg = JSON.stringify({
+      skipDataSrc: lazyLoadMode === "light",
+      maxScrollVh: lazyLoadMode === "light" ? 2 : 5,
+      scrollWaitMs: lazyLoadMode === "light" ? 150 : 200,
+      attrs: ["data-src", "data-lazy-src", "data-original", "data-lazy"],
+    });
     await page.evaluate<void>(`
       (async () => {
-        // 1) loading="lazy" → "eager" 강제 전환
-        document.querySelectorAll('img[loading="lazy"]').forEach(img => {
+        const cfg = ${lazyCfg};
+
+        document.querySelectorAll('img[loading="lazy"]').forEach((img) => {
           img.setAttribute('loading', 'eager');
         });
 
-        // 2) data-src, data-lazy-src 등 → src 복원
-        document.querySelectorAll('img').forEach(img => {
-          for (const attr of ${JSON.stringify(['data-src', 'data-lazy-src', 'data-original', 'data-lazy'])}) {
-            const val = img.getAttribute(attr);
-            if (val && !img.src.startsWith('data:') && (!img.src || img.src.includes('placeholder') || img.src.includes('blank') || img.naturalWidth === 0)) {
-              img.src = val;
-              img.removeAttribute(attr);
-              break;
+        if (!cfg.skipDataSrc) {
+          document.querySelectorAll('img').forEach((img) => {
+            for (const attr of cfg.attrs) {
+              const val = img.getAttribute(attr);
+              if (
+                val &&
+                !img.src.startsWith('data:') &&
+                (!img.src ||
+                  img.src.includes('placeholder') ||
+                  img.src.includes('blank') ||
+                  img.naturalWidth === 0)
+              ) {
+                img.src = val;
+                img.removeAttribute(attr);
+                break;
+              }
             }
-          }
-          // data-srcset → srcset
-          const lazySrcset = img.getAttribute('data-srcset');
-          if (lazySrcset && !img.srcset) {
-            img.srcset = lazySrcset;
-          }
-        });
+            const lazySrcset = img.getAttribute('data-srcset');
+            if (lazySrcset && !img.srcset) {
+              img.srcset = lazySrcset;
+            }
+          });
 
-        // 3) <source> 태그의 data-srcset도 처리 (picture 요소)
-        document.querySelectorAll('source[data-srcset]').forEach(source => {
-          const val = source.getAttribute('data-srcset');
-          if (val) {
-            source.setAttribute('srcset', val);
-            source.removeAttribute('data-srcset');
-          }
-        });
+          document.querySelectorAll('source[data-srcset]').forEach((source) => {
+            const val = source.getAttribute('data-srcset');
+            if (val) {
+              source.setAttribute('srcset', val);
+              source.removeAttribute('data-srcset');
+            }
+          });
+        }
 
-        // 4) 제한적 스크롤 — 뷰포트 5배 높이까지만 (상단 콘텐츠 보존)
         const viewportH = window.innerHeight || 900;
         const scrollStep = Math.max(viewportH * 0.7, 500);
-        const maxScrollTarget = viewportH * 5; // 뷰포트 5배까지만
+        const maxScrollTarget = viewportH * cfg.maxScrollVh;
         const actualMax = Math.min(
           maxScrollTarget,
           Math.max(document.body.scrollHeight, document.documentElement.scrollHeight)
         );
-        
+
         for (let y = 0; y < actualMax; y += scrollStep) {
           window.scrollTo({ top: y, behavior: 'instant' });
-          await new Promise(r => setTimeout(r, 200));
+          await new Promise((r) => setTimeout(r, cfg.scrollWaitMs));
         }
 
-        // 5) 맨 위로 복원 + 확실한 렌더링 대기
         window.scrollTo({ top: 0, behavior: 'instant' });
-        await new Promise(r => setTimeout(r, 300));
-        // 이중 복원: 일부 사이트에서 scrollTo가 무시될 수 있음
+        await new Promise((r) => setTimeout(r, 300));
         window.scrollTo(0, 0);
         document.documentElement.scrollTop = 0;
         document.body.scrollTop = 0;
@@ -228,7 +247,6 @@ export class GdnCapture extends BaseChannel {
       slots.length = 0;
       normalSlots.forEach((s) => slots.push(s));
     }
-    const host = this.getHostnameSafe(request.publisherUrl);
     this.diagnostics.slotsDetected = slots.length;
     console.log(`[GDN] 탐지된 슬롯: ${slots.length}개`);
     const hugePageLikely = slots.length >= 200;
@@ -444,6 +462,11 @@ export class GdnCapture extends BaseChannel {
     this.diagnostics.injectedElementCount = injectedCheck.count;
     this.diagnostics.injectedInViewport = injectedCheck.inViewport;
 
+    // 조선일보 등: 스크롤·지연 로드 후에 뜨는 프로모션 레이어 재정리
+    if (isChosunHost(host)) {
+      await this.dismissChosunPromoLayer(page);
+    }
+
     // 캡처 직전 고정 배지 보정: 사이트 CSS로 배지가 가려지는 경우를 방지
     await this.ensureAdDisclosureBadge(page);
 
@@ -598,6 +621,137 @@ export class GdnCapture extends BaseChannel {
     `);
   }
 
+  /** 조선일보 멤버십/혜택 모달이 우측 광고를 가리는 경우 — 닫기·체크 후 레이어 숨김 (최대 3회) */
+  private async dismissChosunPromoLayer(page: IPageHandle): Promise<void> {
+    console.log("[GDN] 🧹 조선일보 프로모션/레이어 정리 시도...");
+    const script = `
+      (() => {
+        const norm = (s) => (s || "").replace(/\\s+/g, " ").trim();
+
+        const labels = Array.from(document.querySelectorAll("label"));
+        for (const lb of labels) {
+          const tx = norm(lb.textContent);
+          if (tx.includes("오늘 하루") || tx.includes("보지 않기")) {
+            const fid = lb.getAttribute("for");
+            const inp = fid ? document.getElementById(fid) : lb.querySelector('input[type="checkbox"]');
+            if (inp && inp instanceof HTMLInputElement) {
+              inp.click();
+              break;
+            }
+          }
+        }
+
+        const clickables = Array.from(
+          document.querySelectorAll(
+            "button, a, [role='button'], input[type='button'], input[type='submit'], span[onclick], div[onclick]"
+          )
+        );
+        for (const el of clickables) {
+          const t =
+            norm(el.textContent) ||
+            norm(el.getAttribute("aria-label") || "") ||
+            (el instanceof HTMLInputElement ? norm(el.value) : "");
+          if (t === "닫기" || t === "Close" || t === "close" || t.endsWith("닫기")) {
+            try {
+              el.click();
+            } catch (e) {}
+          }
+        }
+
+        document.querySelectorAll('[role="dialog"], [aria-modal="true"]').forEach((el) => {
+          if (el instanceof HTMLElement) el.remove();
+        });
+
+        document.querySelectorAll("div,section,aside,dialog").forEach((el) => {
+          if (!(el instanceof HTMLElement)) return;
+          if (el.closest("[data-injected]")) return;
+          const tx = norm(el.innerText || "");
+          if (tx.length < 8 || tx.length > 400) return;
+          const promo =
+            (tx.includes("4달러") && tx.includes("40달러")) ||
+            (tx.includes("달러") && tx.includes("혜택") && tx.includes("PDF")) ||
+            (tx.includes("조선멤버십") && tx.includes("혜택"));
+          if (!promo) return;
+          const st = window.getComputedStyle(el);
+          if (st.position !== "fixed" && st.position !== "sticky" && st.position !== "absolute") return;
+          try {
+            el.remove();
+          } catch (e) {}
+        });
+
+        const overlayHints =
+          '[class*="dimmed"],[class*="Dimmed"],[class*="backdrop"],[class*="Backdrop"],[class*="modal"],[class*="Modal"],[class*="layer"],[class*="Layer"],[class*="popup"],[class*="Popup"]';
+        document.querySelectorAll(overlayHints).forEach((el) => {
+          if (!(el instanceof HTMLElement)) return;
+          if (el.closest("[data-injected]")) return;
+          const st = window.getComputedStyle(el);
+          if (st.position !== "fixed" && st.position !== "sticky") return;
+          const z = parseInt(st.zIndex, 10);
+          if (!Number.isFinite(z) || z < 500) return;
+          const r = el.getBoundingClientRect();
+          const cw = window.innerWidth;
+          const ch = window.innerHeight;
+          if (r.width < cw * 0.28 || r.height < ch * 0.18) return;
+          el.style.setProperty("display", "none", "important");
+        });
+
+        const hits = [];
+        let scanned = 0;
+        const maxScan = 10000;
+        for (const el of document.querySelectorAll("body *")) {
+          if (++scanned > maxScan) break;
+          if (!(el instanceof HTMLElement)) continue;
+          if (el.hasAttribute("data-injected")) continue;
+          const tag = el.tagName;
+          if (tag === "SCRIPT" || tag === "STYLE" || tag === "LINK" || tag === "IFRAME" || tag === "IMG") continue;
+          const st = window.getComputedStyle(el);
+          if (st.position !== "fixed" && st.position !== "sticky") continue;
+          const z = parseInt(st.zIndex, 10) || 0;
+          if (z < 150) continue;
+          const r = el.getBoundingClientRect();
+          const area = r.width * r.height;
+          const vw = window.innerWidth;
+          const vh = window.innerHeight;
+          if (area < vw * vh * 0.1) continue;
+          hits.push({ el, z, area });
+        }
+        hits.sort((a, b) => b.z - a.z || b.area - a.area);
+        hits.slice(0, 10).forEach((h) => {
+          try {
+            h.el.remove();
+          } catch (e) {}
+        });
+
+        for (const el of Array.from(document.body.children)) {
+          if (!(el instanceof HTMLElement)) continue;
+          if (el.hasAttribute("data-injected")) continue;
+          const st = window.getComputedStyle(el);
+          if (st.display === "none" || st.visibility === "hidden") continue;
+          if (st.position !== "fixed" && st.position !== "sticky") continue;
+          const z = parseInt(st.zIndex, 10);
+          if (!Number.isFinite(z) || z < 800) continue;
+          const r = el.getBoundingClientRect();
+          const cw = window.innerWidth;
+          const ch = window.innerHeight;
+          if (r.width < cw * 0.3 || r.height < ch * 0.2) continue;
+          const op = parseFloat(st.opacity) || 1;
+          const bg = (st.backgroundColor || "").toLowerCase();
+          if (op < 0.98 || bg.includes("rgba(0, 0, 0") || r.width > cw * 0.55) {
+            el.style.setProperty("display", "none", "important");
+          }
+        }
+
+        document.body.style.overflow = "";
+        document.documentElement.style.overflow = "";
+        document.body.classList.remove("modal-open", "scroll-lock", "no-scroll", "popup-open");
+      })()
+    `;
+    for (let pass = 0; pass < 3; pass++) {
+      await page.evaluate<void>(script);
+      await new Promise((r) => setTimeout(r, 400));
+    }
+  }
+
   private async runWithFrameRetry<T>(op: () => Promise<T>, phase: string): Promise<T> {
     const maxAttempts = 2;
     let lastErr: unknown;
@@ -736,28 +890,69 @@ export class GdnCapture extends BaseChannel {
                 '<rect x="6.85" y="5.9" width="1.3" height="5.2" rx="0.65" fill="#00aecd"></rect>' +
               '</svg>';
 
-            badge.appendChild(info);
-            badge.appendChild(text);
-            badge.appendChild(icon);
+            const pill = document.createElement('span');
+            pill.setAttribute('data-injected', 'admate-badge-pill');
+            pill.style.cssText = [
+              'display: inline-flex !important',
+              'align-items: center !important',
+              'gap: 2px !important',
+              'padding: 2px 4px !important',
+              'margin: 0 !important',
+              'background: #ffffff !important',
+              'background-color: #ffffff !important',
+              'border-radius: 2px !important',
+              'box-shadow: 0 0 0 1px rgba(0,0,0,0.08) !important',
+              'border: none !important',
+            ].join('; ');
+            pill.appendChild(info);
+            pill.appendChild(text);
+            pill.appendChild(icon);
+            badge.appendChild(pill);
             badge.appendChild(hidden);
             host.appendChild(badge);
           }
 
-          badge.style.cssText = [
+          const pillEl = badge.querySelector(':scope > [data-injected="admate-badge-pill"]');
+          const outerBase = [
             'position: absolute !important',
             'top: 4px !important',
             'right: 4px !important',
             'z-index: 2147483647 !important',
-            'display: inline-flex !important',
-            'align-items: center !important',
-            'gap: 2px !important',
-            'padding: 0 !important',
-            'margin: 0 !important',
-            'background: transparent !important',
-            'border: none !important',
             'pointer-events: none !important',
             'user-select: none !important',
-          ].join('; ');
+            'border: none !important',
+          ];
+          if (pillEl) {
+            badge.style.cssText = outerBase.concat([
+              'display: inline-block !important',
+              'padding: 0 !important',
+              'margin: 0 !important',
+              'background: transparent !important',
+            ]).join('; ');
+            pillEl.style.cssText = [
+              'display: inline-flex !important',
+              'align-items: center !important',
+              'gap: 2px !important',
+              'padding: 2px 4px !important',
+              'margin: 0 !important',
+              'background: #ffffff !important',
+              'background-color: #ffffff !important',
+              'border-radius: 2px !important',
+              'box-shadow: 0 0 0 1px rgba(0,0,0,0.08) !important',
+              'border: none !important',
+            ].join('; ');
+          } else {
+            badge.style.cssText = outerBase.concat([
+              'display: inline-flex !important',
+              'align-items: center !important',
+              'gap: 2px !important',
+              'padding: 2px 4px !important',
+              'margin: 0 !important',
+              'background: #ffffff !important',
+              'border-radius: 2px !important',
+              'box-shadow: 0 0 0 1px rgba(0,0,0,0.08) !important',
+            ]).join('; ');
+          }
 
           const img = host.querySelector('img[data-injected="admate"]');
           if (img) syncBadgeToCreativeCorner(host, img);

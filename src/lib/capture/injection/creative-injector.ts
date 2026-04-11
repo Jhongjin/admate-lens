@@ -204,15 +204,28 @@ export async function injectCreative(
           'top: 4px !important',
           'right: 4px !important',
           'z-index: 2147483647 !important',
-          'display: inline-flex !important',
-          'align-items: center !important',
-          'gap: 2px !important',
+          'display: inline-block !important',
           'padding: 0 !important',
           'margin: 0 !important',
           'background: transparent !important',
           'border: none !important',
           'pointer-events: none !important',
           'user-select: none !important',
+        ].join('; ');
+
+        const pill = document.createElement('span');
+        pill.setAttribute('data-injected', 'admate-badge-pill');
+        pill.style.cssText = [
+          'display: inline-flex !important',
+          'align-items: center !important',
+          'gap: 2px !important',
+          'padding: 2px 4px !important',
+          'margin: 0 !important',
+          'background: #ffffff !important',
+          'background-color: #ffffff !important',
+          'border-radius: 2px !important',
+          'box-shadow: 0 0 0 1px rgba(0,0,0,0.08) !important',
+          'border: none !important',
         ].join('; ');
 
         // 좌측 AdChoices(i) 아이콘(원형 테두리 + 청록 i)
@@ -235,10 +248,10 @@ export async function injectCreative(
             '<rect x="6.85" y="5.9" width="1.3" height="5.2" rx="0.65" fill="#00aecd"></rect>' +
           '</svg>';
 
-        // DOM 순서: i → (빈 텍스트 영역) → 점(메뉴) → hidden input
-        badge.appendChild(info);
-        badge.appendChild(text);
-        badge.appendChild(icon);
+        pill.appendChild(info);
+        pill.appendChild(text);
+        pill.appendChild(icon);
+        badge.appendChild(pill);
         badge.appendChild(hidden);
 
         container.appendChild(badge);
