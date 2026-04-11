@@ -834,6 +834,13 @@ export class GdnCapture extends BaseChannel {
         }
 
         function ensureBadgeForTarget(target) {
+          const cellCss =
+            'display:inline-flex !important;align-items:center !important;justify-content:center !important;' +
+            'width:15px !important;height:15px !important;min-width:15px !important;min-height:15px !important;' +
+            'padding:0 !important;margin:0 !important;line-height:0 !important;box-sizing:border-box !important;' +
+            'background:#ffffff !important;background-color:#ffffff !important;border-radius:0 !important;' +
+            'box-shadow:none !important;border:none !important;';
+
           const host = target.closest('[data-injected="admate-wrapper"]') || target.parentElement || target;
           if (!host) return;
           const hostStyle = window.getComputedStyle(host);
@@ -853,9 +860,6 @@ export class GdnCapture extends BaseChannel {
             badge.setAttribute('for', uid);
             badge.id = uid + '_lbl';
 
-            const text = document.createElement('div');
-            text.className = 'il-text il-text-leading';
-
             const icon = document.createElement('div');
             icon.className = 'il-icon';
             icon.innerHTML =
@@ -870,6 +874,22 @@ export class GdnCapture extends BaseChannel {
             hidden.type = 'checkbox';
             hidden.style.cssText = 'display:none !important';
             hidden.setAttribute('tabindex', '-1');
+
+            const row = document.createElement('span');
+            row.setAttribute('data-injected', 'admate-badge-row');
+            row.style.cssText = [
+              'display: inline-flex !important',
+              'align-items: center !important',
+              'gap: 2px !important',
+              'padding: 0 !important',
+              'margin: 0 !important',
+              'background: transparent !important',
+              'border: none !important',
+            ].join('; ');
+
+            const cellInfo = document.createElement('span');
+            cellInfo.setAttribute('data-injected', 'admate-adchoices-cell');
+            cellInfo.style.cssText = cellCss;
 
             const info = document.createElement('span');
             info.setAttribute('data-injected', 'admate-adchoices');
@@ -889,29 +909,21 @@ export class GdnCapture extends BaseChannel {
                 '<circle cx="7.5" cy="4.35" r="0.95" fill="#00aecd"></circle>' +
                 '<rect x="6.85" y="5.9" width="1.3" height="5.2" rx="0.65" fill="#00aecd"></rect>' +
               '</svg>';
+            cellInfo.appendChild(info);
 
-            const pill = document.createElement('span');
-            pill.setAttribute('data-injected', 'admate-badge-pill');
-            pill.style.cssText = [
-              'display: inline-flex !important',
-              'align-items: center !important',
-              'gap: 2px !important',
-              'padding: 2px 4px !important',
-              'margin: 0 !important',
-              'background: #ffffff !important',
-              'background-color: #ffffff !important',
-              'border-radius: 2px !important',
-              'box-shadow: 0 0 0 1px rgba(0,0,0,0.08) !important',
-              'border: none !important',
-            ].join('; ');
-            pill.appendChild(info);
-            pill.appendChild(text);
-            pill.appendChild(icon);
-            badge.appendChild(pill);
+            const cellMenu = document.createElement('span');
+            cellMenu.setAttribute('data-injected', 'admate-adchoices-cell');
+            cellMenu.style.cssText = cellCss;
+            cellMenu.appendChild(icon);
+
+            row.appendChild(cellInfo);
+            row.appendChild(cellMenu);
+            badge.appendChild(row);
             badge.appendChild(hidden);
             host.appendChild(badge);
           }
 
+          const rowEl = badge.querySelector(':scope > [data-injected="admate-badge-row"]');
           const pillEl = badge.querySelector(':scope > [data-injected="admate-badge-pill"]');
           const outerBase = [
             'position: absolute !important',
@@ -922,7 +934,26 @@ export class GdnCapture extends BaseChannel {
             'user-select: none !important',
             'border: none !important',
           ];
-          if (pillEl) {
+          if (rowEl) {
+            badge.style.cssText = outerBase.concat([
+              'display: inline-block !important',
+              'padding: 0 !important',
+              'margin: 0 !important',
+              'background: transparent !important',
+            ]).join('; ');
+            rowEl.style.cssText = [
+              'display: inline-flex !important',
+              'align-items: center !important',
+              'gap: 2px !important',
+              'padding: 0 !important',
+              'margin: 0 !important',
+              'background: transparent !important',
+              'border: none !important',
+            ].join('; ');
+            rowEl.querySelectorAll('[data-injected="admate-adchoices-cell"]').forEach((cell) => {
+              cell.style.cssText = cellCss;
+            });
+          } else if (pillEl) {
             badge.style.cssText = outerBase.concat([
               'display: inline-block !important',
               'padding: 0 !important',

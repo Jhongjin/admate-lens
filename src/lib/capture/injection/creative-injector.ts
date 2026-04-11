@@ -180,10 +180,6 @@ export async function injectCreative(
         badge.setAttribute('for', uid);
         badge.id = uid + '_lbl';
 
-        // 구글 광고 우상단 UI(AdChoices + 메뉴)와 동일한 형태로 맞춤
-        const text = document.createElement('div');
-        text.className = 'il-text il-text-leading';
-
         const icon = document.createElement('div');
         icon.className = 'il-icon';
         icon.innerHTML =
@@ -213,22 +209,29 @@ export async function injectCreative(
           'user-select: none !important',
         ].join('; ');
 
-        const pill = document.createElement('span');
-        pill.setAttribute('data-injected', 'admate-badge-pill');
-        pill.style.cssText = [
+        const row = document.createElement('span');
+        row.setAttribute('data-injected', 'admate-badge-row');
+        row.style.cssText = [
           'display: inline-flex !important',
           'align-items: center !important',
           'gap: 2px !important',
-          'padding: 2px 4px !important',
+          'padding: 0 !important',
           'margin: 0 !important',
-          'background: #ffffff !important',
-          'background-color: #ffffff !important',
-          'border-radius: 2px !important',
-          'box-shadow: 0 0 0 1px rgba(0,0,0,0.08) !important',
+          'background: transparent !important',
           'border: none !important',
         ].join('; ');
 
-        // 좌측 AdChoices(i) 아이콘(원형 테두리 + 청록 i)
+        const cellCss =
+          'display:inline-flex !important;align-items:center !important;justify-content:center !important;' +
+          'width:15px !important;height:15px !important;min-width:15px !important;min-height:15px !important;' +
+          'padding:0 !important;margin:0 !important;line-height:0 !important;box-sizing:border-box !important;' +
+          'background:#ffffff !important;background-color:#ffffff !important;border-radius:0 !important;' +
+          'box-shadow:none !important;border:none !important;';
+
+        const cellInfo = document.createElement('span');
+        cellInfo.setAttribute('data-injected', 'admate-adchoices-cell');
+        cellInfo.style.cssText = cellCss;
+
         const info = document.createElement('span');
         info.setAttribute('data-injected', 'admate-adchoices');
         info.style.cssText = [
@@ -247,11 +250,16 @@ export async function injectCreative(
             '<circle cx="7.5" cy="4.35" r="0.95" fill="#00aecd"></circle>' +
             '<rect x="6.85" y="5.9" width="1.3" height="5.2" rx="0.65" fill="#00aecd"></rect>' +
           '</svg>';
+        cellInfo.appendChild(info);
 
-        pill.appendChild(info);
-        pill.appendChild(text);
-        pill.appendChild(icon);
-        badge.appendChild(pill);
+        const cellMenu = document.createElement('span');
+        cellMenu.setAttribute('data-injected', 'admate-adchoices-cell');
+        cellMenu.style.cssText = cellCss;
+        cellMenu.appendChild(icon);
+
+        row.appendChild(cellInfo);
+        row.appendChild(cellMenu);
+        badge.appendChild(row);
         badge.appendChild(hidden);
 
         container.appendChild(badge);
