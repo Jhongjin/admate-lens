@@ -62,6 +62,13 @@ export async function injectCreative(
 
       console.log('[Injector] 인젝션 시도:', selector, tagName, slotW + 'x' + slotH);
 
+      document.querySelectorAll('[data-admate-scroll-anchor="1"]').forEach(function (n) {
+        n.removeAttribute('data-admate-scroll-anchor');
+      });
+      function markInjectScrollTarget(el) {
+        if (el && el.setAttribute) el.setAttribute('data-admate-scroll-anchor', '1');
+      }
+
       // 헬퍼: 이미지 엘리먼트 생성
       function createImgElement() {
         const img = document.createElement('img');
@@ -262,6 +269,7 @@ export async function injectCreative(
         overlay.appendChild(img);
         addAdBadge(overlay);
         document.body.appendChild(overlay);
+        markInjectScrollTarget(overlay);
         await waitForImageLoad(img);
         syncBadgeToCreativeCorner(overlay, img);
         return { success: true, method: 'overlay', error: 'empty-selector-fallback' };
@@ -282,6 +290,7 @@ export async function injectCreative(
         overlay.appendChild(img);
         addAdBadge(overlay);
         document.body.appendChild(overlay);
+        markInjectScrollTarget(overlay);
 
         await waitForImageLoad(img);
         syncBadgeToCreativeCorner(overlay, img);
@@ -298,6 +307,7 @@ export async function injectCreative(
           addAdBadge(wrapper);
 
           el.replaceWith(wrapper);
+          markInjectScrollTarget(wrapper);
           await waitForImageLoad(img);
           syncBadgeToCreativeCorner(wrapper, img);
           console.log('[Injector] iframe 대체 성공');
@@ -314,6 +324,7 @@ export async function injectCreative(
           overlay.appendChild(img2);
           addAdBadge(overlay);
           document.body.appendChild(overlay);
+          markInjectScrollTarget(overlay);
           await waitForImageLoad(img2);
           syncBadgeToCreativeCorner(overlay, img2);
           return { success: true, method: 'overlay', error: err.message };
@@ -344,6 +355,7 @@ export async function injectCreative(
         const img = createImgElement();
         el.appendChild(img);
         addAdBadge(el);
+        markInjectScrollTarget(el);
 
         await waitForImageLoad(img);
         syncBadgeToCreativeCorner(el, img);

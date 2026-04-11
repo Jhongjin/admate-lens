@@ -61,6 +61,31 @@ export function prioritizeGdnSlotsByHost(host: string, slots: DetectedSlot[]): v
   }
 }
 
+/**
+ * 탐지 시점의 뷰포트 폭 기준으로 슬롯 순서를 한 번 더 다듬습니다.
+ * 머니투데이: 좌측 스카이스크래퍼보다 우측 MPU를 쓰도록 x 중심 가산.
+ */
+export function finalizeGdnSlotsForHost(host: string, slots: DetectedSlot[], viewportWidth: number): void {
+  if (!isMoneyTodayHost(host) || slots.length <= 1) return;
+  const vw = Math.max(320, viewportWidth || 1280);
+  slots.sort((a, b) => {
+    const sa = calcMoneyTodaySlotScore(a) + mtRightColumnBias(a, vw);
+    const sb = calcMoneyTodaySlotScore(b) + mtRightColumnBias(b, vw);
+    if (sb !== sa) return sb - sa;
+    return b.x + b.width / 2 - (a.x + a.width / 2);
+  });
+  console.log("[GDN] 🧭 머니투데이 우측 광고 슬롯 보정 정렬");
+}
+
+function mtRightColumnBias(slot: DetectedSlot, vw: number): number {
+  const cx = slot.x + slot.width / 2;
+  let b = 0;
+  if (cx >= vw * 0.38) b += 520;
+  if (slot.width <= 200 && slot.height >= 400) b -= 450;
+  if (cx < vw * 0.22 && slot.height >= 400) b -= 400;
+  return b;
+}
+
 export function narrowGdnSlotsByHost(host: string, slots: DetectedSlot[]): void {
   if (!host || slots.length <= 1) return;
 

@@ -12,6 +12,7 @@ import { BaseChannel, type CaptureRequest } from "./base-channel";
 import { detectAdSlots, type DetectedSlot } from "../injection/ad-slot-detector";
 import { injectCreative, type InjectionResult } from "../injection/creative-injector";
 import {
+  finalizeGdnSlotsForHost,
   getGdnScreenshotPolicy,
   narrowGdnSlotsByHost,
   prioritizeGdnSlotsByHost,
@@ -359,6 +360,7 @@ export class GdnCapture extends BaseChannel {
     // 도메인별 최종 우선순위는 정렬/필터링이 모두 끝난 뒤에 적용해야 덮어써지지 않음
     prioritizeGdnSlotsByHost(host, slots);
     narrowGdnSlotsByHost(host, slots);
+    finalizeGdnSlotsForHost(host, slots, viewport.width);
 
     // 5) 소재 인젝션 — injectionMode에 따라 동작
     const injectionMode = (request.options?.injectionMode as string) || "single";
@@ -492,7 +494,7 @@ export class GdnCapture extends BaseChannel {
 
     if (forceCenteredViewport) {
       console.log(`[GDN] 📌 호스트 정책 캡처 적용: ${host} (타겟 중심 viewport)`);
-      const centeredOnInjected = await this.centerToInjected(page, true);
+      const centeredOnInjected = await this.centerToInjected(page, true, host);
       if (centeredOnInjected) {
         await new Promise((r) => setTimeout(r, 450));
       }
@@ -512,7 +514,7 @@ export class GdnCapture extends BaseChannel {
       console.warn(
         `[GDN] 대형 페이지 감지(slots=${slotsDetected}, bodyH=${bodyHeight}) — fullPage 생략 후 타겟 중심 캡처`
       );
-      const centeredOnInjected = await this.centerToInjected(page, true);
+      const centeredOnInjected = await this.centerToInjected(page, true, host);
       if (centeredOnInjected) {
         await new Promise((r) => setTimeout(r, 400));
       }
@@ -537,7 +539,7 @@ export class GdnCapture extends BaseChannel {
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       console.warn(`[GDN] fullPage 캡처 실패 — viewport 폴백: ${msg}`);
-      const centeredOnInjected = await this.centerToInjected(page, false);
+      const centeredOnInjected = await this.centerToInjected(page, false, host);
 
       if (centeredOnInjected) {
         await new Promise((r) => setTimeout(r, 400));
@@ -551,11 +553,46 @@ export class GdnCapture extends BaseChannel {
     }
   }
 
-  private async centerToInjected(page: IPageHandle, forceCenter: boolean): Promise<boolean> {
+  private async centerToInjected(page: IPageHandle, forceCenter: boolean, host = ""): Promise<boolean> {
     return await page.evaluate<boolean>(`
       (() => {
-        const target = document.querySelector('[data-injected="admate"], [data-injected="admate-wrapper"]');
-        if (!target) return false;
+        const hostStr = ${JSON.stringify(host)};
+        const isMt = hostStr.indexOf("mt.co.kr") !== -1;
+        const vw = window.innerWidth || 1280;
+
+        const anchored = document.querySelector('[data-admate-scroll-anchor="1"]');
+        const candidates = anchored
+          ? [anchored]
+          : Array.from(
+              document.querySelectorAll('[data-injected="admate-wrapper"], img[data-injected="admate"]')
+            );
+        if (candidates.length === 0) return false;
+
+        function pickTargetScrollEl() {
+          if (candidates.length === 1) return candidates[0];
+          let best = candidates[0];
+          let bestScore = -1e18;
+          for (let i = 0; i < candidates.length; i++) {
+            const el = candidates[i];
+            const r = el.getBoundingClientRect();
+            const area = r.width * r.height;
+            const cx = r.left + r.width / 2;
+            let s = area;
+            if (r.width < 120 || r.height < 50) s -= 1e12;
+            if (isMt) {
+              if (cx >= vw * 0.36) s += 6e6;
+              if (r.width <= 200 && r.height >= 400) s -= 4e6;
+              if (cx < vw * 0.2 && r.height >= 400) s -= 3e6;
+            }
+            if (s > bestScore) {
+              bestScore = s;
+              best = el;
+            }
+          }
+          return best;
+        }
+
+        const target = pickTargetScrollEl();
         const rect = target.getBoundingClientRect();
         const isVisibleNow = rect.bottom > 0 && rect.top < (window.innerHeight || 0);
         const force = ${forceCenter ? "true" : "false"};
