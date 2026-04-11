@@ -8,6 +8,20 @@ function isZdnetHost(host: string): boolean {
   return host === "zdnet.co.kr" || host === "www.zdnet.co.kr";
 }
 
+function isMoneyTodayHost(host: string): boolean {
+  return host === "mt.co.kr" || host === "www.mt.co.kr" || host === "m.mt.co.kr";
+}
+
+function mtHasStrongAdHint(sel: string): boolean {
+  return (
+    sel.includes("div-gpt-ad") ||
+    sel.includes("google_ads_iframe") ||
+    sel.includes("googlesyndication") ||
+    sel.includes("adsbygoogle") ||
+    sel.includes("aswift")
+  );
+}
+
 export function isGdnExcludedHost(host: string): boolean {
   return GDN_EXCLUDED_HOSTS.has(host);
 }
@@ -16,6 +30,7 @@ export function getGdnScreenshotPolicy(host: string): GdnScreenshotPolicy {
   if (host === "news.sbs.co.kr") return "force_centered_viewport";
   if (host === "www.ddaily.co.kr") return "force_centered_viewport";
   if (isZdnetHost(host)) return "force_centered_viewport";
+  if (isMoneyTodayHost(host)) return "force_centered_viewport";
   return "default";
 }
 
@@ -37,6 +52,12 @@ export function prioritizeGdnSlotsByHost(host: string, slots: DetectedSlot[]): v
   if (isZdnetHost(host)) {
     slots.sort((a, b) => calcZdnetSlotScore(b) - calcZdnetSlotScore(a));
     console.log("[GDN] 🧭 ZDNet 전용 슬롯 우선순위 적용");
+    return;
+  }
+
+  if (isMoneyTodayHost(host)) {
+    slots.sort((a, b) => calcMoneyTodaySlotScore(b) - calcMoneyTodaySlotScore(a));
+    console.log("[GDN] 🧭 머니투데이 전용 슬롯 우선순위 적용");
   }
 }
 
@@ -81,6 +102,25 @@ export function narrowGdnSlotsByHost(host: string, slots: DetectedSlot[]): void 
       slots.length = 0;
       preferred.forEach((s) => slots.push(s));
       console.log(`[GDN] 🎯 ZDNet 전용 후보 축소 적용: ${preferred.length}개`);
+    }
+  }
+
+  if (isMoneyTodayHost(host)) {
+    const preferred = slots.filter((s) => {
+      const sel = (s.selector || "").toLowerCase();
+      const hint = mtHasStrongAdHint(sel);
+      const sizeMpu = s.width >= 250 && s.width <= 380 && s.height >= 220 && s.height <= 360;
+      const sizeHalf = s.width >= 250 && s.width <= 380 && s.height >= 430 && s.height <= 660;
+      const leaderboardish = s.width >= 600 && s.width <= 800 && s.height >= 70 && s.height <= 130;
+      const tallEmptyWrapper = s.width <= 420 && s.height > 600 && !hint;
+      if (tallEmptyWrapper) return false;
+      return hint || sizeMpu || sizeHalf || leaderboardish;
+    });
+
+    if (preferred.length > 0) {
+      slots.length = 0;
+      preferred.forEach((s) => slots.push(s));
+      console.log(`[GDN] 🎯 머니투데이 전용 후보 축소 적용: ${preferred.length}개`);
     }
   }
 }
@@ -146,6 +186,32 @@ function calcZdnetSlotScore(slot: DetectedSlot): number {
   if (slot.width >= 900 || area >= 180000) score -= 140;
   if (slot.width >= 1100 || area >= 240000) score -= 180;
   if (slot.width >= 700 && slot.height <= 120) score -= 200;
+
+  return score;
+}
+
+function calcMoneyTodaySlotScore(slot: DetectedSlot): number {
+  const sel = (slot.selector || "").toLowerCase();
+  let score = slot.confidence;
+  const area = slot.width * slot.height;
+  const hint = mtHasStrongAdHint(sel);
+
+  if (slot.type === "gdn-iframe") score += 130;
+  if (sel.includes("google_ads_iframe") || sel.includes("aswift")) score += 125;
+  if (sel.includes("div-gpt-ad")) score += 105;
+  if (sel.includes("adsbygoogle")) score += 95;
+
+  if (slot.width >= 250 && slot.width <= 380 && slot.height >= 220 && slot.height <= 360) score += 75;
+  if (slot.width >= 250 && slot.width <= 380 && slot.height >= 430 && slot.height <= 660) score += 60;
+  if (slot.width >= 600 && slot.width <= 800 && slot.height >= 70 && slot.height <= 130) score += 50;
+
+  // 우측 사이드에 세로로 긴 빈 래퍼(소재보다 큰 박스) 오탐
+  if (slot.width <= 420 && slot.height > 520 && !hint) score -= 230;
+  if (slot.width <= 420 && slot.height > 680) score -= 280;
+  if (slot.height > slot.width * 2.4 && slot.width < 420 && slot.type === "size-match") score -= 170;
+
+  if (slot.width >= 900 || area >= 200000) score -= 150;
+  if (slot.width >= 700 && slot.height <= 100) score -= 210;
 
   return score;
 }
