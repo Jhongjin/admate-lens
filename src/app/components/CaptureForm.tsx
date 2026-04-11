@@ -282,7 +282,7 @@ const YOUTUBE_AD_TYPES: YouTubeAdTypeOption[] = [
   },
 ];
 
-type InjectionMode = "single" | "all" | "custom";
+type InjectionMode = "single" | "custom";
 interface InjectionModeOption {
   value: InjectionMode;
   label: string;
@@ -296,12 +296,6 @@ const INJECTION_MODES: InjectionModeOption[] = [
     label: "최상위 1개",
     icon: "🎯",
     description: "가장 좋은 위치의 슬롯 1개만 교체",
-  },
-  {
-    value: "all",
-    label: "전체 슬롯",
-    icon: "🔥",
-    description: "탐지된 모든 광고 슬롯에 소재 교체",
   },
   {
     value: "custom",

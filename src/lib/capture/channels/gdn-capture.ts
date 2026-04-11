@@ -381,7 +381,7 @@ export class GdnCapture extends BaseChannel {
     prioritizeGdnSlotsByHost(host, slots);
     narrowGdnSlotsByHost(host, slots);
 
-    // 5) 소재 인젝션 — injectionMode에 따라 동작
+    // 5) 소재 인젝션 — injectionMode에 따라 동작 (UI에서는 "all" 제거, 레거시 메타만 "all" 가능)
     const injectionMode = (request.options?.injectionMode as string) || "single";
     const targetSlotCount = (request.options?.slotCount as number) || 1;
     
