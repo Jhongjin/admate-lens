@@ -638,7 +638,8 @@ export async function GET(request: NextRequest) {
   try {
     const supabase = createServerClient();
     const { searchParams } = new URL(request.url);
-    const staleThresholdIso = new Date(Date.now() - 3 * 60 * 1000).toISOString();
+    // 캡처 중에는 DB를 건드리지 않아 updated_at이 갱신되지 않음 → 너무 짧으면 정상 장기 처리중 행까지 실패 처리됨(SBS 등)
+    const staleThresholdIso = new Date(Date.now() - 12 * 60 * 1000).toISOString();
 
     // 오래된 processing 상태 자동 정리 (워커 중단/세션 종료 후 고착 방지)
     await supabase

@@ -65,6 +65,8 @@ export function isChosunHost(host: string): boolean {
 
 export function getGdnLazyLoadMode(host: string): GdnLazyLoadMode {
   if (isMkHost(host)) return "light";
+  // SBS는 광고 DOM이 무겁고 full lazy 복원이 길어져 목록 조회(오래된 processing 정리) 타이밍과 충돌하기 쉬움
+  if (host === "news.sbs.co.kr") return "light";
   return "full";
 }
 
