@@ -815,7 +815,7 @@ export class GdnCapture extends BaseChannel {
             const img = document.createElement('img');
             img.src = imgUrl;
             img.setAttribute('data-injected', 'admate');
-            img.style.cssText = 'display:block !important; width:' + Math.round(rect.width) + 'px !important; height:' + Math.round(rect.height) + 'px !important; object-fit:cover !important; border:none !important;';
+            img.style.cssText = 'display:block !important; width:' + Math.round(rect.width) + 'px !important; height:' + Math.round(rect.height) + 'px !important; object-fit:contain !important; object-position:center center !important; border:none !important;';
             
             wrapper.appendChild(img);
             iframe.replaceWith(wrapper);
@@ -833,7 +833,7 @@ export class GdnCapture extends BaseChannel {
             if (rect.width >= 250 && rect.height >= 50 && rect.width <= 1200 && rect.height <= 400) {
               existingImg.src = imgUrl;
               existingImg.setAttribute('data-injected', 'admate');
-              existingImg.style.cssText += ';object-fit:cover !important;';
+              existingImg.style.cssText += ';object-fit:contain !important;object-position:center center !important;';
               console.log('[Injector] 폴백: 배너 크기 이미지 교체 (' + Math.round(rect.width) + 'x' + Math.round(rect.height) + ')');
               replaced = true;
               break;
