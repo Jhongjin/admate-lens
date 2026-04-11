@@ -4,6 +4,10 @@ export type GdnScreenshotPolicy = "default" | "force_centered_viewport";
 
 const GDN_EXCLUDED_HOSTS = new Set<string>(["news.kbs.co.kr"]);
 
+function isZdnetHost(host: string): boolean {
+  return host === "zdnet.co.kr" || host === "www.zdnet.co.kr";
+}
+
 export function isGdnExcludedHost(host: string): boolean {
   return GDN_EXCLUDED_HOSTS.has(host);
 }
@@ -11,6 +15,7 @@ export function isGdnExcludedHost(host: string): boolean {
 export function getGdnScreenshotPolicy(host: string): GdnScreenshotPolicy {
   if (host === "news.sbs.co.kr") return "force_centered_viewport";
   if (host === "www.ddaily.co.kr") return "force_centered_viewport";
+  if (isZdnetHost(host)) return "force_centered_viewport";
   return "default";
 }
 
@@ -26,6 +31,12 @@ export function prioritizeGdnSlotsByHost(host: string, slots: DetectedSlot[]): v
   if (host === "www.ddaily.co.kr") {
     slots.sort((a, b) => calcDdailySlotScore(b) - calcDdailySlotScore(a));
     console.log("[GDN] 🧭 디지털데일리 전용 슬롯 우선순위 적용");
+    return;
+  }
+
+  if (isZdnetHost(host)) {
+    slots.sort((a, b) => calcZdnetSlotScore(b) - calcZdnetSlotScore(a));
+    console.log("[GDN] 🧭 ZDNet 전용 슬롯 우선순위 적용");
   }
 }
 
@@ -47,6 +58,29 @@ export function narrowGdnSlotsByHost(host: string, slots: DetectedSlot[]): void 
       slots.length = 0;
       preferred.forEach((s) => slots.push(s));
       console.log(`[GDN] 🎯 디지털데일리 전용 후보 축소 적용: ${preferred.length}개`);
+    }
+  }
+
+  if (isZdnetHost(host)) {
+    const preferred = slots.filter((s) => {
+      const sel = (s.selector || "").toLowerCase();
+      const sizeNear300x250 = s.width >= 250 && s.width <= 340 && s.height >= 220 && s.height <= 340;
+      const leaderboardish = s.width >= 680 && s.width <= 780 && s.height >= 80 && s.height <= 120;
+      return (
+        sel.includes("zc-banner") ||
+        sel.includes("zdk") ||
+        sel.includes("div-gpt-ad") ||
+        sel.includes("google_ads_iframe") ||
+        sel.includes("adsbygoogle") ||
+        sizeNear300x250 ||
+        leaderboardish
+      );
+    });
+
+    if (preferred.length > 0) {
+      slots.length = 0;
+      preferred.forEach((s) => slots.push(s));
+      console.log(`[GDN] 🎯 ZDNet 전용 후보 축소 적용: ${preferred.length}개`);
     }
   }
 }
@@ -91,6 +125,27 @@ function calcDdailySlotScore(slot: DetectedSlot): number {
   // ddaily에서는 상단 와이드 슬롯보다 300x250 실광고를 우선
   if (slot.width >= 700 && slot.height <= 120) score -= 220;
   if (slot.width >= 900 && slot.height <= 120) score -= 260;
+
+  return score;
+}
+
+function calcZdnetSlotScore(slot: DetectedSlot): number {
+  const sel = (slot.selector || "").toLowerCase();
+  let score = slot.confidence;
+  const area = slot.width * slot.height;
+
+  if (slot.type === "gdn-iframe") score += 110;
+  if (sel.includes("google_ads_iframe")) score += 110;
+  if (sel.includes("div-gpt-ad")) score += 95;
+  if (sel.includes("adsbygoogle")) score += 85;
+  if (sel.includes("zc-banner") || sel.includes("zdk")) score += 100;
+
+  if ((slot.width >= 230 && slot.width <= 340) && (slot.height >= 230 && slot.height <= 340)) score += 55;
+  if (slot.width >= 680 && slot.width <= 780 && slot.height >= 80 && slot.height <= 120) score += 45;
+
+  if (slot.width >= 900 || area >= 180000) score -= 140;
+  if (slot.width >= 1100 || area >= 240000) score -= 180;
+  if (slot.width >= 700 && slot.height <= 120) score -= 200;
 
   return score;
 }
