@@ -13,6 +13,8 @@ export interface PrerollInjectPagePayload {
   enableCtaText: boolean;
   ctaBtnText: string;
   progressFillPct: number;
+  /** false면 데스크톱 우하단 건너뛰기 버튼 미노출(논스킵 인스트림) */
+  showSkipButton?: boolean;
   /** Node에서 측정한 플레이어 박스(인페이지 재탐색과 불일치 시 흰 영역·찢어짐 방지) */
   serverPlayerBox?: { left: number; top: number; width: number; height: number };
 }
@@ -29,6 +31,7 @@ export function runPrerollInjectInPage(...args: unknown[]): boolean {
     const enableCtaText = p.enableCtaText;
     const ctaBtnText = p.ctaBtnText;
     const progressFillPct = p.progressFillPct;
+    const showSkipButton = p.showSkipButton !== false;
 
     const playerSelectors = [
       "#yt-thumb-overlay",
@@ -368,7 +371,7 @@ export function runPrerollInjectInPage(...args: unknown[]): boolean {
       document.body.appendChild(mobileBar);
     }
 
-    if (!isMobile) {
+    if (!isMobile && showSkipButton) {
       const skipTop = py + ph - 90;
       const skipBtn = document.createElement("div");
       skipBtn.id = "admate-skip-btn";

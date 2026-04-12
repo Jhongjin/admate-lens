@@ -66,6 +66,7 @@ export async function POST(request: NextRequest) {
       instreamOpts?: {
         videoUrl?: string;
         skipSeconds?: number;
+        instreamSkipMode?: "skippable" | "non-skippable";
         adTitle?: string;
         enableCtaText?: boolean;
         ctaText?: string;

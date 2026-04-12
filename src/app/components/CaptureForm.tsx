@@ -765,15 +765,21 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
   const selectedOptionPreset =
     selectedMediaMenu === "youtube"
       ? form.youtubeAdType === "preroll"
-        ? "pc-skip"
-        : form.youtubeAdType === "mobile-preroll-ios"
         ? form.instreamSkipMode === "non-skippable"
-          ? "ios-non-skip"
-          : "ios-skip"
+          ? "pc-non-skip"
+          : "pc-skip"
         : form.instreamSkipMode === "non-skippable"
-          ? "aos-non-skip"
-          : "aos-skip"
+          ? "mo-non-skip"
+          : "mo-skip"
       : "gdn-default";
+
+  const youtubeDetailOptionLabel: Record<string, string> = {
+    "pc-skip": "Pc instream (Skip)",
+    "pc-non-skip": "Pc instream (Non skip)",
+    "mo-skip": "Mo instream (Skip)",
+    "mo-non-skip": "Mo instream (Non skip)",
+    "gdn-default": "Network Ads 기본",
+  };
 
   const hasValidSource = isYoutubeInstream
     ? form.instreamVideoUrl && isValidUrl(form.instreamVideoUrl)
@@ -874,6 +880,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                         : undefined,
                   companionUseChannelBanner: form.instreamUseChannelBanner,
                   enableCompanionBanner: form.instreamEnableCompanionBanner,
+                  instreamSkipMode: form.instreamSkipMode,
                 }
               : undefined,
         }),
@@ -914,6 +921,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
         instreamCompanionImageUrl: "",
         instreamCompanionChannelUrl: "",
         instreamUseChannelBanner: true,
+        instreamSkipMode: "skippable",
       }));
       setUploadedFile(null);
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -953,7 +961,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
           </div>
         </div>
 
-        {/* ===== 매체 / 상품 / 기본옵션 선택 ===== */}
+        {/* ===== 매체 / 상품 / 상세 옵션 선택 ===== */}
         <div className="mb-5 space-y-3">
           <div>
             <label className="form-label">1) 매체 선택</label>
@@ -1010,7 +1018,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
           </div>
 
           <div>
-            <label className="form-label">3) 기본 옵션</label>
+            <label className="form-label">3) 상세 옵션</label>
             <select
               className="form-input"
               value={selectedOptionPreset}
@@ -1027,30 +1035,40 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                   }));
                   return;
                 }
-                if (preset.startsWith("ios")) {
+                if (preset === "pc-non-skip") {
                   setForm((prev) => ({
                     ...prev,
                     channel: "youtube",
-                    youtubeAdType: "mobile-preroll-ios",
-                    instreamSkipMode: preset.includes("non") ? "non-skippable" : "skippable",
+                    youtubeAdType: "preroll",
+                    instreamSkipMode: "non-skippable",
                   }));
-                } else {
+                  return;
+                }
+                if (preset === "mo-skip") {
                   setForm((prev) => ({
                     ...prev,
                     channel: "youtube",
                     youtubeAdType: "mobile-preroll-aos",
-                    instreamSkipMode: preset.includes("non") ? "non-skippable" : "skippable",
+                    instreamSkipMode: "skippable",
+                  }));
+                  return;
+                }
+                if (preset === "mo-non-skip") {
+                  setForm((prev) => ({
+                    ...prev,
+                    channel: "youtube",
+                    youtubeAdType: "mobile-preroll-aos",
+                    instreamSkipMode: "non-skippable",
                   }));
                 }
               }}
             >
               {selectedMediaMenu === "youtube" ? (
                 <>
-                  <option value="pc-skip">PC Instream (Skip)</option>
-                  <option value="aos-skip">AOS Instream - Skip</option>
-                  <option value="aos-non-skip">AOS Instream - Non Skip</option>
-                  <option value="ios-skip">iOS Instream - Skip</option>
-                  <option value="ios-non-skip">iOS Instream - Non Skip</option>
+                  <option value="pc-skip">Pc instream (Skip)</option>
+                  <option value="pc-non-skip">Pc instream (Non skip)</option>
+                  <option value="mo-skip">Mo instream (Skip)</option>
+                  <option value="mo-non-skip">Mo instream (Non skip)</option>
                 </>
               ) : (
                 <option value="gdn-default">Network Ads 기본</option>
@@ -1075,7 +1093,8 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
               상품: {selectedProduct === "instream" ? "Instream" : "Network Ads"}
             </span>
             <span className="text-[10px] px-2 py-1 rounded-full bg-[var(--color-accent-subtle)] text-[var(--color-accent)]">
-              옵션: {selectedOptionPreset}
+              상세:{" "}
+              {youtubeDetailOptionLabel[selectedOptionPreset] ?? selectedOptionPreset}
             </span>
           </div>
         </div>
@@ -1084,9 +1103,9 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
           <div className="mb-5 animate-fade-in">
             <p className="form-helper mt-1.5">
               💡 {form.youtubeAdType === "mobile-preroll-aos" &&
-                "Android 모바일(Pixel 8) 화면에서 YouTube 인스트림 광고로 표시됩니다."}
+                "모바일 인스트림은 Android(Pixel 8) 뷰포트 기준으로 캡처됩니다."}
               {form.youtubeAdType === "mobile-preroll-ios" &&
-                "iPhone 15 화면에서 YouTube 인스트림 광고로 표시됩니다."}
+                "모바일 인스트림은 iPhone 15 뷰포트 기준으로 캡처됩니다."}
             </p>
 
             {/* 🎬 인스트림 광고 상세 옵션 (프리롤 + 모바일 인스트림 공통) */}

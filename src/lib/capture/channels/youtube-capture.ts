@@ -63,6 +63,8 @@ async function imageUrlToDataUrl(imageUrl: string): Promise<{ dataUrl: string; s
 type InstreamOptsPayload = {
   videoUrl?: string;
   skipSeconds?: number;
+  /** 스킵 가능 광고면 UI에 건너뛰기 노출(미지정 시 스킵 가능으로 간주) */
+  instreamSkipMode?: "skippable" | "non-skippable";
   adTitle?: string;
   enableCtaText?: boolean;
   ctaText?: string;
@@ -622,6 +624,7 @@ export class YouTubeCapture extends BaseChannel {
           progressFillPercent: prerollProgressPercent,
           enableCtaText: instreamOpts.enableCtaText,
           isMobile: isMobilePlatform,
+          instreamSkipMode: instreamOpts.instreamSkipMode,
         };
         console.log(
           `[YouTube] 인스트림 옵션: title="${prerollUiOpts.adTitle}" cta="${prerollUiOpts.ctaText}" landing="${prerollUiOpts.landingUrl}" enableCtaText="${prerollUiOpts.enableCtaText}" mobile=${isMobilePlatform}`
@@ -803,7 +806,7 @@ export class YouTubeCapture extends BaseChannel {
    * 📌 실제 YouTube 인스트림 광고 형태를 정확히 재현:
    *   - 좌상단: 작은 "광고" 라벨
    *   - 좌하단: 카드형 CTA (썸네일 + 상품명 + CTA 버튼 + "스폰서 · URL")
-   *   - 우하단: "건너뛰기 ▶|" 버튼
+   *   - 우하단: 스킵 가능일 때만 "건너뛰기 ▶|" 버튼
    *   - 하단: 노란색 프로그레스 바
    */
   private async injectPrerollAd(
@@ -824,6 +827,7 @@ export class YouTubeCapture extends BaseChannel {
       avatarImageUrl?: string;
       progressFillPercent?: number;
       isMobile?: boolean;
+      instreamSkipMode?: "skippable" | "non-skippable";
     } = {}
   ): Promise<boolean> {
     const isMobile = instreamOpts.isMobile ?? false;
@@ -882,6 +886,8 @@ export class YouTubeCapture extends BaseChannel {
     }
     const ctaText = instreamOpts.ctaText || '자세히 알아보기';
 
+    const showSkipButton = instreamOpts.instreamSkipMode !== "non-skippable";
+
     const prerollPayload: PrerollInjectPagePayload = {
       imgUrl: imgDataUrl,
       isMobile,
@@ -892,6 +898,7 @@ export class YouTubeCapture extends BaseChannel {
       enableCtaText: instreamOpts.enableCtaText !== false,
       ctaBtnText: ctaText,
       progressFillPct: Math.min(100, Math.max(0, instreamOpts.progressFillPercent ?? 33)),
+      showSkipButton,
       serverPlayerBox:
         playerInfo.found && playerInfo.width > 80 && playerInfo.height > 80
           ? {
