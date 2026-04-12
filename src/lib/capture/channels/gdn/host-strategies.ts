@@ -18,9 +18,14 @@ import type { DetectedSlot } from "@/lib/capture/injection/ad-slot-detector";
 
 export type GdnScreenshotPolicy = "default" | "force_centered_viewport";
 
-/** 슬롯 정렬·축소 시 모바일 뷰포트 여부(조선 등 본문 MPU 우선에 사용) */
+/** 슬롯 정렬·축소 시 모바일 뷰포트·조선 홈면 여부 */
 export interface GdnSlotHostContext {
   mobileViewport?: boolean;
+  /**
+   * 조선 모바일 + 캡처 URL이 사이트 루트(`/`)일 때 true.
+   * GAM iframe 경로에 `…/home/mh…`(예: 오늘의 핫뉴스 상단 336×280)이 붙는 슬롯을 가산한다.
+   */
+  chosunHomeSurface?: boolean;
 }
 
 /** Lazy-load 강제: full은 data-src 일괄 복원+스크롤, light는 loading만+짧은 스크롤(대형 뉴스지면 OOM 방지) */
@@ -70,6 +75,21 @@ function isYnaHost(host: string): boolean {
 export function isChosunHost(host: string): boolean {
   const h = host.toLowerCase();
   return h === "www.chosun.com" || h === "chosun.com" || h === "m.chosun.com";
+}
+
+/** 모바일 + 조선 + URL 경로가 `/`(메인) — 홈 전용 GAM `…/home/mh…` 구간 */
+export function isChosunMobileHomeSurface(
+  host: string,
+  publisherUrl: string,
+  mobileViewport: boolean,
+): boolean {
+  if (!isChosunHost(host) || !mobileViewport) return false;
+  try {
+    const p = new URL(publisherUrl).pathname.replace(/\/+$/, "") || "/";
+    return p === "/";
+  } catch {
+    return false;
+  }
 }
 
 // --- Lazy-load (gdn-capture에서 evaluate 스크립트 분기) ---
@@ -142,11 +162,14 @@ export function prioritizeGdnSlotsByHost(
 
   if (isChosunHost(host)) {
     const mobile = Boolean(ctx?.mobileViewport);
+    const home = Boolean(ctx?.chosunHomeSurface);
     slots.sort(
-      (a, b) => calcChosunSlotScore(b, mobile) - calcChosunSlotScore(a, mobile),
+      (a, b) => calcChosunSlotScore(b, ctx) - calcChosunSlotScore(a, ctx),
     );
     console.log(
-      `[GDN] 🧭 조선일보 전용 슬롯 우선순위 적용${mobile ? " (모바일·기사 플로우 MPU 우선)" : ""}`,
+      `[GDN] 🧭 조선일보 전용 슬롯 우선순위 적용${
+        mobile ? (home ? " (모바일 홈·/home/mh… MPU)" : " (모바일·기사 등 MPU)") : ""
+      }`,
     );
     return;
   }
@@ -264,6 +287,7 @@ export function narrowGdnSlotsByHost(
 
   if (isChosunHost(host)) {
     const mobile = Boolean(ctx?.mobileViewport);
+    const chosunHome = Boolean(ctx?.chosunHomeSurface);
     const preferred = slots.filter((s) => {
       if (s.type === "gdn-iframe" && s.height > 780) return false;
       const sel = (s.selector || "").toLowerCase();
@@ -287,7 +311,9 @@ export function narrowGdnSlotsByHost(
       slots.length = 0;
       preferred.forEach((s) => slots.push(s));
       console.log(
-        `[GDN] 🎯 조선일보 후보 축소: ${preferred.length}개${mobile ? " (모바일 GAM·본문 MPU)" : ""}`,
+        `[GDN] 🎯 조선일보 후보 축소: ${preferred.length}개${
+          mobile ? (chosunHome ? " (모바일 홈 GAM·핫뉴스 상단 등)" : " (모바일 GAM·본문 MPU)") : ""
+        }`,
       );
     }
   }
@@ -423,10 +449,14 @@ function calcYnaSlotScore(slot: DetectedSlot): number {
 }
 
 /**
- * 조선일보 모바일: 멤버십·내비 아래 기사 플로우의 MPU(300×250 / 336×280)가 대표 인벤.
+ * 조선일보 모바일 MPU(336×280 등):
+ * - **기사 URL**: 멤버십 바로 아래·제목 위 등 기사 플로우 인벤이 흔함.
+ * - **메인(`/`)**: GAM 경로 `…/home/mh…`(팀장님 제공 iframe) = 오늘의 핫뉴스 바로 위 홈 슬롯.
  * 세로 과대 GAM iframe·하단 스티키보다 실제 게재면에 가깝게 점수화.
  */
-function calcChosunSlotScore(slot: DetectedSlot, mobileViewport: boolean): number {
+function calcChosunSlotScore(slot: DetectedSlot, ctx?: GdnSlotHostContext): number {
+  const mobileViewport = Boolean(ctx?.mobileViewport);
+  const chosunHomeSurface = Boolean(ctx?.chosunHomeSurface);
   const sel = (slot.selector || "").toLowerCase();
   let score = slot.confidence;
   const area = slot.width * slot.height;
@@ -445,6 +475,14 @@ function calcChosunSlotScore(slot: DetectedSlot, mobileViewport: boolean): numbe
   if (mpu) score += 88;
 
   if (slot.width >= 680 && slot.width <= 800 && slot.height >= 80 && slot.height <= 120) score += 48;
+
+  if (chosunHomeSurface) {
+    const homeGamPath =
+      (sel.includes("google_ads") && (sel.includes("/home/") || sel.includes("home%2f"))) ||
+      /\/home\/mh\d/i.test(sel) ||
+      /\bmh\d[_-]/i.test(sel);
+    if (homeGamPath) score += 125;
+  }
 
   if (mobileViewport) {
     if (!slot.isFixed && mpu && slot.y >= 72 && slot.y <= 920) score += 95;
