@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 
 /** 채널 타입 */
 type ChannelOption = {
@@ -223,6 +223,46 @@ const GDN_AD_SIZES: AdSizeInfo[] = [
     popularity: "보통",
   },
 ];
+
+/** Google Ads MO 지면 — 직접 선택 시 노출할 모바일 단위 사이즈만 */
+const GDN_AD_SIZES_MOBILE: AdSizeInfo[] = [
+  {
+    size: "320×100",
+    width: 320,
+    height: 100,
+    name: "모바일 배너",
+    usage: "모바일 상단/하단",
+    popularity: "높음",
+  },
+  {
+    size: "320×50",
+    width: 320,
+    height: 50,
+    name: "모바일 배너(좁은형)",
+    usage: "모바일 스티키/상단",
+    popularity: "높음",
+  },
+  {
+    size: "300×250",
+    width: 300,
+    height: 250,
+    name: "미디엄 렉탱글",
+    usage: "모바일 기사/피드",
+    popularity: "높음",
+  },
+  {
+    size: "336×280",
+    width: 336,
+    height: 280,
+    name: "라지 렉탱글",
+    usage: "모바일 본문 중간",
+    popularity: "보통",
+  },
+];
+
+const GDN_MOBILE_SIZE_KEYS = new Set(
+  GDN_AD_SIZES_MOBILE.map((a) => `${a.width}x${a.height}`),
+);
 
 /** 인젝션 모드 */
 /** 광고 사이즈 모드 */
@@ -516,6 +556,22 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
     };
   }, []);
 
+  // MO 지면: 직접 선택에 남아 있는 데스크톱 전용 사이즈(728×90 등) 제거
+  useEffect(() => {
+    if (form.channel !== "gdn" || form.gdnViewportMode !== "mobile") return;
+    setForm((prev) => {
+      if (prev.channel !== "gdn" || prev.gdnViewportMode !== "mobile") return prev;
+      const next = prev.targetAdSizes.filter((s) => GDN_MOBILE_SIZE_KEYS.has(s));
+      if (
+        next.length === prev.targetAdSizes.length &&
+        next.every((v, i) => v === prev.targetAdSizes[i])
+      ) {
+        return prev;
+      }
+      return { ...prev, targetAdSizes: next };
+    });
+  }, [form.channel, form.gdnViewportMode]);
+
   /** 파일 업로드 처리 */
   const handleFileUpload = async (file: File) => {
     // 유효성 검증
@@ -787,6 +843,14 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
     "gdn-mobile": "MO지면",
   };
 
+  const isGdnMobileSurface =
+    form.channel === "gdn" && form.gdnViewportMode === "mobile";
+
+  const gdnAdSizeCatalog = useMemo(
+    () => (isGdnMobileSurface ? GDN_AD_SIZES_MOBILE : GDN_AD_SIZES),
+    [isGdnMobileSurface],
+  );
+
   const hasValidSource = isYoutubeInstream
     ? form.instreamVideoUrl && isValidUrl(form.instreamVideoUrl)
     : form.creativeUrl && isValidUrl(form.creativeUrl);
@@ -1039,7 +1103,14 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                   return;
                 }
                 if (preset === "gdn-mobile") {
-                  setForm((prev) => ({ ...prev, channel: "gdn", gdnViewportMode: "mobile" }));
+                  setForm((prev) => ({
+                    ...prev,
+                    channel: "gdn",
+                    gdnViewportMode: "mobile",
+                    targetAdSizes: prev.targetAdSizes.filter((s) =>
+                      GDN_MOBILE_SIZE_KEYS.has(s),
+                    ),
+                  }));
                   return;
                 }
                 if (preset === "pc-skip") {
@@ -2190,7 +2261,11 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
               <input
                 type="url"
                 className="form-input"
-                placeholder="https://via.placeholder.com/300x250.png"
+                placeholder={
+                  isGdnMobileSurface
+                    ? "https://via.placeholder.com/320x100.png"
+                    : "https://via.placeholder.com/300x250.png"
+                }
                 value={form.creativeUrl}
                 onChange={(e) =>
                   setForm((prev) => ({ ...prev, creativeUrl: e.target.value }))
@@ -2198,7 +2273,9 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                 required
               />
               <p className="form-helper">
-                광고 슬롯에 교체할 이미지 URL (300×250 권장)
+                {isGdnMobileSurface
+                  ? "광고 슬롯에 교체할 이미지 URL (모바일: 320×100 또는 300×250 권장)"
+                  : "광고 슬롯에 교체할 이미지 URL (300×250 권장)"}
               </p>
               {form.creativeUrl && !isValidUrl(form.creativeUrl) && (
                 <p
@@ -2419,11 +2496,12 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                   className="text-[11px] mb-2.5"
                   style={{ color: "var(--color-text-muted)" }}
                 >
-                  원하는 광고 사이즈를 선택해주세요. 선택한 사이즈의 슬롯만
-                  타겟팅합니다.
+                  {isGdnMobileSurface
+                    ? "모바일 지면에서는 아래 모바일 단위 사이즈만 선택할 수 있습니다. 선택한 슬롯만 타겟팅합니다."
+                    : "원하는 광고 사이즈를 선택해주세요. 선택한 사이즈의 슬롯만 타겟팅합니다."}
                 </p>
                 <div className="grid grid-cols-2 gap-2">
-                  {GDN_AD_SIZES.map((ad) => {
+                  {gdnAdSizeCatalog.map((ad) => {
                     const sizeKey = `${ad.width}x${ad.height}`;
                     const isSelected = form.targetAdSizes.includes(sizeKey);
                     // 📐 추천 배지: 업로드한 이미지 사이즈와 비교
