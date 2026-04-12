@@ -68,7 +68,7 @@ export abstract class BaseChannel {
         let landingUrl: string | undefined;
 
         if (request.captureLanding && request.clickUrl) {
-          const landingResult = await this.captureLanding(page, request.clickUrl);
+          const landingResult = await this.captureLanding(page, request.clickUrl, request);
           landingScreenshot = landingResult.screenshot;
           landingUrl = landingResult.finalUrl;
         }
@@ -95,19 +95,36 @@ export abstract class BaseChannel {
   /** 랜딩 페이지 캡처 (공통) */
   protected async captureLanding(
     page: IPageHandle,
-    clickUrl: string
+    clickUrl: string,
+    request?: CaptureRequest,
   ): Promise<{ screenshot: Buffer; finalUrl: string }> {
-    // 랜딩 페이지로 이동
-    await page.goto(clickUrl, { waitUntil: "networkidle2", timeout: 30000 });
+    const mobileGdn = request?.options?.gdnViewportMode === "mobile";
+    // 모바일 지면: 게재면 이후 동일 탭에서 fullPage 랜딩 캡처 시 Chromium OOM·Target closed 빈발
+    if (mobileGdn) {
+      console.log(
+        "[BaseChannel] 랜딩 캡처: MO 지면 → domcontentloaded + 뷰포트 스크린샷(fullPage 생략)",
+      );
+    }
+
+    await page.goto(clickUrl, {
+      waitUntil: mobileGdn ? "domcontentloaded" : "networkidle2",
+      timeout: mobileGdn ? 45000 : 30000,
+    });
+    if (mobileGdn) {
+      await new Promise((r) => setTimeout(r, 2500));
+    }
 
     // 쿠키 배너/팝업 제거
     const { removePageObstructions } = await import("../injection/creative-injector");
     await removePageObstructions(page);
 
     // 잠시 대기 (동적 컨텐츠 로드)
-    await new Promise((r) => setTimeout(r, 2000));
+    await new Promise((r) => setTimeout(r, mobileGdn ? 1500 : 2000));
 
-    const screenshot = await page.screenshot({ fullPage: true, type: "png" });
+    const screenshot = await page.screenshot({
+      fullPage: !mobileGdn,
+      type: "png",
+    });
     const finalUrl = page.url();
 
     return { screenshot, finalUrl };
