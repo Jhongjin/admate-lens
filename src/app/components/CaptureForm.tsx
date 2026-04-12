@@ -340,6 +340,8 @@ interface CaptureFormData {
   instreamUseChannelBanner: boolean;
   instreamEnableCompanionBanner: boolean;
   instreamSkipMode: "skippable" | "non-skippable";
+  /** GDN 게재면 캡처: PC 뷰포트 vs 모바일 뷰포트 */
+  gdnViewportMode: "pc" | "mobile";
 }
 
 type MediaMenu = "gdn" | "youtube" | "naver" | "kakao";
@@ -406,6 +408,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
     instreamCompanionChannelUrl: "",
     instreamUseChannelBanner: true,
     instreamEnableCompanionBanner: true,
+    gdnViewportMode: "pc",
   });
 
   // 이미지 업로드 관련 상태
@@ -771,14 +774,17 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
         : form.instreamSkipMode === "non-skippable"
           ? "mo-non-skip"
           : "mo-skip"
-      : "gdn-default";
+      : form.gdnViewportMode === "mobile"
+        ? "gdn-mobile"
+        : "gdn-pc";
 
-  const youtubeDetailOptionLabel: Record<string, string> = {
+  const detailOptionLabel: Record<string, string> = {
     "pc-skip": "Pc instream (Skip)",
     "pc-non-skip": "Pc instream (Non skip)",
     "mo-skip": "Mo instream (Skip)",
     "mo-non-skip": "Mo instream (Non skip)",
-    "gdn-default": "Network Ads 기본",
+    "gdn-pc": "PC지면",
+    "gdn-mobile": "MO지면",
   };
 
   const hasValidSource = isYoutubeInstream
@@ -842,6 +848,8 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
           // 🎬 YouTube 광고 유형
           youtubeAdType:
             form.channel === "youtube" ? form.youtubeAdType : undefined,
+          gdnViewportMode:
+            form.channel === "gdn" ? form.gdnViewportMode : undefined,
           // 🎬 인스트림 광고 옵션
           instreamOpts:
             form.channel === "youtube" && isYoutubeInstream
@@ -922,6 +930,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
         instreamCompanionChannelUrl: "",
         instreamUseChannelBanner: true,
         instreamSkipMode: "skippable",
+        gdnViewportMode: "pc",
       }));
       setUploadedFile(null);
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -978,7 +987,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                     youtubeAdType: "mobile-preroll-aos",
                   }));
                 } else {
-                  setForm((prev) => ({ ...prev, channel: "gdn" }));
+                  setForm((prev) => ({ ...prev, channel: "gdn", gdnViewportMode: "pc" }));
                 }
               }}
             >
@@ -1005,7 +1014,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                     youtubeAdType: "mobile-preroll-aos",
                   }));
                 } else {
-                  setForm((prev) => ({ ...prev, channel: "gdn" }));
+                  setForm((prev) => ({ ...prev, channel: "gdn", gdnViewportMode: "pc" }));
                 }
               }}
             >
@@ -1025,7 +1034,14 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
               onChange={(e) => {
                 const preset = e.target.value;
                 setIsOptionPanelExpanded(true);
-                if (preset === "gdn-default") return;
+                if (preset === "gdn-pc") {
+                  setForm((prev) => ({ ...prev, channel: "gdn", gdnViewportMode: "pc" }));
+                  return;
+                }
+                if (preset === "gdn-mobile") {
+                  setForm((prev) => ({ ...prev, channel: "gdn", gdnViewportMode: "mobile" }));
+                  return;
+                }
                 if (preset === "pc-skip") {
                   setForm((prev) => ({
                     ...prev,
@@ -1071,7 +1087,10 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                   <option value="mo-non-skip">Mo instream (Non skip)</option>
                 </>
               ) : (
-                <option value="gdn-default">Network Ads 기본</option>
+                <>
+                  <option value="gdn-pc">PC지면</option>
+                  <option value="gdn-mobile">MO지면</option>
+                </>
               )}
             </select>
           </div>
@@ -1094,7 +1113,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
             </span>
             <span className="text-[10px] px-2 py-1 rounded-full bg-[var(--color-accent-subtle)] text-[var(--color-accent)]">
               상세:{" "}
-              {youtubeDetailOptionLabel[selectedOptionPreset] ?? selectedOptionPreset}
+              {detailOptionLabel[selectedOptionPreset] ?? selectedOptionPreset}
             </span>
           </div>
         </div>

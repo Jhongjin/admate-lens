@@ -192,6 +192,12 @@ export async function POST(request: NextRequest) {
                   youtubeAdType: captureMetadata.youtubeAdType ?? "preroll",
                   instreamOpts: captureMetadata.instreamOpts,
                   publisherGotoRelaxed: multiBatch && resolvedChannel === "gdn",
+                  gdnViewportMode:
+                    resolvedChannel === "gdn"
+                      ? captureMetadata.gdnViewportMode === "mobile"
+                        ? "mobile"
+                        : "pc"
+                      : undefined,
                 },
               }),
             1,

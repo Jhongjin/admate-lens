@@ -11,6 +11,10 @@
  */
 
 import type { IPageHandle } from "../engine/browser-engine";
+import {
+  MOBILE_AOS_VIEWPORT,
+  UA_MOBILE_AOS,
+} from "../engine/puppeteer-engine";
 import { BaseChannel, type CaptureRequest } from "./base-channel";
 import { detectAdSlots, type DetectedSlot } from "../injection/ad-slot-detector";
 import { injectCreative, type InjectionResult } from "../injection/creative-injector";
@@ -110,6 +114,27 @@ export class GdnCapture extends BaseChannel {
       creativeBase64Size: 0,
       slots: [],
     };
+
+    const gdnViewportMode =
+      request.options?.gdnViewportMode === "mobile" ? "mobile" : "pc";
+    if (gdnViewportMode === "mobile") {
+      await page.setViewport(MOBILE_AOS_VIEWPORT);
+      await page.setUserAgent(UA_MOBILE_AOS);
+      console.log(
+        `[GDN] 📱 Mobile 지면: 모바일 뷰포트/UA (${MOBILE_AOS_VIEWPORT.width}×${MOBILE_AOS_VIEWPORT.height})`,
+      );
+    } else {
+      await page.setViewport({
+        width: 1920,
+        height: 1080,
+        deviceScaleFactor: 1,
+        isMobile: false,
+      });
+      await page.setUserAgent(
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36",
+      );
+      console.log("[GDN] 🖥 PC 지면: 데스크톱 뷰포트/UA");
+    }
 
     // 1) 소재 이미지 → base64 data URL 변환
     const { dataUrl: creativeDataUrl, sizeKB, ok } = await imageUrlToDataUrl(request.creativeUrl);
@@ -507,6 +532,7 @@ export class GdnCapture extends BaseChannel {
       slotsDetected: slots.length,
       bodyHeight: scrollCheck.bodyH,
       host,
+      preferViewportOnly: gdnViewportMode === "mobile",
     });
     this.diagnostics.screenshotMode = screenshotResult.mode;
     this.diagnostics.fullPageCaptureError = screenshotResult.errorMessage;
@@ -520,7 +546,13 @@ export class GdnCapture extends BaseChannel {
   /** fullPage 스크린샷 실패(메모리/프로토콜) 시 뷰포트 캡처로 폴백 */
   private async safeCaptureScreenshot(
     page: IPageHandle,
-    context?: { slotsDetected?: number; bodyHeight?: number; host?: string }
+    context?: {
+      slotsDetected?: number;
+      bodyHeight?: number;
+      host?: string;
+      /** Mobile 지면: 긴 fullPage 대신 뷰포트 캡처(메모리·모바일 레이아웃 정합) */
+      preferViewportOnly?: boolean;
+    },
   ): Promise<{
     buffer: Buffer;
     mode: "fullPage" | "viewportFallback";
@@ -547,6 +579,24 @@ export class GdnCapture extends BaseChannel {
         buffer,
         mode: "viewportFallback",
         errorMessage: "host_policy_centered_viewport",
+        centeredOnInjected,
+      };
+    }
+
+    if (context?.preferViewportOnly) {
+      console.log("[GDN] 📱 Mobile 지면: 뷰포트 단위 캡처(fullPage 생략)");
+      const centeredOnInjected = await this.centerToInjected(page, true, host);
+      if (centeredOnInjected) {
+        await new Promise((r) => setTimeout(r, 450));
+      }
+      const buffer = await page.screenshot({
+        fullPage: false,
+        type: "png",
+      });
+      return {
+        buffer,
+        mode: "viewportFallback",
+        errorMessage: "gdn_mobile_viewport_mode",
         centeredOnInjected,
       };
     }

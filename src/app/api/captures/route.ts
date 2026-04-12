@@ -49,6 +49,7 @@ export async function POST(request: NextRequest) {
       creativeObjectFit = "contain", // 📐 슬롯 내 소재: contain | cover
       youtubeAdType,             // 🎬 YouTube 광고 유형
       instreamOpts,              // 🎬 인스트림 광고 옵션
+      gdnViewportMode,           // GDN: PC vs Mobile 뷰포트
     } = body as {
       channel: ChannelType;
       publisherUrl?: string;
@@ -80,6 +81,7 @@ export async function POST(request: NextRequest) {
         enableCompanionBanner?: boolean;
         avatarImageUrl?: string;
       };
+      gdnViewportMode?: "pc" | "mobile";
     };
 
     // URL 배열 통합
@@ -124,6 +126,12 @@ export async function POST(request: NextRequest) {
         creativeObjectFit: normalizedCreativeObjectFit,
         youtubeAdType,
         instreamOpts,
+        gdnViewportMode:
+          channel === "gdn"
+            ? gdnViewportMode === "mobile"
+              ? "mobile"
+              : "pc"
+            : undefined,
       };
       const { data, error } = await supabase
         .from("vision_da_captures")
@@ -321,6 +329,12 @@ async function executeBatchCaptures(captureIds: string[]): Promise<void> {
                 youtubeAdType: captureMetadata.youtubeAdType ?? "preroll",
                 instreamOpts: captureMetadata.instreamOpts,
                 publisherGotoRelaxed: multiBatch && capture.channel === "gdn",
+                gdnViewportMode:
+                  capture.channel === "gdn"
+                    ? captureMetadata.gdnViewportMode === "mobile"
+                      ? "mobile"
+                      : "pc"
+                    : undefined,
               },
             }),
           1,
