@@ -46,14 +46,39 @@ const IAB_STANDARD_SIZES = [
 const MIN_SLOT_WIDTH = 200;
 const MIN_SLOT_HEIGHT = 80;
 
+/** MO 지면: 좁은 폭에서도 잡히는 배너·MPU */
+const MIN_SLOT_WIDTH_MOBILE = 120;
+const MIN_SLOT_HEIGHT_MOBILE = 44;
+
+export interface DetectAdSlotsOptions {
+  /** GDN Mobile 지면: 뷰포트·IAB 필터를 모바일 광고에 맞게 완화 */
+  mobileViewport?: boolean;
+}
+
 /**
  * 페이지에서 광고 슬롯을 탐지합니다.
  * 작은 슬롯(320x50 모바일 스티키 등)은 필터링하고
  * 큰 슬롯을 우선 반환합니다.
  */
-export async function detectAdSlots(page: IPageHandle): Promise<DetectedSlot[]> {
+export async function detectAdSlots(
+  page: IPageHandle,
+  opts: DetectAdSlotsOptions = {},
+): Promise<DetectedSlot[]> {
+  const mobileViewport = Boolean(opts.mobileViewport);
+  const standardSizesForEval = [
+    ...IAB_STANDARD_SIZES,
+    ...(mobileViewport
+      ? [
+          { w: 320, h: 100, tolerance: 28 },
+          { w: 320, h: 50, tolerance: 16 },
+          { w: 360, h: 280, tolerance: 44 },
+        ]
+      : []),
+  ];
+
   const rawSlots = await page.evaluate<DetectedSlot[]>(`
     (() => {
+      const mobileViewport = ${mobileViewport ? "true" : "false"};
       const results = [];
       const seenElements = new Set();
 
@@ -85,7 +110,9 @@ export async function detectAdSlots(page: IPageHandle): Promise<DetectedSlot[]> 
         seenElements.add(el);
         
         const rect = el.getBoundingClientRect();
-        if (rect.width < 50 || rect.height < 20) return;
+        const minW = mobileViewport ? 96 : 50;
+        const minH = mobileViewport ? 32 : 20;
+        if (rect.width < minW || rect.height < minH) return;
         
         const style = window.getComputedStyle(el);
         if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0') return;
@@ -137,7 +164,8 @@ export async function detectAdSlots(page: IPageHandle): Promise<DetectedSlot[]> 
         if (seenElements.has(el)) return;
         const rect = el.getBoundingClientRect();
         // 배너 크기 iframe만 (200x50 이상, 1200px 이하)
-        if (rect.width >= 200 && rect.height >= 50 && rect.width <= 1200 && rect.height <= 700) {
+        const minIframeW = mobileViewport ? 160 : 200;
+        if (rect.width >= minIframeW && rect.height >= 50 && rect.width <= 1200 && rect.height <= 700) {
           const src = (el.src || '').toLowerCase();
           const id = (el.id || '').toLowerCase();
           const cls = (el.className || '').toLowerCase();
@@ -192,8 +220,8 @@ export async function detectAdSlots(page: IPageHandle): Promise<DetectedSlot[]> 
         } catch(e) {}
       });
 
-      // 전략 4: IAB 표준 사이즈에 가까운 요소
-      const standardSizes = ${JSON.stringify(IAB_STANDARD_SIZES)};
+      // 전략 4: IAB 표준 사이즈에 가까운 요소 (모바일은 320 배너·360 MPU 등 추가)
+      const standardSizes = ${JSON.stringify(standardSizesForEval)};
       
       document.querySelectorAll('div, section, aside, figure').forEach(el => {
         const rect = el.getBoundingClientRect();
@@ -224,13 +252,18 @@ export async function detectAdSlots(page: IPageHandle): Promise<DetectedSlot[]> 
 
   // 서버 측 필터: 최소 크기 미달 슬롯 제거 (단, IAB 스카이 120/160×600은 허용)
   const filteredSlots = rawSlots.filter((s) => {
+    if (mobileViewport) {
+      if (s.width >= MIN_SLOT_WIDTH_MOBILE && s.height >= MIN_SLOT_HEIGHT_MOBILE) return true;
+    }
     if (s.width >= MIN_SLOT_WIDTH && s.height >= MIN_SLOT_HEIGHT) return true;
     const skyscraperNarrow =
       s.width >= 120 && s.width < MIN_SLOT_WIDTH && s.height >= 400 && s.height <= 800;
     return skyscraperNarrow;
   });
 
-  console.log(`[AdSlotDetector] 원본 ${rawSlots.length}개 → 필터 후 ${filteredSlots.length}개 슬롯:`);
+  console.log(
+    `[AdSlotDetector] 원본 ${rawSlots.length}개 → 필터 후 ${filteredSlots.length}개 슬롯${mobileViewport ? " [mobile]" : ""}:`,
+  );
   const maxLog = filteredSlots.length > 120 ? 120 : filteredSlots.length;
   if (filteredSlots.length > maxLog) {
     console.log(`[AdSlotDetector] 상세 로그 제한: ${maxLog}/${filteredSlots.length}`);

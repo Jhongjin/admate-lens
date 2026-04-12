@@ -142,17 +142,29 @@ export class GdnCapture extends BaseChannel {
     this.diagnostics.creativeBase64Size = sizeKB;
     console.log(`[GDN] 소재 다운로드: ${ok ? '성공' : '실패'} (${sizeKB}KB)`);
 
-    // 2) 페이지 로드 (배치·다수 사이트 연속 시 networkidle2가 과도하게 길어질 수 있어 완화 옵션 지원)
+    // 2) 페이지 로드
+    // 모바일: networkidle2는 지연·타임아웃·광고 미로드 빈번 → domcontentloaded + 정적 대기
     const gotoRelaxed = Boolean(request.options?.publisherGotoRelaxed);
+    const mobileSurface = gdnViewportMode === "mobile";
+    const gotoWaitUntil = gotoRelaxed
+      ? "domcontentloaded"
+      : mobileSurface
+        ? "domcontentloaded"
+        : "networkidle2";
+    const gotoTimeoutMs = gotoRelaxed ? 60000 : mobileSurface ? 55000 : 45000;
     if (gotoRelaxed) {
       console.log("[GDN] 게재면 로드: 완화 모드(domcontentloaded, 배치/느린 지면 대응)");
+    } else if (mobileSurface) {
+      console.log("[GDN] 게재면 로드: Mobile 지면(domcontentloaded + 광고·레이아웃 안정 대기)");
     }
     await page.goto(request.publisherUrl, {
-      waitUntil: gotoRelaxed ? "domcontentloaded" : "networkidle2",
-      timeout: gotoRelaxed ? 60000 : 45000,
+      waitUntil: gotoWaitUntil,
+      timeout: gotoTimeoutMs,
     });
     if (gotoRelaxed) {
       await new Promise((r) => setTimeout(r, 3500));
+    } else if (mobileSurface) {
+      await new Promise((r) => setTimeout(r, 4500));
     }
 
     // 2.0) 🔤 한글 폰트 로딩 대기 (Vercel 서버리스 Chromium에 CJK 폰트 없음)
@@ -186,7 +198,9 @@ export class GdnCapture extends BaseChannel {
     if (isChosunHost(host)) {
       await this.dismissChosunPromoLayer(page);
     }
-    const lazyLoadMode = getGdnLazyLoadMode(host);
+    // 모바일: DOM이 가볍고 메모리 한계가 빡빡해 lazy는 항상 경량(뉴스지면 OOM 방지)
+    const lazyLoadMode =
+      gdnViewportMode === "mobile" ? "light" : getGdnLazyLoadMode(host);
 
     // 2.5) 🔑 Lazy Loading 이미지 강제 로드
     // — full: data-src 일괄 복원 + 뷰포트 5배 스크롤
@@ -262,8 +276,8 @@ export class GdnCapture extends BaseChannel {
     `);
     console.log("[GDN] ✅ Lazy Loading 이미지 강제 로드 완료");
 
-    // 3) 광고 로드 + 이미지 렌더링 대기
-    await new Promise((r) => setTimeout(r, 3000));
+    // 3) 광고 로드 + 이미지 렌더링 대기 (모바일 GAM은 늦게 붙는 경우가 많음)
+    await new Promise((r) => setTimeout(r, mobileSurface ? 4200 : 3000));
 
     // 3.1) Access Denied/차단 페이지는 성공 처리하지 않고 즉시 실패로 반환
     const blocked = await this.detectAccessDenied(page);
@@ -272,7 +286,10 @@ export class GdnCapture extends BaseChannel {
     }
 
     // 4) 광고 슬롯 탐지
-    const slots = await this.runWithFrameRetry(() => detectAdSlots(page), "detect-slots");
+    const slots = await this.runWithFrameRetry(
+      () => detectAdSlots(page, { mobileViewport: mobileSurface }),
+      "detect-slots",
+    );
     const viewport = await page.evaluate<{ width: number; height: number }>(`
       (() => ({ width: window.innerWidth || 1920, height: window.innerHeight || 1080 }))()
     `);
@@ -379,7 +396,7 @@ export class GdnCapture extends BaseChannel {
     }
 
     // 콘텐츠 카드로 오탐된 슬롯(특히 section 기반 size-match)은 우선 제외
-    const filteredContentLike = slots.filter((s) => !this.isLikelyContentSlot(s));
+    const filteredContentLike = slots.filter((s) => !this.isLikelyContentSlot(s, mobileSurface));
     if (filteredContentLike.length > 0) {
       const removed = slots.length - filteredContentLike.length;
       if (removed > 0) {
@@ -1146,7 +1163,19 @@ export class GdnCapture extends BaseChannel {
     return Math.round((aspectScore + sizeScore) * 10) / 10;
   }
 
-  private isLikelyContentSlot(slot: DetectedSlot): boolean {
+  /**
+   * 모바일 본문 피드의 MPU는 `section` 안에 있어도 실제 광고 슬롯인 경우가 많아,
+   * 전형적인 MPU 크기면 콘텐츠 오탐에서 제외한다.
+   */
+  private isLikelyContentSlot(slot: DetectedSlot, mobileSurface: boolean): boolean {
+    if (mobileSurface) {
+      const mpuLike =
+        slot.width >= 260 &&
+        slot.width <= 430 &&
+        slot.height >= 200 &&
+        slot.height <= 380;
+      if (mpuLike) return false;
+    }
     const sel = (slot.selector || "").toLowerCase();
     const contentPattern =
       sel.includes("> section") ||
