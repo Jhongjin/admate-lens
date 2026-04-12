@@ -371,49 +371,96 @@ export function runPrerollInjectInPage(...args: unknown[]): boolean {
       document.body.appendChild(mobileBar);
     }
 
-    // 모바일·PC 공통: 스킵 가능일 때만 우하단 건너뛰기 (Mo instream Skip 등)
+    // 스킵 가능: PC는 뷰포트 기준 고정, 모바일은 플레이어 오버레이 기준 우하단(노란 진행바 위)
     if (showSkipButton) {
-      const skipTop = py + ph - (isMobile ? 52 : 90);
       const skipBtn = document.createElement("div");
       skipBtn.id = "admate-skip-btn";
       skipBtn.className = "admate-ytp-skip-ad-button";
       skipBtn.setAttribute("data-injected", "admate-youtube-preroll");
-      skipBtn.style.cssText = [
-        "position: fixed",
-        "top: " + skipTop + "px",
-        "left: " + (px + pw - 24) + "px",
-        "transform: translateX(-100%)",
-        "box-sizing: border-box",
-        "background: rgba(28,28,28,0.8)",
-        "color: #fff",
-        "padding: 8px 16px",
-        "min-height: 36px",
-        "border-radius: 18px",
-        "border: none",
-        "cursor: pointer",
-        "display: flex",
-        "align-items: center",
-        "flex-direction: row",
-        "gap: 12px",
-        "z-index: 2147483647",
-        "letter-spacing: 0",
-        "backdrop-filter: blur(4px)",
-      ].join(" !important;") + " !important";
 
       const skipText = document.createElement("div");
       skipText.className = "admate-ytp-skip-ad-button__text";
-      skipText.style.cssText =
-        "color:#fff !important;font-size:15px !important;font-weight:500 !important;line-height:1 !important;font-family:'Noto Sans KR','Roboto',Arial,Helvetica,sans-serif !important;display:flex !important;align-items:center !important";
-      skipText.textContent = "건너뛰기";
       const skipIcon = document.createElement("span");
       skipIcon.className = "admate-ytp-skip-ad-button__icon";
-      skipIcon.style.cssText =
-        "display:inline-flex !important;align-items:center !important;justify-content:center !important;line-height:0 !important;flex-shrink:0 !important";
-      skipIcon.innerHTML =
-        '<svg fill="none" height="24" viewBox="0 0 24 24" width="24" xmlns="http://www.w3.org/2000/svg" focusable="false" aria-hidden="true"><path d="M20 20C20.26 20 20.51 19.89 20.70 19.70C20.89 19.51 21 19.26 21 19V5C21 4.73 20.89 4.48 20.70 4.29C20.51 4.10 20.26 4 20 4C19.73 4 19.48 4.10 19.29 4.29C19.10 4.48 19 4.73 19 5V19C19 19.26 19.10 19.51 19.29 19.70C19.48 19.89 19.73 20 20 20ZM5.04 19.77L18 12L5.04 4.22C4.84 4.10 4.60 4.03 4.36 4.03C4.12 4.03 3.89 4.09 3.68 4.21C3.47 4.32 3.30 4.49 3.18 4.70C3.06 4.91 2.99 5.14 3 5.38V18.61C2.99 18.85 3.06 19.08 3.18 19.29C3.30 19.50 3.47 19.67 3.68 19.79C3.89 19.90 4.12 19.96 4.36 19.96C4.60 19.96 4.84 19.89 5.04 19.77Z" fill="white"/></svg>';
-      skipBtn.appendChild(skipText);
-      skipBtn.appendChild(skipIcon);
-      document.body.appendChild(skipBtn);
+
+      if (isMobile) {
+        // 모바일: 오버레이 안 절대좌표 → 플레이어와 함께 정렬, 세로 레이블 + 아이콘(유튜브 모바일 광고 UI에 가깝게)
+        skipBtn.style.cssText = [
+          "position: absolute",
+          "right: 8px",
+          "bottom: 10px",
+          "left: auto",
+          "top: auto",
+          "transform: none",
+          "box-sizing: border-box",
+          "background: rgba(0,0,0,0.58)",
+          "color: #fff",
+          "padding: 6px 8px 6px 6px",
+          "border-radius: 8px",
+          "border: none",
+          "cursor: pointer",
+          "display: flex",
+          "flex-direction: row",
+          "align-items: center",
+          "justify-content: center",
+          "gap: 4px",
+          "z-index: 15",
+          "letter-spacing: 0",
+          "backdrop-filter: blur(6px)",
+          "pointer-events: auto",
+        ].join(" !important;") + " !important";
+        skipText.textContent = "건너뛰기";
+        skipText.style.cssText = [
+          "color:#fff !important",
+          "font-size:12px !important",
+          "font-weight:500 !important",
+          "line-height:1.15 !important",
+          "font-family:'Noto Sans KR',Roboto,Arial,sans-serif !important",
+          "writing-mode: vertical-rl !important",
+          "text-orientation: upright !important",
+          "white-space: nowrap !important",
+        ].join(";");
+        skipIcon.style.cssText =
+          "display:inline-flex !important;align-items:center !important;justify-content:center !important;line-height:0 !important;flex-shrink:0 !important";
+        skipIcon.innerHTML =
+          '<svg fill="none" height="18" viewBox="0 0 24 24" width="18" xmlns="http://www.w3.org/2000/svg" focusable="false" aria-hidden="true"><path d="M20 20C20.26 20 20.51 19.89 20.70 19.70C20.89 19.51 21 19.26 21 19V5C21 4.73 20.89 4.48 20.70 4.29C20.51 4.10 20.26 4 20 4C19.73 4 19.48 4.10 19.29 4.29C19.10 4.48 19 4.73 19 5V19C19 19.26 19.10 19.51 19.29 19.70C19.48 19.89 19.73 20 20 20ZM5.04 19.77L18 12L5.04 4.22C4.84 4.10 4.60 4.03 4.36 4.03C4.12 4.03 3.89 4.09 3.68 4.21C3.47 4.32 3.30 4.49 3.18 4.70C3.06 4.91 2.99 5.14 3 5.38V18.61C2.99 18.85 3.06 19.08 3.18 19.29C3.30 19.50 3.47 19.67 3.68 19.79C3.89 19.90 4.12 19.96 4.36 19.96C4.60 19.96 4.84 19.89 5.04 19.77Z" fill="white"/></svg>';
+        skipBtn.appendChild(skipText);
+        skipBtn.appendChild(skipIcon);
+        overlay.appendChild(skipBtn);
+      } else {
+        const skipTop = py + ph - 90;
+        skipBtn.style.cssText = [
+          "position: fixed",
+          "top: " + skipTop + "px",
+          "left: " + (px + pw - 24) + "px",
+          "transform: translateX(-100%)",
+          "box-sizing: border-box",
+          "background: rgba(28,28,28,0.8)",
+          "color: #fff",
+          "padding: 8px 16px",
+          "min-height: 36px",
+          "border-radius: 18px",
+          "border: none",
+          "cursor: pointer",
+          "display: flex",
+          "align-items: center",
+          "flex-direction: row",
+          "gap: 12px",
+          "z-index: 2147483647",
+          "letter-spacing: 0",
+          "backdrop-filter: blur(4px)",
+        ].join(" !important;") + " !important";
+        skipText.textContent = "건너뛰기";
+        skipText.style.cssText =
+          "color:#fff !important;font-size:15px !important;font-weight:500 !important;line-height:1 !important;font-family:'Noto Sans KR','Roboto',Arial,Helvetica,sans-serif !important;display:flex !important;align-items:center !important";
+        skipIcon.style.cssText =
+          "display:inline-flex !important;align-items:center !important;justify-content:center !important;line-height:0 !important;flex-shrink:0 !important";
+        skipIcon.innerHTML =
+          '<svg fill="none" height="24" viewBox="0 0 24 24" width="24" xmlns="http://www.w3.org/2000/svg" focusable="false" aria-hidden="true"><path d="M20 20C20.26 20 20.51 19.89 20.70 19.70C20.89 19.51 21 19.26 21 19V5C21 4.73 20.89 4.48 20.70 4.29C20.51 4.10 20.26 4 20 4C19.73 4 19.48 4.10 19.29 4.29C19.10 4.48 19 4.73 19 5V19C19 19.26 19.10 19.51 19.29 19.70C19.48 19.89 19.73 20 20 20ZM5.04 19.77L18 12L5.04 4.22C4.84 4.10 4.60 4.03 4.36 4.03C4.12 4.03 3.89 4.09 3.68 4.21C3.47 4.32 3.30 4.49 3.18 4.70C3.06 4.91 2.99 5.14 3 5.38V18.61C2.99 18.85 3.06 19.08 3.18 19.29C3.30 19.50 3.47 19.67 3.68 19.79C3.89 19.90 4.12 19.96 4.36 19.96C4.60 19.96 4.84 19.89 5.04 19.77Z" fill="white"/></svg>';
+        skipBtn.appendChild(skipText);
+        skipBtn.appendChild(skipIcon);
+        document.body.appendChild(skipBtn);
+      }
     }
 
     console.log(
