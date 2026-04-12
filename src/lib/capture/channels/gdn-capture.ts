@@ -856,9 +856,10 @@ export class GdnCapture extends BaseChannel {
           if (!nw || !nh) return;
 
           const fit = (getComputedStyle(img).objectFit || 'fill').toLowerCase();
+          const edge = 4;
           if (fit !== 'contain') {
             badge.style.setProperty('top', '1px', 'important');
-            badge.style.setProperty('right', '17px', 'important');
+            badge.style.setProperty('right', edge + 'px', 'important');
             badge.style.setProperty('left', 'auto', 'important');
             badge.style.setProperty('bottom', 'auto', 'important');
             return;
@@ -894,7 +895,7 @@ export class GdnCapture extends BaseChannel {
           const fitW = dw * sx;
 
           const bw = badge.offsetWidth || 40;
-          const left = fitLeft + fitW - bw - 17 - hr.left;
+          const left = fitLeft + fitW - bw - edge - hr.left;
           const top = fitTop + 1 - hr.top;
 
           badge.style.setProperty('top', top + 'px', 'important');
@@ -931,7 +932,7 @@ export class GdnCapture extends BaseChannel {
               'display: block !important',
               'height: 15px !important',
               'position: absolute !important',
-              'right: 17px !important',
+              'right: 4px !important',
               'top: 1px !important',
               'text-rendering: geometricPrecision !important',
               'z-index: 2147483646 !important',
@@ -1021,7 +1022,7 @@ export class GdnCapture extends BaseChannel {
             'display: block !important',
             'height: 15px !important',
             'position: absolute !important',
-            'right: 17px !important',
+            'right: 4px !important',
             'top: 1px !important',
             'text-rendering: geometricPrecision !important',
             'z-index: 2147483646 !important',

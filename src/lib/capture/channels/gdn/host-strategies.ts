@@ -10,7 +10,7 @@
  *    - `getGdnLazyLoadMode` → `"light"`: 대형 뉴스지면에서 lazy 이미지 일괄 복원 시 Chromium OOM 방지.
  *    - 조선일보처럼 **모달이 광고를 가림**: `isChosunHost` 패턴으로 `gdn-capture.ts` 의 `dismissChosunPromoLayer` 호출 연결.
  *    - **인젝션은 됐는데 스샷이 어색**: `getGdnScreenshotPolicy` → `force_centered_viewport`(SBS·디지털데일리·ZDNet 참고).
- *    - **슬롯 오탐·우선순위**: `prioritizeGdnSlotsByHost`, `narrowGdnSlotsByHost` 에 호스트 분기 + 점수 함수.
+ *    - **슬롯 오탐·우선순위**: `prioritizeGdnSlotsByHost`, `narrowGdnSlotsByHost` 에 호스트 분기 + 점수 함수 (연합뉴스: `isYnaHost`).
  * 4. **검증**: `npx tsc --noEmit` 후 커밋·`main` 푸시(프로젝트 Cursor 규칙).
  */
 
@@ -53,6 +53,12 @@ function isHeraldBizHost(host: string): boolean {
 function isDongaHost(host: string): boolean {
   const h = host.toLowerCase();
   return h === "www.donga.com" || h === "donga.com" || h === "m.donga.com";
+}
+
+/** 연합뉴스 — 모바일 피드 MPU(약 361×280)가 GAM iframe(세로 과대)보다 실제 광고에 가깝다 */
+function isYnaHost(host: string): boolean {
+  const h = host.toLowerCase();
+  return h === "www.yna.co.kr" || h === "yna.co.kr" || h === "m.yna.co.kr";
 }
 
 /** 조선일보: `gdn-capture.dismissChosunPromoLayer` 와 짝. 신규 사이트는 별도 `isXxxHost` + dismiss 연결. */
@@ -116,6 +122,12 @@ export function prioritizeGdnSlotsByHost(host: string, slots: DetectedSlot[]): v
   if (isDongaHost(host)) {
     slots.sort((a, b) => calcDongaSlotScore(b) - calcDongaSlotScore(a));
     console.log("[GDN] 🧭 동아일보 전용 슬롯 우선순위 적용");
+    return;
+  }
+
+  if (isYnaHost(host)) {
+    slots.sort((a, b) => calcYnaSlotScore(b) - calcYnaSlotScore(a));
+    console.log("[GDN] 🧭 연합뉴스 전용 슬롯 우선순위 적용");
     return;
   }
 }
@@ -202,6 +214,27 @@ export function narrowGdnSlotsByHost(host: string, slots: DetectedSlot[]): void 
       slots.length = 0;
       preferred.forEach((s) => slots.push(s));
       console.log(`[GDN] 🎯 동아일보 후보 축소: ${preferred.length}개`);
+    }
+  }
+
+  if (isYnaHost(host)) {
+    const preferred = slots.filter((s) => {
+      if (s.type === "gdn-iframe" && s.height > 800) return false;
+      const sel = (s.selector || "").toLowerCase();
+      const gam =
+        sel.includes("google_ads") ||
+        sel.includes("div-gpt-ad") ||
+        sel.includes("adsbygoogle") ||
+        sel.includes("googlesyndication");
+      const mpu =
+        s.width >= 300 && s.width <= 400 && s.height >= 240 && s.height <= 320;
+      const lb = s.width >= 680 && s.width <= 800 && s.height >= 80 && s.height <= 120;
+      return (mpu || lb || (gam && s.height < 600)) && s.width <= 1024;
+    });
+    if (preferred.length > 0) {
+      slots.length = 0;
+      preferred.forEach((s) => slots.push(s));
+      console.log(`[GDN] 🎯 연합뉴스 후보 축소: ${preferred.length}개 (모바일 MPU·GAM 위주)`);
     }
   }
 }
@@ -310,6 +343,27 @@ function calcDongaSlotScore(slot: DetectedSlot): number {
   if (slot.type === "ad-container" && !sel.includes("google") && !sel.includes("gpt") && area > 120000) {
     score -= 180;
   }
+
+  return score;
+}
+
+/** 연합뉴스 모바일: 본문 피드 MPU(~361×280)가 세로 과대 GAM iframe보다 실제 인벤토리에 가깝다 */
+function calcYnaSlotScore(slot: DetectedSlot): number {
+  const sel = (slot.selector || "").toLowerCase();
+  let score = slot.confidence;
+  const area = slot.width * slot.height;
+
+  if (sel.includes("google_ads") || sel.includes("div-gpt-ad") || sel.includes("adsbygoogle")) score += 95;
+  if (slot.type === "gdn-iframe" && slot.height < 600) score += 70;
+  if (slot.type === "gdn-iframe" && slot.height >= 800) score -= 400;
+
+  if (slot.width >= 320 && slot.width <= 400 && slot.height >= 260 && slot.height <= 300) score += 90;
+  if (slot.width >= 300 && slot.width <= 380 && slot.height >= 240 && slot.height <= 320) score += 75;
+
+  if (slot.width >= 680 && slot.width <= 800 && slot.height >= 80 && slot.height <= 120) score += 50;
+
+  if (slot.height > 2000 || area > 400000) score -= 500;
+  if (slot.height > 600 && slot.type === "gdn-iframe") score -= 350;
 
   return score;
 }

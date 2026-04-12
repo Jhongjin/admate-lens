@@ -123,9 +123,10 @@ export async function injectCreative(
         if (!nw || !nh) return;
 
         const fit = (getComputedStyle(img).objectFit || 'fill').toLowerCase();
+        const edge = 4;
         if (fit !== 'contain') {
           badge.style.setProperty('top', '1px', 'important');
-          badge.style.setProperty('right', '17px', 'important');
+          badge.style.setProperty('right', edge + 'px', 'important');
           badge.style.setProperty('left', 'auto', 'important');
           badge.style.setProperty('bottom', 'auto', 'important');
           return;
@@ -161,7 +162,7 @@ export async function injectCreative(
         const fitW = dw * sx;
 
         const bw = badge.offsetWidth || 40;
-        const left = fitLeft + fitW - bw - 17 - hr.left;
+        const left = fitLeft + fitW - bw - edge - hr.left;
         const top = fitTop + 1 - hr.top;
 
         badge.style.setProperty('top', top + 'px', 'important');
@@ -170,7 +171,7 @@ export async function injectCreative(
         badge.style.setProperty('bottom', 'auto', 'important');
       }
 
-      // AdChoices: Google AdChoices DOM (.abgc / .il-wrap / .cbb) — right:17px, top:1px
+      // AdChoices: Google AdChoices DOM — 우상단, 광고 박스에 더 붙이기 위해 right 소량(4px)
       function addAdBadge(container) {
         const uid = 'spr_' + Math.random().toString(16).slice(2);
 
@@ -183,7 +184,7 @@ export async function injectCreative(
           'display: block !important',
           'height: 15px !important',
           'position: absolute !important',
-          'right: 17px !important',
+          'right: 4px !important',
           'top: 1px !important',
           'text-rendering: geometricPrecision !important',
           'z-index: 2147483646 !important',
