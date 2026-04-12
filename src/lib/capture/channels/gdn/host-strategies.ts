@@ -10,7 +10,7 @@
  *    - `getGdnLazyLoadMode` → `"light"`: 대형 뉴스지면에서 lazy 이미지 일괄 복원 시 Chromium OOM 방지.
  *    - 조선일보처럼 **모달이 광고를 가림**: `isChosunHost` 패턴으로 `gdn-capture.ts` 의 `dismissChosunPromoLayer` 호출 연결.
  *    - **인젝션은 됐는데 스샷이 어색**: `getGdnScreenshotPolicy` → `force_centered_viewport`(SBS·디지털데일리·ZDNet 참고).
- *    - **슬롯 오탐·우선순위**: `prioritizeGdnSlotsByHost`, `narrowGdnSlotsByHost` 에 호스트 분기 + 점수 함수 (연합뉴스: `isYnaHost`, 조선: `isChosunHost`).
+ *    - **슬롯 오탐·우선순위**: `prioritizeGdnSlotsByHost`, `narrowGdnSlotsByHost` (MK·헤럴드biz·동아·중앙·연합·조선 등).
  * 4. **검증**: `npx tsc --noEmit` 후 커밋·`main` 푸시(프로젝트 Cursor 규칙).
  */
 
@@ -65,6 +65,25 @@ function isDongaHost(host: string): boolean {
   return h === "www.donga.com" || h === "donga.com" || h === "m.donga.com";
 }
 
+function isJoongangHost(host: string): boolean {
+  const h = host.toLowerCase();
+  return h === "www.joongang.co.kr" || h === "joongang.co.kr" || h === "m.joongang.co.kr";
+}
+
+/** GAM/DFP DOM 힌트 — 조상 셀렉터에 #wrap 등이 있어도 iframe 경로에 google이 있으면 true */
+function hasGoogleInventoryHint(sel: string): boolean {
+  const s = sel.toLowerCase();
+  return (
+    s.includes("google_ads") ||
+    s.includes("div-gpt-ad") ||
+    s.includes("adsbygoogle") ||
+    s.includes("googlesyndication") ||
+    s.includes("dfpad") ||
+    s.includes("dfp-ad") ||
+    s.includes("googletag")
+  );
+}
+
 /** 연합뉴스 — 모바일 피드 MPU(약 361×280)가 GAM iframe(세로 과대)보다 실제 광고에 가깝다 */
 function isYnaHost(host: string): boolean {
   const h = host.toLowerCase();
@@ -107,11 +126,18 @@ export function isGdnExcludedHost(host: string): boolean {
 
 // --- 스크린샷(인젝션 후 뷰포트 정책, gdn-capture safeCaptureScreenshot 경로) ---
 
-export function getGdnScreenshotPolicy(host: string): GdnScreenshotPolicy {
+export function getGdnScreenshotPolicy(
+  host: string,
+  ctx?: { mobileViewport?: boolean },
+): GdnScreenshotPolicy {
+  const mobile = Boolean(ctx?.mobileViewport);
   if (host === "news.sbs.co.kr") return "force_centered_viewport";
   if (host === "www.ddaily.co.kr") return "force_centered_viewport";
   if (isZdnetHost(host)) return "force_centered_viewport";
   if (isDongaHost(host)) return "force_centered_viewport";
+  if (isJoongangHost(host)) return "force_centered_viewport";
+  if (mobile && isMkHost(host)) return "force_centered_viewport";
+  if (mobile && isHeraldBizHost(host)) return "force_centered_viewport";
   return "default";
 }
 
@@ -142,15 +168,27 @@ export function prioritizeGdnSlotsByHost(
     return;
   }
 
+  if (isMkHost(host)) {
+    slots.sort((a, b) => calcMkSlotScore(b, ctx) - calcMkSlotScore(a, ctx));
+    console.log("[GDN] 🧭 매일경제(MK) 전용 슬롯 우선순위 적용");
+    return;
+  }
+
   if (isHeraldBizHost(host)) {
-    slots.sort((a, b) => calcHeraldBizSlotScore(b) - calcHeraldBizSlotScore(a));
+    slots.sort((a, b) => calcHeraldBizSlotScore(b, ctx) - calcHeraldBizSlotScore(a, ctx));
     console.log("[GDN] 🧭 헤럴드경제(biz) 전용 슬롯 우선순위 적용");
     return;
   }
 
   if (isDongaHost(host)) {
-    slots.sort((a, b) => calcDongaSlotScore(b) - calcDongaSlotScore(a));
+    slots.sort((a, b) => calcDongaSlotScore(b, ctx) - calcDongaSlotScore(a, ctx));
     console.log("[GDN] 🧭 동아일보 전용 슬롯 우선순위 적용");
+    return;
+  }
+
+  if (isJoongangHost(host)) {
+    slots.sort((a, b) => calcJoongangSlotScore(b, ctx) - calcJoongangSlotScore(a, ctx));
+    console.log("[GDN] 🧭 중앙일보 전용 슬롯 우선순위 적용");
     return;
   }
 
@@ -223,7 +261,31 @@ export function narrowGdnSlotsByHost(
     }
   }
 
+  if (isMkHost(host)) {
+    const mobile = Boolean(ctx?.mobileViewport);
+    const preferred = slots.filter((s) => {
+      if (s.type === "gdn-iframe" && s.height > 820) return false;
+      const sel = (s.selector || "").toLowerCase();
+      const gam =
+        sel.includes("google_ads") ||
+        sel.includes("div-gpt-ad") ||
+        sel.includes("adsbygoogle") ||
+        sel.includes("googlesyndication");
+      if (gam || s.type === "gdn-iframe") return s.width <= 1024 && s.height <= 520;
+      const mpu = s.width >= 250 && s.width <= 400 && s.height >= 200 && s.height <= 340;
+      const mobBand =
+        mobile && s.width >= 280 && s.width <= 430 && s.height >= 44 && s.height <= 130;
+      return mpu || mobBand;
+    });
+    if (preferred.length > 0) {
+      slots.length = 0;
+      preferred.forEach((s) => slots.push(s));
+      console.log(`[GDN] 🎯 매일경제 후보 축소: ${preferred.length}개`);
+    }
+  }
+
   if (isHeraldBizHost(host)) {
+    const mobile = Boolean(ctx?.mobileViewport);
     const preferred = slots.filter((s) => {
       const sel = (s.selector || "").toLowerCase();
       const gam =
@@ -231,10 +293,15 @@ export function narrowGdnSlotsByHost(
         sel.includes("div-gpt-ad") ||
         sel.includes("adsbygoogle") ||
         sel.includes("googlesyndication");
-      if (gam || s.type === "gdn-iframe") return true;
+      if (gam || s.type === "gdn-iframe") {
+        if (s.type === "gdn-iframe" && s.height > 720) return false;
+        return s.width <= 1024 && s.height <= 520;
+      }
       const mpu = s.width >= 250 && s.width <= 380 && s.height >= 220 && s.height <= 340;
       const lb = s.width >= 680 && s.width <= 1024 && s.height >= 180 && s.height <= 300;
-      return mpu || lb;
+      const mobBand =
+        mobile && s.width >= 280 && s.width <= 430 && s.height >= 44 && s.height <= 130;
+      return mpu || lb || mobBand;
     });
     if (preferred.length > 0) {
       slots.length = 0;
@@ -244,6 +311,7 @@ export function narrowGdnSlotsByHost(
   }
 
   if (isDongaHost(host)) {
+    const mobile = Boolean(ctx?.mobileViewport);
     const preferred = slots.filter((s) => {
       const sel = (s.selector || "").toLowerCase();
       const gam =
@@ -251,16 +319,44 @@ export function narrowGdnSlotsByHost(
         sel.includes("div-gpt-ad") ||
         sel.includes("adsbygoogle") ||
         sel.includes("googlesyndication");
-      if (gam || s.type === "gdn-iframe") return true;
+      if (gam || s.type === "gdn-iframe") {
+        if (s.type === "gdn-iframe" && s.height > 720) return false;
+        return s.width <= 1024 && s.height <= 520;
+      }
       const mpu = s.width >= 250 && s.width <= 380 && s.height >= 220 && s.height <= 340;
       const lb = s.width >= 700 && s.width <= 1024 && s.height >= 200 && s.height <= 280;
+      const mobBand =
+        mobile && s.width >= 280 && s.width <= 430 && s.height >= 44 && s.height <= 130;
       const reasonable = s.width <= 1024 && s.height <= 400;
-      return (mpu || lb) && reasonable;
+      return ((mpu || lb) && reasonable) || mobBand;
     });
     if (preferred.length > 0) {
       slots.length = 0;
       preferred.forEach((s) => slots.push(s));
       console.log(`[GDN] 🎯 동아일보 후보 축소: ${preferred.length}개`);
+    }
+  }
+
+  if (isJoongangHost(host)) {
+    const mobile = Boolean(ctx?.mobileViewport);
+    const preferred = slots.filter((s) => {
+      if (s.type === "gdn-iframe" && s.height > 720) return false;
+      const sel = (s.selector || "").toLowerCase();
+      const gam =
+        sel.includes("google_ads") ||
+        sel.includes("div-gpt-ad") ||
+        sel.includes("adsbygoogle") ||
+        sel.includes("googlesyndication");
+      if (gam || s.type === "gdn-iframe") return s.width <= 1024 && s.height <= 520;
+      const mpu = s.width >= 250 && s.width <= 400 && s.height >= 220 && s.height <= 340;
+      const mobBand =
+        mobile && s.width >= 280 && s.width <= 430 && s.height >= 44 && s.height <= 130;
+      return mpu || mobBand;
+    });
+    if (preferred.length > 0) {
+      slots.length = 0;
+      preferred.forEach((s) => slots.push(s));
+      console.log(`[GDN] 🎯 중앙일보 후보 축소: ${preferred.length}개`);
     }
   }
 
@@ -384,18 +480,30 @@ function calcZdnetSlotScore(slot: DetectedSlot): number {
   return score;
 }
 
-function calcHeraldBizSlotScore(slot: DetectedSlot): number {
+function calcHeraldBizSlotScore(slot: DetectedSlot, ctx?: GdnSlotHostContext): number {
   const sel = (slot.selector || "").toLowerCase();
+  const mobile = Boolean(ctx?.mobileViewport);
   let score = slot.confidence;
   const area = slot.width * slot.height;
+  const gam = hasGoogleInventoryHint(sel);
 
   if (slot.type === "gdn-iframe") score += 130;
   if (sel.includes("google_ads")) score += 130;
   if (sel.includes("div-gpt-ad")) score += 100;
   if (sel.includes("adsbygoogle")) score += 90;
+  if (sel.includes("googlesyndication")) score += 85;
 
   if ((slot.width >= 250 && slot.width <= 360) && (slot.height >= 230 && slot.height <= 300)) score += 70;
   if (slot.width >= 680 && slot.width <= 1000 && slot.height >= 200 && slot.height <= 280) score += 55;
+
+  const mobBand =
+    mobile && slot.width >= 280 && slot.width <= 430 && slot.height >= 44 && slot.height <= 130;
+  if (mobBand && gam) score += 145;
+  else if (mobBand) score += 100;
+  if (mobile && mobBand && !slot.isFixed && slot.y >= 80 && slot.y <= 720) score += 55;
+
+  if (mobile && slot.height >= 480 && slot.height <= 900 && gam && slot.type === "gdn-iframe") score += 35;
+  if (mobile && slot.height > 650 && !gam) score -= 260;
 
   if (slot.type === "size-match" && (sel.includes("> section") || sel.includes("> article"))) score -= 150;
   if (sel.includes("#container > div:nth-child")) score -= 80;
@@ -404,10 +512,12 @@ function calcHeraldBizSlotScore(slot: DetectedSlot): number {
   return score;
 }
 
-function calcDongaSlotScore(slot: DetectedSlot): number {
+function calcDongaSlotScore(slot: DetectedSlot, ctx?: GdnSlotHostContext): number {
   const sel = (slot.selector || "").toLowerCase();
+  const mobile = Boolean(ctx?.mobileViewport);
   let score = slot.confidence;
   const area = slot.width * slot.height;
+  const gam = hasGoogleInventoryHint(sel);
 
   if (slot.type === "gdn-iframe") score += 130;
   if (sel.includes("google_ads")) score += 130;
@@ -417,12 +527,89 @@ function calcDongaSlotScore(slot: DetectedSlot): number {
   if ((slot.width >= 250 && slot.width <= 380) && (slot.height >= 220 && slot.height <= 320)) score += 65;
   if (slot.width >= 700 && slot.width <= 1024 && slot.height >= 200 && slot.height <= 280) score += 55;
 
-  // 메인 레이아웃·과대 영역 오탐 강하게 감점
-  if (sel.includes("#wrap") || sel.includes("#container") || sel.includes("main_content")) score -= 200;
+  const mobBand =
+    mobile && slot.width >= 280 && slot.width <= 430 && slot.height >= 44 && slot.height <= 130;
+  if (mobBand && gam) score += 130;
+  else if (mobBand) score += 88;
+  if (mobile && !slot.isFixed && slot.width >= 300 && slot.width <= 400 && slot.height >= 250 && slot.height <= 310) {
+    score += 40;
+  }
+
+  if (
+    (sel.includes("#wrap") || sel.includes("#container") || sel.includes("main_content")) &&
+    !gam
+  ) {
+    score -= 200;
+  }
   if (slot.width >= 1100 || area >= 280000) score -= 220;
   if (slot.type === "ad-container" && !sel.includes("google") && !sel.includes("gpt") && area > 120000) {
     score -= 180;
   }
+
+  if (slot.type === "gdn-iframe" && slot.height > 700) score -= 200;
+
+  return score;
+}
+
+/** 매일경제: 모바일 이슈·댓글 사이 MPU, 상단 모바일 배너 등 */
+function calcMkSlotScore(slot: DetectedSlot, ctx?: GdnSlotHostContext): number {
+  const sel = (slot.selector || "").toLowerCase();
+  const mobile = Boolean(ctx?.mobileViewport);
+  let score = slot.confidence;
+  const area = slot.width * slot.height;
+  const gam = hasGoogleInventoryHint(sel);
+
+  if (slot.type === "gdn-iframe") score += 125;
+  if (sel.includes("google_ads")) score += 125;
+  if (sel.includes("div-gpt-ad")) score += 102;
+  if (sel.includes("adsbygoogle")) score += 95;
+  if (sel.includes("googlesyndication")) score += 88;
+
+  if ((slot.width >= 260 && slot.width <= 400) && (slot.height >= 220 && slot.height <= 330)) score += 82;
+  const mobBand =
+    mobile && slot.width >= 280 && slot.width <= 430 && slot.height >= 44 && slot.height <= 130;
+  if (mobBand && gam) score += 120;
+  else if (mobBand) score += 78;
+
+  if (mobile && !slot.isFixed && slot.y >= 60 && slot.y <= 880) score += 35;
+  if (slot.isFixed && slot.height <= 90) score -= 70;
+
+  if (slot.type === "gdn-iframe" && slot.height > 780) score -= 340;
+  if (slot.height > 2000 || area > 450000) score -= 400;
+
+  return score;
+}
+
+/** 중앙일보: ADVERTISEMENT 블록·캐러셀 상단 MPU + 모바일 배너 */
+function calcJoongangSlotScore(slot: DetectedSlot, ctx?: GdnSlotHostContext): number {
+  const sel = (slot.selector || "").toLowerCase();
+  const mobile = Boolean(ctx?.mobileViewport);
+  let score = slot.confidence;
+  const area = slot.width * slot.height;
+  const gam = hasGoogleInventoryHint(sel);
+
+  if (slot.type === "gdn-iframe") score += 128;
+  if (sel.includes("google_ads")) score += 128;
+  if (sel.includes("div-gpt-ad")) score += 106;
+  if (sel.includes("adsbygoogle")) score += 98;
+
+  if ((slot.width >= 260 && slot.width <= 400) && (slot.height >= 220 && slot.height <= 330)) score += 80;
+  const mobBand =
+    mobile && slot.width >= 280 && slot.width <= 430 && slot.height >= 44 && slot.height <= 130;
+  if (mobBand && gam) score += 125;
+  else if (mobBand) score += 82;
+
+  if (mobile && !slot.isFixed && slot.y >= 72 && slot.y <= 900) score += 42;
+  if (slot.isFixed && slot.height <= 100 && slot.y > 350) score -= 75;
+
+  if (
+    (sel.includes("#wrap") || sel.includes("#container") || sel.includes("main_content")) &&
+    !gam
+  ) {
+    score -= 190;
+  }
+  if (slot.type === "gdn-iframe" && slot.height > 700) score -= 210;
+  if (slot.height > 2000 || area > 480000) score -= 420;
 
   return score;
 }

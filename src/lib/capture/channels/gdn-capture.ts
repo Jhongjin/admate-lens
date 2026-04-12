@@ -592,7 +592,10 @@ export class GdnCapture extends BaseChannel {
     const bodyHeight = context?.bodyHeight ?? 0;
     const host = context?.host ?? "";
     const isHugePage = slotsDetected >= 200 || bodyHeight >= 7000;
-    const forceCenteredViewport = getGdnScreenshotPolicy(host) === "force_centered_viewport";
+    const forceCenteredViewport =
+      getGdnScreenshotPolicy(host, {
+        mobileViewport: Boolean(context?.preferViewportOnly),
+      }) === "force_centered_viewport";
 
     if (forceCenteredViewport) {
       console.log(`[GDN] 📌 호스트 정책 캡처 적용: ${host} (타겟 중심 viewport)`);
