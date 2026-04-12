@@ -151,18 +151,31 @@ export function runPrerollInjectInPage(...args: unknown[]): boolean {
         )
         .forEach((el) => el.remove());
 
+      // 스폰서 배지 — .ytp-ad-badge--stark-clean-player / __text--clean-player 에 맞춤
       const adLabel = document.createElement("div");
+      adLabel.setAttribute("data-injected", "admate-ytp-ad-badge");
       adLabel.style.cssText =
-        "position:absolute;bottom:10px;left:10px;color:rgba(255,255,255,0.8);font-size:12px;font-family:Roboto,Arial,sans-serif;font-weight:500;z-index:10;display:flex;align-items:center;gap:4px;";
+        "position:absolute;bottom:12px;left:18px;z-index:15;pointer-events:none;" +
+        "color:#fff;opacity:1;font-size:12px;line-height:28px;letter-spacing:0.35px;" +
+        'font-family:"YouTube Noto",Roboto,"Noto Sans KR",Arial,sans-serif;font-weight:600;' +
+        "text-shadow:0 0 8px rgba(0,0,0,0.5),0 0 16px rgba(0,0,0,0.25);" +
+        "display:flex;align-items:center;gap:5px;";
       adLabel.innerHTML =
-        '스폰서 <svg width="12" height="12" viewBox="0 0 16 16" fill="white"><path d="M8 15A7 7 0 1 0 8 1a7 7 0 0 0 0 14zm0 1A8 8 0 1 1 8 0a8 8 0 0 1 0 16z"/><path d="M8.93 6.588l-2.29.287-.082.38.45.083c.294.07.352.176.288.469l-.738 3.468c-.194.897.105 1.319.808 1.319.545 0 1.178-.252 1.465-.598l.088-.416c-.2.176-.492.246-.686.246-.275 0-.375-.193-.304-.533L8.93 6.588zM9 4.5a1 1 0 1 1-2 0 1 1 0 0 1 2 0z"/></svg>';
+        '<span style="font-weight:600">스폰서</span> <svg width="13" height="13" viewBox="0 0 16 16" fill="white" style="flex-shrink:0;opacity:0.95"><path d="M8 15A7 7 0 1 0 8 1a7 7 0 0 0 0 14zm0 1A8 8 0 1 1 8 0a8 8 0 0 1 0 16z"/><path d="M8.93 6.588l-2.29.287-.082.38.45.083c.294.07.352.176.288.469l-.738 3.468c-.194.897.105 1.319.808 1.319.545 0 1.178-.252 1.465-.598l.088-.416c-.2.176-.492.246-.686.246-.275 0-.375-.193-.304-.533L8.93 6.588zM9 4.5a1 1 0 1 1-2 0 1 1 0 0 1 2 0z"/></svg>';
       overlay.appendChild(adLabel);
 
+      // 광고주 페이지 방문 — .ytp-ad-player-overlay-top-bar-gradients .ytp-ad-visit-advertiser-button
       const visitLabel = document.createElement("div");
+      visitLabel.setAttribute("data-injected", "admate-ytp-visit-advertiser");
       visitLabel.style.cssText =
-        "position:absolute;top:10px;right:10px;color:rgba(255,255,255,0.9);font-size:12px;font-family:Roboto,Arial,sans-serif;font-weight:500;z-index:10;display:flex;align-items:center;gap:4px;text-shadow:0 1px 2px rgba(0,0,0,0.5);";
+        "position:absolute;top:10px;right:11px;z-index:15;pointer-events:auto;" +
+        "display:flex;align-items:center;gap:4px;margin:0;" +
+        'font-family:"YouTube Noto",Roboto,"Noto Sans KR",Arial,sans-serif;' +
+        "font-size:14px;font-weight:500;line-height:normal;color:#fff;" +
+        "text-shadow:1px 1px 1px rgba(0,0,0,0.75);" +
+        "padding:0 4px 5px 4px;box-sizing:border-box;";
       visitLabel.innerHTML =
-        '광고주 페이지 방문 <svg width="12" height="12" viewBox="0 0 24 24" fill="white"><path d="M19 19H5V5h7V3H5a2 2 0 00-2 2v14a2 2 0 002 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"/></svg>';
+        '<span style="padding:0 2px 0 0">광고주 페이지 방문</span><svg width="12" height="12" viewBox="0 0 24 24" fill="white" style="flex-shrink:0;opacity:0.95"><path d="M19 19H5V5h7V3H5a2 2 0 00-2 2v14a2 2 0 002 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"/></svg>';
       overlay.appendChild(visitLabel);
 
       const timerBg = document.createElement("div");
@@ -384,44 +397,56 @@ export function runPrerollInjectInPage(...args: unknown[]): boolean {
       skipIcon.className = "admate-ytp-skip-ad-button__icon";
 
       if (isMobile) {
-        // 모바일: 오버레이 우하단, 가로 한 줄(텍스트 + 아이콘), 컴팩트 크기
+        // 모바일 건너뛰기 — .ytp-ad-skip-button-modern (유튜브 실측 CSS)
+        skipBtn.className = "admate-ytp-skip-ad-button admate-ytp-ad-skip-button-modern";
         skipBtn.style.cssText = [
           "position: absolute",
-          "right: 8px",
-          "bottom: 10px",
+          "right: 11px",
+          "bottom: 12px",
           "left: auto",
           "top: auto",
           "transform: none",
-          "box-sizing: border-box",
-          "background: rgba(0,0,0,0.55)",
+          "box-sizing: content-box",
+          "background: rgba(0,0,0,0.6)",
           "color: #fff",
-          "padding: 3px 7px 3px 8px",
-          "border-radius: 6px",
+          "direction: ltr",
+          "height: 36px",
+          "min-height: 36px",
+          "padding: 0 6px 0 16px",
+          "width: auto",
+          "min-width: 0",
+          "margin: 0",
+          "border-radius: 18px",
           "border: none",
           "cursor: pointer",
           "display: flex",
           "flex-direction: row",
           "align-items: center",
           "justify-content: center",
-          "gap: 3px",
+          "gap: 6px",
           "z-index: 15",
+          'font-family: Roboto, Arial, "Noto Sans KR", sans-serif',
+          "font-size: 14px",
+          "font-weight: 500",
+          "line-height: normal",
           "letter-spacing: 0",
-          "backdrop-filter: blur(4px)",
+          "text-align: center",
           "pointer-events: auto",
         ].join(" !important;") + " !important";
         skipText.textContent = "건너뛰기";
         skipText.style.cssText = [
-          "color:#fff !important",
-          "font-size:11px !important",
-          "font-weight:500 !important",
-          "line-height:1 !important",
-          "font-family:'Noto Sans KR',Roboto,Arial,sans-serif !important",
+          "display: inline-block !important",
+          "color: inherit !important",
+          "font-size: inherit !important",
+          "font-weight: inherit !important",
+          "line-height: normal !important",
+          "font-family: inherit !important",
           "white-space: nowrap !important",
         ].join(";");
         skipIcon.style.cssText =
-          "display:inline-flex !important;align-items:center !important;justify-content:center !important;line-height:0 !important;flex-shrink:0 !important";
+          "display:inline-block !important;vertical-align:middle;line-height:0 !important;flex-shrink:0 !important";
         skipIcon.innerHTML =
-          '<svg fill="none" height="14" viewBox="0 0 24 24" width="14" xmlns="http://www.w3.org/2000/svg" focusable="false" aria-hidden="true"><path d="M20 20C20.26 20 20.51 19.89 20.70 19.70C20.89 19.51 21 19.26 21 19V5C21 4.73 20.89 4.48 20.70 4.29C20.51 4.10 20.26 4 20 4C19.73 4 19.48 4.10 19.29 4.29C19.10 4.48 19 4.73 19 5V19C19 19.26 19.10 19.51 19.29 19.70C19.48 19.89 19.73 20 20 20ZM5.04 19.77L18 12L5.04 4.22C4.84 4.10 4.60 4.03 4.36 4.03C4.12 4.03 3.89 4.09 3.68 4.21C3.47 4.32 3.30 4.49 3.18 4.70C3.06 4.91 2.99 5.14 3 5.38V18.61C2.99 18.85 3.06 19.08 3.18 19.29C3.30 19.50 3.47 19.67 3.68 19.79C3.89 19.90 4.12 19.96 4.36 19.96C4.60 19.96 4.84 19.89 5.04 19.77Z" fill="white"/></svg>';
+          '<svg fill="none" height="20" viewBox="0 0 24 24" width="20" xmlns="http://www.w3.org/2000/svg" focusable="false" aria-hidden="true"><path d="M20 20C20.26 20 20.51 19.89 20.70 19.70C20.89 19.51 21 19.26 21 19V5C21 4.73 20.89 4.48 20.70 4.29C20.51 4.10 20.26 4 20 4C19.73 4 19.48 4.10 19.29 4.29C19.10 4.48 19 4.73 19 5V19C19 19.26 19.10 19.51 19.29 19.70C19.48 19.89 19.73 20 20 20ZM5.04 19.77L18 12L5.04 4.22C4.84 4.10 4.60 4.03 4.36 4.03C4.12 4.03 3.89 4.09 3.68 4.21C3.47 4.32 3.30 4.49 3.18 4.70C3.06 4.91 2.99 5.14 3 5.38V18.61C2.99 18.85 3.06 19.08 3.18 19.29C3.30 19.50 3.47 19.67 3.68 19.79C3.89 19.90 4.12 19.96 4.36 19.96C4.60 19.96 4.84 19.89 5.04 19.77Z" fill="white"/></svg>';
         skipBtn.appendChild(skipText);
         skipBtn.appendChild(skipIcon);
         overlay.appendChild(skipBtn);
