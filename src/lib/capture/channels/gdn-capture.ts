@@ -436,8 +436,8 @@ export class GdnCapture extends BaseChannel {
     }
 
     // 도메인별 최종 우선순위는 정렬/필터링이 모두 끝난 뒤에 적용해야 덮어써지지 않음
-    prioritizeGdnSlotsByHost(host, slots);
-    narrowGdnSlotsByHost(host, slots);
+    prioritizeGdnSlotsByHost(host, slots, { mobileViewport: mobileSurface });
+    narrowGdnSlotsByHost(host, slots, { mobileViewport: mobileSurface });
 
     // 5) 소재 인젝션 — injectionMode에 따라 동작 (UI에서는 "all" 제거, 레거시 메타만 "all" 가능)
     const injectionMode = (request.options?.injectionMode as string) || "single";
@@ -1189,6 +1189,7 @@ export class GdnCapture extends BaseChannel {
       sel.includes("google_ads") ||
       sel.includes("div-gpt-ad") ||
       sel.includes("adsbygoogle") ||
+      sel.includes("googlesyndication") ||
       sel.includes("ad-") ||
       sel.includes("_ad") ||
       sel.includes("banner");
@@ -1202,6 +1203,7 @@ export class GdnCapture extends BaseChannel {
       sel.includes("google_ads") ||
       sel.includes("div-gpt-ad") ||
       sel.includes("adsbygoogle") ||
+      sel.includes("googlesyndication") ||
       sel.includes("#ph") ||
       sel.includes("banner") ||
       slot.type === "gdn-iframe"

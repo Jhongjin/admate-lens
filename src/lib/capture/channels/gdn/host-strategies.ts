@@ -10,13 +10,18 @@
  *    - `getGdnLazyLoadMode` → `"light"`: 대형 뉴스지면에서 lazy 이미지 일괄 복원 시 Chromium OOM 방지.
  *    - 조선일보처럼 **모달이 광고를 가림**: `isChosunHost` 패턴으로 `gdn-capture.ts` 의 `dismissChosunPromoLayer` 호출 연결.
  *    - **인젝션은 됐는데 스샷이 어색**: `getGdnScreenshotPolicy` → `force_centered_viewport`(SBS·디지털데일리·ZDNet 참고).
- *    - **슬롯 오탐·우선순위**: `prioritizeGdnSlotsByHost`, `narrowGdnSlotsByHost` 에 호스트 분기 + 점수 함수 (연합뉴스: `isYnaHost`).
+ *    - **슬롯 오탐·우선순위**: `prioritizeGdnSlotsByHost`, `narrowGdnSlotsByHost` 에 호스트 분기 + 점수 함수 (연합뉴스: `isYnaHost`, 조선: `isChosunHost`).
  * 4. **검증**: `npx tsc --noEmit` 후 커밋·`main` 푸시(프로젝트 Cursor 규칙).
  */
 
 import type { DetectedSlot } from "@/lib/capture/injection/ad-slot-detector";
 
 export type GdnScreenshotPolicy = "default" | "force_centered_viewport";
+
+/** 슬롯 정렬·축소 시 모바일 뷰포트 여부(조선 등 본문 MPU 우선에 사용) */
+export interface GdnSlotHostContext {
+  mobileViewport?: boolean;
+}
 
 /** Lazy-load 강제: full은 data-src 일괄 복원+스크롤, light는 loading만+짧은 스크롤(대형 뉴스지면 OOM 방지) */
 export type GdnLazyLoadMode = "full" | "light";
@@ -92,7 +97,11 @@ export function getGdnScreenshotPolicy(host: string): GdnScreenshotPolicy {
 
 // --- 슬롯 후보: 정렬(우선) / 필터(축소) — detectAdSlots 이후 gdn-capture에서 호출 ---
 
-export function prioritizeGdnSlotsByHost(host: string, slots: DetectedSlot[]): void {
+export function prioritizeGdnSlotsByHost(
+  host: string,
+  slots: DetectedSlot[],
+  ctx?: GdnSlotHostContext,
+): void {
   if (!host || slots.length <= 1) return;
 
   if (host === "news.sbs.co.kr") {
@@ -130,9 +139,24 @@ export function prioritizeGdnSlotsByHost(host: string, slots: DetectedSlot[]): v
     console.log("[GDN] 🧭 연합뉴스 전용 슬롯 우선순위 적용");
     return;
   }
+
+  if (isChosunHost(host)) {
+    const mobile = Boolean(ctx?.mobileViewport);
+    slots.sort(
+      (a, b) => calcChosunSlotScore(b, mobile) - calcChosunSlotScore(a, mobile),
+    );
+    console.log(
+      `[GDN] 🧭 조선일보 전용 슬롯 우선순위 적용${mobile ? " (모바일·기사 플로우 MPU 우선)" : ""}`,
+    );
+    return;
+  }
 }
 
-export function narrowGdnSlotsByHost(host: string, slots: DetectedSlot[]): void {
+export function narrowGdnSlotsByHost(
+  host: string,
+  slots: DetectedSlot[],
+  ctx?: GdnSlotHostContext,
+): void {
   if (!host || slots.length <= 1) return;
 
   if (host === "www.ddaily.co.kr") {
@@ -235,6 +259,36 @@ export function narrowGdnSlotsByHost(host: string, slots: DetectedSlot[]): void 
       slots.length = 0;
       preferred.forEach((s) => slots.push(s));
       console.log(`[GDN] 🎯 연합뉴스 후보 축소: ${preferred.length}개 (모바일 MPU·GAM 위주)`);
+    }
+  }
+
+  if (isChosunHost(host)) {
+    const mobile = Boolean(ctx?.mobileViewport);
+    const preferred = slots.filter((s) => {
+      if (s.type === "gdn-iframe" && s.height > 780) return false;
+      const sel = (s.selector || "").toLowerCase();
+      const gam =
+        sel.includes("google_ads") ||
+        sel.includes("div-gpt-ad") ||
+        sel.includes("adsbygoogle") ||
+        sel.includes("googlesyndication");
+      if (gam || s.type === "gdn-iframe") return s.width <= 1024 && s.height <= 520;
+      const mpu =
+        s.width >= 260 && s.width <= 400 && s.height >= 200 && s.height <= 340;
+      const mobTopBanner =
+        mobile &&
+        s.width >= 300 &&
+        s.width <= 400 &&
+        s.height >= 44 &&
+        s.height <= 130;
+      return mpu || mobTopBanner;
+    });
+    if (preferred.length > 0) {
+      slots.length = 0;
+      preferred.forEach((s) => slots.push(s));
+      console.log(
+        `[GDN] 🎯 조선일보 후보 축소: ${preferred.length}개${mobile ? " (모바일 GAM·본문 MPU)" : ""}`,
+      );
     }
   }
 }
@@ -364,6 +418,44 @@ function calcYnaSlotScore(slot: DetectedSlot): number {
 
   if (slot.height > 2000 || area > 400000) score -= 500;
   if (slot.height > 600 && slot.type === "gdn-iframe") score -= 350;
+
+  return score;
+}
+
+/**
+ * 조선일보 모바일: 멤버십·내비 아래 기사 플로우의 MPU(300×250 / 336×280)가 대표 인벤.
+ * 세로 과대 GAM iframe·하단 스티키보다 실제 게재면에 가깝게 점수화.
+ */
+function calcChosunSlotScore(slot: DetectedSlot, mobileViewport: boolean): number {
+  const sel = (slot.selector || "").toLowerCase();
+  let score = slot.confidence;
+  const area = slot.width * slot.height;
+
+  if (slot.type === "gdn-iframe") score += 118;
+  if (sel.includes("google_ads")) score += 118;
+  if (sel.includes("div-gpt-ad")) score += 108;
+  if (sel.includes("adsbygoogle")) score += 102;
+  if (sel.includes("googlesyndication")) score += 92;
+
+  const mpu =
+    slot.width >= 280 &&
+    slot.width <= 400 &&
+    slot.height >= 220 &&
+    slot.height <= 330;
+  if (mpu) score += 88;
+
+  if (slot.width >= 680 && slot.width <= 800 && slot.height >= 80 && slot.height <= 120) score += 48;
+
+  if (mobileViewport) {
+    if (!slot.isFixed && mpu && slot.y >= 72 && slot.y <= 920) score += 95;
+    if (slot.isFixed) score -= 58;
+    if (slot.isFixed && slot.height <= 100 && slot.y > 380) score -= 85;
+  } else {
+    if (slot.isFixed) score -= 35;
+  }
+
+  if (slot.type === "gdn-iframe" && slot.height > 680) score -= 320;
+  if (slot.height > 2000 || area > 480000) score -= 450;
 
   return score;
 }
