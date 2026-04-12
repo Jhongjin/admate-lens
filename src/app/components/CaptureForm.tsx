@@ -2604,6 +2604,9 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
         </div>
         )}
 
+        {/* Google Ads만: 구분선 + 고급 옵션 (YouTube는 GDN 슬롯/랜딩 옵션 비적용) */}
+        {form.channel === "gdn" && (
+          <>
         {/* 구분선 */}
         <div
           className="my-5"
@@ -2787,6 +2790,8 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
             </div>
           )}
         </div>
+          </>
+        )}
 
         {/* ===== 제출 버튼 ===== */}
         <div className="mt-6">
