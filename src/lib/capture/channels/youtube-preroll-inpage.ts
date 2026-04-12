@@ -371,8 +371,9 @@ export function runPrerollInjectInPage(...args: unknown[]): boolean {
       document.body.appendChild(mobileBar);
     }
 
-    if (!isMobile && showSkipButton) {
-      const skipTop = py + ph - 90;
+    // 모바일·PC 공통: 스킵 가능일 때만 우하단 건너뛰기 (Mo instream Skip 등)
+    if (showSkipButton) {
+      const skipTop = py + ph - (isMobile ? 52 : 90);
       const skipBtn = document.createElement("div");
       skipBtn.id = "admate-skip-btn";
       skipBtn.className = "admate-ytp-skip-ad-button";
