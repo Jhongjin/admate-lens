@@ -18,13 +18,13 @@ export interface InfeedInjectPagePayload {
   ctaSecondary: string;
 }
 
-function esc(s: string): string {
-  const d = document.createElement("div");
-  d.textContent = s;
-  return d.innerHTML;
-}
-
 export function runInfeedInjectInPage(...args: unknown[]): boolean {
+  /** page.evaluate로 전달될 때는 이 함수 본문만 브라우저에서 실행되므로 esc는 반드시 내부에 둡니다. */
+  const esc = (s: string): string => {
+    const d = document.createElement("div");
+    d.textContent = s;
+    return d.innerHTML;
+  };
   const p = args[0] as InfeedInjectPagePayload;
   try {
     document.querySelectorAll('[data-injected="admate-youtube-infeed"]').forEach((el) => el.remove());
