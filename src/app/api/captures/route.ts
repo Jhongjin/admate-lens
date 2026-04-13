@@ -400,8 +400,14 @@ async function executeBatchCaptures(captureIds: string[]): Promise<void> {
                 targetAdSizes: captureMetadata.targetAdSizes ?? [],
                 creativeObjectFit:
                   captureMetadata.creativeObjectFit === "cover" ? "cover" : "contain",
-                youtubeAdType: captureMetadata.youtubeAdType ?? "preroll",
+                youtubeAdType:
+                  (typeof captureMetadata.youtubeAdType === "string" &&
+                    captureMetadata.youtubeAdType) ||
+                  (typeof captureMetadata["youtube_ad_type"] === "string" &&
+                    captureMetadata["youtube_ad_type"]) ||
+                  "preroll",
                 instreamOpts: captureMetadata.instreamOpts,
+                infeedOpts: captureMetadata.infeedOpts,
                 publisherGotoRelaxed: multiBatch && capture.channel === "gdn",
                 gdnViewportMode:
                   capture.channel === "gdn"

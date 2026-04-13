@@ -50,6 +50,8 @@ export interface YouTubeDiagnostics {
   injectionSuccess: boolean;
   creativeDownloaded: boolean;
   creativeBase64Size: number;
+  /** 인피드 캡처 직전 브라우저 URL(배포·리다이렉트 이슈 확인용) */
+  infeedCaptureUrl?: string;
 }
 
 /**
@@ -949,6 +951,18 @@ export class YouTubeCapture extends BaseChannel {
 
     await this.applyYouTubeConsentCookies(page);
     await page.goto(targetUrl, { waitUntil: "networkidle2", timeout: 45000 });
+    if (adType === "infeed-home") {
+      const opened = page.url();
+      if (!/\/feed\/trending/i.test(opened)) {
+        console.warn(
+          `[YouTube] 인피드 홈: 첫 이동 후 URL이 트렌딩이 아님 (${opened}) — /feed/trending 으로 재이동합니다.`
+        );
+        await page.goto("https://www.youtube.com/feed/trending?app=desktop", {
+          waitUntil: "networkidle2",
+          timeout: 45000,
+        });
+      }
+    }
     await this.injectKoreanFonts(page);
     await this.dismissYouTubeConsent(page);
     await new Promise((r) => setTimeout(r, 2500));
@@ -986,6 +1000,18 @@ export class YouTubeCapture extends BaseChannel {
       await page.goto(targetUrl, { waitUntil: "networkidle2", timeout: 45000 });
       await new Promise((r) => setTimeout(r, 2000));
       await this.applyMastheadLoggedInLook(page, mastheadProfileDataUrl);
+      if (adType === "infeed-home") {
+        const opened = page.url();
+        if (!/\/feed\/trending/i.test(opened)) {
+          console.warn(
+            `[YouTube] 인피드 홈: 동의 처리 후 URL이 트렌딩이 아님 (${opened}) — /feed/trending 으로 재이동합니다.`
+          );
+          await page.goto("https://www.youtube.com/feed/trending?app=desktop", {
+            waitUntil: "networkidle2",
+            timeout: 45000,
+          });
+        }
+      }
     }
 
     if (surface === "home") {
@@ -1061,8 +1087,12 @@ export class YouTubeCapture extends BaseChannel {
     `);
     await this.applyMastheadLoggedInLook(page, mastheadProfileDataUrl);
 
+    this.diagnostics.infeedCaptureUrl = page.url();
+
     const screenshot = await page.screenshot({ fullPage: false, type: "png" });
-    console.log(`[YouTube] ===== 인피드 캡처 완료 (${surface}) =====`);
+    console.log(
+      `[YouTube] ===== 인피드 캡처 완료 (${surface}) url=${this.diagnostics.infeedCaptureUrl ?? ""} =====`
+    );
     return screenshot;
   }
 
