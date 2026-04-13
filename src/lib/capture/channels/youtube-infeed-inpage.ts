@@ -51,7 +51,7 @@ export function runInfeedInjectInPage(...args: unknown[]): boolean {
         : "";
 
     const menuBtn = `<button type="button" aria-label="메뉴" style="flex-shrink:0;background:none;border:none;padding:4px;cursor:default;color:var(--yt-spec-text-primary,#0f0f0f);border-radius:50%;width:40px;height:40px;display:flex;align-items:center;justify-content:center;margin:-4px -4px 0 0;"><svg height="24" viewBox="0 0 24 24" width="24"><path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z" fill="currentColor"/></svg></button>`;
-    const menuBtnSearch = `<button type="button" aria-label="메뉴" style="flex-shrink:0;background:none;border:none;padding:2px;cursor:default;color:var(--yt-spec-text-primary,#0f0f0f);border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;margin:0 -2px 0 0;"><svg height="24" viewBox="0 0 24 24" width="24"><path d="M6 10a2 2 0 100 4 2 2 0 000-4Zm6 0a2 2 0 100 4 2 2 0 000-4Zm6 0a2 2 0 100 4 2 2 0 000-4Z" fill="currentColor"/></svg></button>`;
+    const menuBtnSearch = `<button type="button" aria-label="메뉴" style="flex-shrink:0;background:rgba(255,255,255,0.96);border:none;padding:2px;cursor:default;color:var(--yt-spec-text-primary,#0f0f0f);border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 1px rgba(0,0,0,0.06);"><svg height="24" viewBox="0 0 24 24" width="24"><path d="M6 10a2 2 0 100 4 2 2 0 000-4Zm6 0a2 2 0 100 4 2 2 0 000-4Zm6 0a2 2 0 100 4 2 2 0 000-4Z" fill="currentColor"/></svg></button>`;
 
     /**
      * 데스크톱 웹 인피드 광고 CTA — yt-spec-button-shape-next--size-m 근접
@@ -219,11 +219,11 @@ export function runInfeedInjectInPage(...args: unknown[]): boolean {
             ${extIcon}
           </div>
           <div style="flex:1;min-width:0;padding-top:0;max-width:600px;">
-            <div style="position:relative;min-height:58px;padding-right:36px;">
+            <div style="position:relative;min-height:58px;padding-right:40px;">
               <h3 style="margin:0;font-size:2.2rem;font-weight:400;line-height:3rem;color:var(--yt-spec-text-primary,#0f0f0f);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">${esc(
                 title
               )}</h3>
-              <div style="position:absolute;top:0;right:0;">${menuBtnSearch}</div>
+              <div style="position:absolute;top:-2px;right:-6px;z-index:4;">${menuBtnSearch}</div>
             </div>
             ${
               d1
