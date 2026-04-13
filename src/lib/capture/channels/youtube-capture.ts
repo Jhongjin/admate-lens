@@ -987,12 +987,34 @@ export class YouTubeCapture extends BaseChannel {
     }
 
     if (surface === "home") {
-      const hasFeedItems = await page.evaluate<boolean>(`
-        (() => !!document.querySelector("ytd-rich-grid-renderer ytd-rich-item-renderer"))()
+      await page.evaluate<void>(`
+        (() => {
+          for (let i = 0; i < 6; i++) {
+            window.scrollBy(0, 400);
+          }
+          window.scrollTo({ top: 0, behavior: 'instant' });
+        })()
       `);
-      if (!hasFeedItems) {
+      await new Promise((r) => setTimeout(r, 2200));
+
+      const feedOk = await page.evaluate<boolean>(`
+        (() => {
+          const items = document.querySelectorAll(
+            "ytd-rich-grid-renderer ytd-rich-item-renderer"
+          );
+          const t = (document.body.innerText || "").toLowerCase();
+          const emptyGuestHome =
+            t.includes("search to start") ||
+            t.includes("검색하여 시작하기") ||
+            t.includes("start watching videos") ||
+            t.includes("동영상 시청을 시작");
+          if (emptyGuestHome) return false;
+          return items.length >= 4;
+        })()
+      `);
+      if (!feedOk) {
         console.warn(
-          "[YouTube] 인피드 홈: 추천 그리드가 없어 /feed/trending 으로 열어 주변 콘텐츠를 채웁니다."
+          "[YouTube] 인피드 홈: 추천 칸이 부족하거나 게스트 빈 홈입니다 — /feed/trending 으로 전환합니다."
         );
         await page.goto("https://www.youtube.com/feed/trending", {
           waitUntil: "networkidle2",
@@ -1002,6 +1024,15 @@ export class YouTubeCapture extends BaseChannel {
         await this.dismissYouTubeConsent(page);
         await new Promise((r) => setTimeout(r, 2000));
         await this.applyMastheadLoggedInLook(page, mastheadProfileDataUrl);
+        await page.evaluate<void>(`
+          (() => {
+            for (let i = 0; i < 5; i++) {
+              window.scrollBy(0, 500);
+            }
+            window.scrollTo({ top: 0, behavior: 'instant' });
+          })()
+        `);
+        await new Promise((r) => setTimeout(r, 1800));
       }
     }
 
@@ -1011,18 +1042,6 @@ export class YouTubeCapture extends BaseChannel {
           window.scrollTo({ top: 0, behavior: 'instant' });
         })()
       `);
-    }
-
-    if (surface === "home") {
-      await page.evaluate<void>(`
-        (() => {
-          for (let i = 0; i < 6; i++) {
-            window.scrollBy(0, 400);
-          }
-          window.scrollTo({ top: 0, behavior: 'instant' });
-        })()
-      `);
-      await new Promise((r) => setTimeout(r, 2000));
     }
 
     let injected = await page.evaluate(runInfeedInjectInPage, {

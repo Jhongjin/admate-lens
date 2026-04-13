@@ -53,20 +53,20 @@ export function runInfeedInjectInPage(...args: unknown[]): boolean {
     const menuBtn = `<button type="button" aria-label="메뉴" style="flex-shrink:0;background:none;border:none;padding:4px;cursor:default;color:var(--yt-spec-text-primary,#0f0f0f);border-radius:50%;width:40px;height:40px;display:flex;align-items:center;justify-content:center;margin:-4px -4px 0 0;"><svg height="24" viewBox="0 0 24 24" width="24"><path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z" fill="currentColor"/></svg></button>`;
 
     /**
-     * 데스크톱 웹 광고 CTA — yt-spec-button-shape-next--size-m 계열
-     * (보조: 밝은 바탕용 tonal / 주: mono-filled에 가까운 대비)
+     * 데스크톱 웹 인피드 광고 CTA — yt-spec-button-shape-next--size-m 근접
+     * 보조: 연한 회색 면 + 얇은 테두리 / 주: mono-filled (#0f0f0f)
      */
     const btnBase =
-      "box-sizing:border-box;margin:0;border:none;cursor:default;font-family:Roboto,'Noto Sans KR',Arial,sans-serif;font-size:14px;line-height:36px;font-weight:500;height:36px;padding:0 16px;border-radius:18px;display:flex;align-items:center;justify-content:center;white-space:nowrap;";
+      "box-sizing:border-box;margin:0;border:none;cursor:default;font-family:Roboto,'Noto Sans KR',Arial,sans-serif;font-size:14px;line-height:36px;font-weight:500;height:36px;padding:0 16px;border-radius:18px;display:flex;align-items:center;justify-content:center;white-space:nowrap;letter-spacing:0.011px;";
     const btnRow = (compact: boolean) => {
       const gap = "8px";
       const sec = showSecondary
-        ? `<button type="button" style="${btnBase}flex:1;min-width:0;background:rgba(0,0,0,0.05);color:#0f0f0f;">${esc(
+        ? `<button type="button" style="${btnBase}flex:1;min-width:0;background:#f2f2f2;color:#0f0f0f;border:1px solid #e5e5e5;">${esc(
             ctaS
           )}</button>`
         : "";
       const primW = showSecondary ? "flex:1" : "width:100%";
-      return `<div style="display:flex;flex-direction:row;gap:${gap};margin-top:${compact ? "8px" : "10px"};align-items:center;width:100%;">${sec}<button type="button" style="${btnBase}${primW};min-width:0;background:#0f0f0f;color:#fff;">${esc(
+      return `<div style="display:flex;flex-direction:row;gap:${gap};margin-top:${compact ? "8px" : "10px"};align-items:center;width:100%;">${sec}<button type="button" style="${btnBase}${primW};min-width:0;background:#0f0f0f;color:#fff;border:1px solid #0f0f0f;">${esc(
         ctaP
       )}</button></div>`;
     };
