@@ -117,6 +117,7 @@ export function runInfeedInjectInPage(...args: unknown[]): boolean {
       }
 
       const primary =
+        (document.getElementById("primary") as HTMLElement | null) ||
         (document.querySelector("ytd-browse[page-subtype='home'] #primary") as HTMLElement | null) ||
         (document.querySelector("ytd-two-column-browse-results-renderer #primary") as HTMLElement | null) ||
         (document.querySelector("ytd-app[layout] #primary") as HTMLElement | null) ||
@@ -138,8 +139,35 @@ export function runInfeedInjectInPage(...args: unknown[]): boolean {
         return true;
       }
 
-      console.warn("[admate infeed] home: 삽입 앵커 없음");
-      return false;
+      const appContent =
+        (document.querySelector("ytd-app #content") as HTMLElement | null) ||
+        (document.querySelector("#content") as HTMLElement | null);
+      if (appContent) {
+        const slot = document.createElement("div");
+        const ml = window.innerWidth >= 1312 ? "240px" : window.innerWidth >= 792 ? "72px" : "16px";
+        slot.style.cssText =
+          "box-sizing:border-box;padding:20px 16px 32px 16px;max-width:420px;margin-left:" +
+          ml +
+          ";margin-right:auto;";
+        slot.appendChild(buildHomeFeedCard());
+        const pm = appContent.querySelector("ytd-page-manager");
+        const host = (pm as HTMLElement) || appContent;
+        host.insertBefore(slot, host.firstChild);
+        console.log("[admate infeed] home: ytd-app #content / page-manager 상단 삽입");
+        return true;
+      }
+
+      const card = buildHomeFeedCard();
+      const left = window.innerWidth >= 1312 ? "240px" : window.innerWidth >= 792 ? "88px" : "16px";
+      card.style.setProperty("position", "fixed", "important");
+      card.style.setProperty("z-index", "2147483000", "important");
+      card.style.setProperty("top", "72px", "important");
+      card.style.setProperty("left", left, "important");
+      card.style.setProperty("width", "min(400px, calc(100vw - 48px))", "important");
+      card.style.setProperty("box-shadow", "0 4px 24px rgba(0,0,0,0.15)", "important");
+      document.body.appendChild(card);
+      console.log("[admate infeed] home: body fixed 최종 폴백(헤드리스·빈 피드)");
+      return true;
     }
 
     if (p.surface === "search") {

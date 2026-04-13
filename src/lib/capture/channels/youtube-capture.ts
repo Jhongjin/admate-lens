@@ -994,7 +994,19 @@ export class YouTubeCapture extends BaseChannel {
       `);
     }
 
-    const injected = await page.evaluate(runInfeedInjectInPage, {
+    if (surface === "home") {
+      await page.evaluate<void>(`
+        (() => {
+          for (let i = 0; i < 6; i++) {
+            window.scrollBy(0, 400);
+          }
+          window.scrollTo({ top: 0, behavior: 'instant' });
+        })()
+      `);
+      await new Promise((r) => setTimeout(r, 2000));
+    }
+
+    let injected = await page.evaluate(runInfeedInjectInPage, {
       surface,
       thumbDataUrl: creativeDataUrl,
       avatarDataUrl,
@@ -1006,6 +1018,33 @@ export class YouTubeCapture extends BaseChannel {
       ctaSecondary,
     });
     this.diagnostics.injectionSuccess = injected;
+
+    if (!injected && surface === "home") {
+      console.warn(
+        "[YouTube] 홈(/) 인젝션 실패 — 인기 탭으로 이동 후 그리드 첫 칸에 재시도합니다."
+      );
+      await page.goto("https://www.youtube.com/feed/trending", {
+        waitUntil: "networkidle2",
+        timeout: 45000,
+      });
+      await this.injectKoreanFonts(page);
+      await this.dismissYouTubeConsent(page);
+      await new Promise((r) => setTimeout(r, 2000));
+      await this.applyMastheadLoggedInLook(page, mastheadProfileDataUrl);
+      injected = await page.evaluate(runInfeedInjectInPage, {
+        surface,
+        thumbDataUrl: creativeDataUrl,
+        avatarDataUrl,
+        title,
+        description1,
+        description2,
+        sponsorName,
+        ctaPrimary,
+        ctaSecondary,
+      });
+      this.diagnostics.injectionSuccess = injected;
+    }
+
     if (!injected) {
       console.warn("[YouTube] 인피드 인젝션 실패 — 빈 피드·레이아웃 변경 가능");
     }
