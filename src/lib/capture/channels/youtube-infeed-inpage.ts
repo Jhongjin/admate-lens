@@ -52,22 +52,31 @@ export function runInfeedInjectInPage(...args: unknown[]): boolean {
 
     const menuBtn = `<button type="button" aria-label="메뉴" style="flex-shrink:0;background:none;border:none;padding:4px;cursor:default;color:var(--yt-spec-text-primary,#0f0f0f);border-radius:50%;width:40px;height:40px;display:flex;align-items:center;justify-content:center;margin:-4px -4px 0 0;"><svg height="24" viewBox="0 0 24 24" width="24"><path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z" fill="currentColor"/></svg></button>`;
 
+    /**
+     * 데스크톱 웹 광고 CTA — yt-spec-button-shape-next--size-m 계열
+     * (보조: 밝은 바탕용 tonal / 주: mono-filled에 가까운 대비)
+     */
+    const btnBase =
+      "box-sizing:border-box;margin:0;border:none;cursor:default;font-family:Roboto,'Noto Sans KR',Arial,sans-serif;font-size:14px;line-height:36px;font-weight:500;height:36px;padding:0 16px;border-radius:18px;display:flex;align-items:center;justify-content:center;white-space:nowrap;";
     const btnRow = (compact: boolean) => {
-      const gap = compact ? "8px" : "10px";
+      const gap = "8px";
       const sec = showSecondary
-        ? `<button type="button" style="flex:1;min-width:0;height:36px;border-radius:18px;border:none;background:var(--yt-spec-badge-chip-background,rgba(0,0,0,0.05));color:var(--yt-spec-text-primary,#0f0f0f);font-family:Roboto,'Noto Sans KR',Arial,sans-serif;font-size:1.4rem;font-weight:500;cursor:default;">${esc(
+        ? `<button type="button" style="${btnBase}flex:1;min-width:0;background:rgba(0,0,0,0.05);color:#0f0f0f;">${esc(
             ctaS
           )}</button>`
         : "";
       const primW = showSecondary ? "flex:1" : "width:100%";
-      return `<div style="display:flex;gap:${gap};margin-top:${compact ? "10px" : "12px"};align-items:center;">${sec}<button type="button" style="${primW};min-width:0;height:36px;border-radius:18px;border:none;background:var(--yt-spec-text-primary,#0f0f0f);color:var(--yt-spec-static-brand-white,#fff);font-family:Roboto,'Noto Sans KR',Arial,sans-serif;font-size:1.4rem;font-weight:500;cursor:default;">${esc(
+      return `<div style="display:flex;flex-direction:row;gap:${gap};margin-top:${compact ? "8px" : "10px"};align-items:center;width:100%;">${sec}<button type="button" style="${btnBase}${primW};min-width:0;background:#0f0f0f;color:#fff;">${esc(
         ctaP
       )}</button></div>`;
     };
 
-    /** YouTube 인피드 썸네일 우하단: 작은 직사각 배지 + 단순 대각 화살표(박스형 외부링크 아이콘과 구분) */
+    /**
+     * 썸네일 우하단 — 실제 웹의 overlay-dark tonal 버튼과 동일 토큰
+     * (rgba(0,0,0,0.3) + 흰 아이콘, yt-spec-button-shape-next--size-m 높이에 맞춘 원형)
+     */
     const extIcon =
-      '<span style="position:absolute;bottom:4px;right:4px;width:24px;height:20px;border-radius:2px;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;box-sizing:border-box;"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M7 17L17 7M17 7H10M17 7V14" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>';
+      '<span style="position:absolute;bottom:8px;right:8px;width:36px;height:36px;border-radius:18px;background:rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;box-sizing:border-box;color:#fff;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M7 17L17 7M17 7H10M17 7V14" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>';
 
     const buildHomeFeedCard = (): HTMLElement => {
       const wrap = document.createElement("div");
