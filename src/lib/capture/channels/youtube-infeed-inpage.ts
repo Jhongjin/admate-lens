@@ -210,7 +210,7 @@ export function runInfeedInjectInPage(...args: unknown[]): boolean {
           "ytd-rich-shelf-renderer ytd-reel-item-renderer, ytd-reel-shelf-renderer ytd-reel-item-renderer"
         ) as HTMLElement | null;
         const w = shorts?.getBoundingClientRect().width || 0;
-        return w > 40 ? Math.round(Math.max(420, Math.min(620, w * 2 + 24))) : 460;
+        return w > 40 ? Math.round(Math.max(450, Math.min(660, w * 2 + 44))) : 500;
       })();
       wrap.innerHTML = `
         <div style="display:flex;flex-direction:row;gap:16px;align-items:flex-start;width:100%;max-width:var(--ytd-grid-max-width,1284px);">
@@ -219,15 +219,15 @@ export function runInfeedInjectInPage(...args: unknown[]): boolean {
             ${extIcon}
           </div>
           <div style="flex:1 1 auto;min-width:0;padding-top:0;width:100%;max-width:none;">
-            <div style="display:grid;grid-template-columns:minmax(0,1fr) 32px;align-items:start;column-gap:8px;min-height:58px;width:100%;">
-              <h3 style="margin:0;font-size:2.2rem;font-weight:400;line-height:3rem;color:var(--yt-spec-text-primary,#0f0f0f);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;max-width:100%;">${esc(
+            <div style="display:grid;grid-template-columns:minmax(0,1fr) 32px;align-items:start;column-gap:8px;min-height:54px;width:100%;">
+              <h3 style="margin:0;font-size:2.2rem;font-weight:400;line-height:2.8rem;color:var(--yt-spec-text-primary,#0f0f0f);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;max-width:100%;">${esc(
                 title
               )}</h3>
               <div style="justify-self:end;align-self:start;z-index:6;transform:translateX(2px);">${menuBtnSearch}</div>
             </div>
             ${
               d1
-                ? `<div style="margin-top:0;font-size:1.24rem;font-weight:400;line-height:1.72rem;color:var(--yt-spec-text-secondary,#606060);display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden;">${esc(
+                ? `<div style="margin-top:-6px;font-size:1.24rem;font-weight:400;line-height:1.72rem;color:var(--yt-spec-text-secondary,#606060);display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden;">${esc(
                     d1
                   )}</div>`
                 : ""
