@@ -939,7 +939,9 @@ export class YouTubeCapture extends BaseChannel {
 
     let targetUrl = request.publisherUrl;
     if (adType === "infeed-home") {
-      targetUrl = "https://www.youtube.com/";
+      /** 비로그인 `/` 는 문구·그리드가 shadow/숏스 행 때문에 휴리스틱이 자주 실패함 → 그리드 보장을 위해 인기만 사용 */
+      targetUrl = "https://www.youtube.com/feed/trending";
+      console.log("[YouTube] 인피드 홈: 추천 그리드 확보를 위해 /feed/trending 에서 캡처합니다.");
     } else if (adType === "infeed-search") {
       const q = (infeedOpts.searchQuery?.trim() || "시세이도").slice(0, 200);
       targetUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(q)}`;
@@ -996,44 +998,6 @@ export class YouTubeCapture extends BaseChannel {
         })()
       `);
       await new Promise((r) => setTimeout(r, 2200));
-
-      const feedOk = await page.evaluate<boolean>(`
-        (() => {
-          const items = document.querySelectorAll(
-            "ytd-rich-grid-renderer ytd-rich-item-renderer"
-          );
-          const t = (document.body.innerText || "").toLowerCase();
-          const emptyGuestHome =
-            t.includes("search to start") ||
-            t.includes("검색하여 시작하기") ||
-            t.includes("start watching videos") ||
-            t.includes("동영상 시청을 시작");
-          if (emptyGuestHome) return false;
-          return items.length >= 4;
-        })()
-      `);
-      if (!feedOk) {
-        console.warn(
-          "[YouTube] 인피드 홈: 추천 칸이 부족하거나 게스트 빈 홈입니다 — /feed/trending 으로 전환합니다."
-        );
-        await page.goto("https://www.youtube.com/feed/trending", {
-          waitUntil: "networkidle2",
-          timeout: 45000,
-        });
-        await this.injectKoreanFonts(page);
-        await this.dismissYouTubeConsent(page);
-        await new Promise((r) => setTimeout(r, 2000));
-        await this.applyMastheadLoggedInLook(page, mastheadProfileDataUrl);
-        await page.evaluate<void>(`
-          (() => {
-            for (let i = 0; i < 5; i++) {
-              window.scrollBy(0, 500);
-            }
-            window.scrollTo({ top: 0, behavior: 'instant' });
-          })()
-        `);
-        await new Promise((r) => setTimeout(r, 1800));
-      }
     }
 
     if (surface === "search") {

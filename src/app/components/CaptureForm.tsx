@@ -1377,7 +1377,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
               {form.youtubeAdType === "mobile-preroll-ios" &&
                 "모바일 인스트림은 iPhone 15 뷰포트 기준으로 캡처됩니다."}
               {isYoutubeInfeed &&
-                "인피드는 PC 1920×1080 뷰포트에서 실제 홈·검색·시청 페이지를 연 뒤 카드 UI를 합성합니다."}
+                "인피드는 PC 1920×1080 뷰포트에서 열립니다. 홈 지면은 빈 게스트 피드를 피하기 위해 인기(/feed/trending) 그리드에서 캡처합니다."}
             </p>
 
             {/* 🎬 인스트림 광고 상세 옵션 (프리롤 + 모바일 인스트림 공통) */}
@@ -2216,8 +2216,8 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                 >
                   {isYoutubeInfeed ? (
                     <>
-                      인피드는 홈·검색·관련동영상 각각 실제 URL로 열린 뒤 카드 UI가
-                      합성됩니다. 광고 영상 URL 또는 소재 이미지 중 하나는 필요합니다.
+                      인피드 홈은 인기 피드에서, 검색·관련동영상은 각각 해당 URL에서
+                      카드 UI를 합성합니다. 광고 영상 URL 또는 소재 이미지 중 하나는 필요합니다.
                     </>
                   ) : (
                     <>
