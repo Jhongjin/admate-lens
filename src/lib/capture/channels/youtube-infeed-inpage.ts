@@ -219,20 +219,22 @@ export function runInfeedInjectInPage(...args: unknown[]): boolean {
             ${extIcon}
           </div>
           <div style="flex:1 1 auto;min-width:0;padding-top:0;width:100%;max-width:none;">
-            <div style="display:grid;grid-template-columns:minmax(0,1fr) 32px;align-items:start;column-gap:8px;min-height:54px;width:100%;">
-              <h3 style="margin:0;font-size:2.2rem;font-weight:400;line-height:2.8rem;color:var(--yt-spec-text-primary,#0f0f0f);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;max-width:100%;">${esc(
-                title
-              )}</h3>
+            <div style="display:grid;grid-template-columns:minmax(0,1fr) 32px;align-items:start;column-gap:8px;min-height:50px;width:100%;">
+              <div style="min-width:0;display:flex;flex-direction:column;gap:0;">
+                <h3 style="margin:0;padding:0;font-size:3rem;font-weight:400;line-height:2.55rem;color:var(--yt-spec-text-primary,#0f0f0f);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;max-width:100%;">${esc(
+                  title
+                )}</h3>
+                ${
+                  d1
+                    ? `<div style="margin-top:-8px;padding:0;font-size:1.24rem;font-weight:400;line-height:1.66rem;color:var(--yt-spec-text-secondary,#606060);display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden;">${esc(
+                        d1
+                      )}</div>`
+                    : ""
+                }
+              </div>
               <div style="justify-self:end;align-self:start;z-index:6;transform:translateX(2px);">${menuBtnSearch}</div>
             </div>
-            ${
-              d1
-                ? `<div style="margin-top:-6px;font-size:1.24rem;font-weight:400;line-height:1.72rem;color:var(--yt-spec-text-secondary,#606060);display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden;">${esc(
-                    d1
-                  )}</div>`
-                : ""
-            }
-            <div style="margin-top:2px;display:flex;align-items:center;gap:8px;font-size:1.2rem;">
+            <div style="margin-top:1px;display:flex;align-items:center;gap:8px;font-size:1.2rem;">
               <div style="width:24px;height:24px;border-radius:50%;overflow:hidden;flex-shrink:0;background:#eee;">
                 <img src="${avatar}" alt="" style="width:100%;height:100%;object-fit:cover;" />
               </div>
