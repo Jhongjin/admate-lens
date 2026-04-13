@@ -76,7 +76,7 @@ export function runInfeedInjectInPage(...args: unknown[]): boolean {
      * (rgba(0,0,0,0.3) + 흰 아이콘, yt-spec-button-shape-next--size-m 높이에 맞춘 원형)
      */
     const extIcon =
-      '<span style="position:absolute;bottom:8px;right:8px;width:36px;height:36px;border-radius:18px;background:rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;box-sizing:border-box;color:#fff;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M7 17L17 7M17 7H10M17 7V14" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>';
+      '<span style="position:absolute;bottom:8px;right:8px;width:34px;height:34px;border-radius:999px;background:rgba(18,18,18,0.72);backdrop-filter:saturate(120%) blur(1px);display:flex;align-items:center;justify-content:center;box-sizing:border-box;color:#fff;border:1px solid rgba(255,255,255,0.12);"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M7 17L17 7M17 7H10M17 7V14" stroke="currentColor" stroke-width="2.15" stroke-linecap="round" stroke-linejoin="round"/></svg></span>';
 
     const buildHomeFeedCard = (): HTMLElement => {
       const wrap = document.createElement("div");
@@ -192,26 +192,45 @@ export function runInfeedInjectInPage(...args: unknown[]): boolean {
       wrap.setAttribute("data-injected", "admate-youtube-infeed");
       wrap.style.cssText =
         "display:block;margin:0 0 16px 0;padding:0 16px;box-sizing:border-box;font-family:Roboto,'Noto Sans KR',Arial,sans-serif;";
+      const searchBtns = `<div style="display:flex;gap:8px;align-items:center;width:100%;max-width:420px;margin-top:12px;">
+        ${
+          showSecondary
+            ? `<button type="button" style="${btnBase}flex:1;background:#f2f2f2;color:#0f0f0f;border:1px solid #e6e6e6;">${esc(
+                ctaS
+              )}</button>`
+            : ""
+        }
+        <button type="button" style="${btnBase}${showSecondary ? "flex:1;" : "width:100%;"}background:#0f0f0f;color:#fff;border:1px solid #0f0f0f;">${esc(
+          ctaP
+        )}</button>
+      </div>`;
       wrap.innerHTML = `
-        <div style="display:flex;flex-direction:row;gap:16px;align-items:flex-start;max-width:960px;">
-          <div style="position:relative;flex-shrink:0;width:246px;aspect-ratio:16/9;border-radius:12px;overflow:hidden;background:#000;">
+        <div style="display:flex;flex-direction:row;gap:16px;align-items:flex-start;width:100%;max-width:1000px;">
+          <div style="position:relative;flex-shrink:0;width:360px;aspect-ratio:16/9;border-radius:12px;overflow:hidden;background:#000;">
             <img src="${thumb}" alt="" style="width:100%;height:100%;object-fit:cover;display:block;" />
             ${extIcon}
           </div>
-          <div style="flex:1;min-width:0;padding-top:2px;">
-            <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
-              <h3 style="margin:0;font-size:1.8rem;font-weight:400;line-height:2.6rem;color:var(--yt-spec-text-primary,#0f0f0f);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">${esc(
+          <div style="flex:1;min-width:0;padding-top:2px;max-width:560px;">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;min-height:56px;">
+              <h3 style="margin:0;font-size:2rem;font-weight:500;line-height:2.8rem;color:var(--yt-spec-text-primary,#0f0f0f);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">${esc(
                 title
               )}</h3>
               ${menuBtn}
             </div>
-            <div style="margin-top:8px;display:flex;align-items:center;gap:8px;font-size:1.2rem;">
+            <div style="margin-top:6px;display:flex;align-items:center;gap:8px;font-size:1.2rem;">
               <div style="width:24px;height:24px;border-radius:50%;overflow:hidden;flex-shrink:0;background:#eee;">
                 <img src="${avatar}" alt="" style="width:100%;height:100%;object-fit:cover;" />
               </div>
               <div style="min-width:0;">${sponsorHtml}</div>
             </div>
-            ${btnRow(false)}
+            ${
+              d1 || d2
+                ? `<div style="margin-top:6px;font-size:1.2rem;line-height:1.8rem;color:var(--yt-spec-text-secondary,#606060);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">${esc(
+                    [d1, d2].filter(Boolean).join(" ")
+                  )}</div>`
+                : ""
+            }
+            ${searchBtns}
           </div>
         </div>`;
       primaryContents.insertBefore(wrap, primaryContents.firstChild);
