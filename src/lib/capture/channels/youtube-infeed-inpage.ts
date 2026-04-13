@@ -221,7 +221,7 @@ export function runInfeedInjectInPage(...args: unknown[]): boolean {
           <div style="flex:1 1 auto;min-width:0;padding-top:0;width:100%;max-width:none;">
             <div style="display:grid;grid-template-columns:minmax(0,1fr) 32px;align-items:start;column-gap:8px;min-height:50px;width:100%;">
               <div style="min-width:0;display:flex;flex-direction:column;gap:0;">
-                <h3 style="margin:0;padding:0;font-size:2.7rem;font-weight:400;line-height:3.1rem;color:var(--yt-spec-text-primary,#0f0f0f);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;max-width:100%;">${esc(
+                <h3 style="margin:0;padding:0;font-size:2.4rem;font-weight:400;line-height:2.9rem;color:var(--yt-spec-text-primary,#0f0f0f);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;max-width:100%;">${esc(
                   title
                 )}</h3>
                 ${
