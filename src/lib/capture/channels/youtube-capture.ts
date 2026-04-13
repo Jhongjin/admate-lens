@@ -903,6 +903,46 @@ export class YouTubeCapture extends BaseChannel {
     await this.dismissYouTubeConsent(page);
     await new Promise((r) => setTimeout(r, 1500));
     await this.applyMastheadLoggedInLook(page, mastheadProfileDataUrl);
+    await this.applySignedOutPromptSuppression(page);
+  }
+
+  /** 좌측 가이드/본문의 비로그인 유도 문구를 숨겨 로그인 상태처럼 보이게 보정 */
+  private async applySignedOutPromptSuppression(page: IPageHandle): Promise<void> {
+    await page.evaluate<void>(`
+      (() => {
+        const removeSelectors = [
+          "ytd-guide-signin-promo-renderer",
+          "ytd-mini-guide-signin-promo-renderer",
+          "ytd-feed-nudge-renderer",
+          "ytd-mealbar-promo-renderer",
+          "ytd-upsell-dialog-renderer",
+          "ytd-action-companion-ad-renderer",
+        ];
+        removeSelectors.forEach((sel) => {
+          document.querySelectorAll(sel).forEach((el) => el.remove());
+        });
+
+        const hideByText = (root) => {
+          if (!root) return;
+          const txt = (root.textContent || "").replace(/\\s+/g, " ").trim();
+          if (!txt) return;
+          if (
+            txt.includes("로그인하면 동영상에 좋아요를 표시") ||
+            txt.includes("채널을 구독") ||
+            txt.includes("Sign in to like videos") ||
+            txt.includes("Sign in to subscribe")
+          ) {
+            root.style.setProperty("display", "none", "important");
+            const host = root.closest("ytd-guide-entry-renderer, ytd-guide-signin-promo-renderer, #header-entry");
+            if (host) host.style.setProperty("display", "none", "important");
+          }
+        };
+
+        document.querySelectorAll("ytd-guide-entry-renderer, ytd-guide-signin-promo-renderer, yt-formatted-string").forEach(
+          (el) => hideByText(el)
+        );
+      })()
+    `);
   }
 
   /**
@@ -1159,6 +1199,7 @@ export class YouTubeCapture extends BaseChannel {
     await this.dismissYouTubeConsent(page);
     await new Promise((r) => setTimeout(r, 2500));
     await this.applyMastheadLoggedInLook(page, mastheadProfileDataUrl);
+    await this.applySignedOutPromptSuppression(page);
 
     const hasConsent = await page.evaluate<boolean>(`
       (() => {
@@ -1192,6 +1233,7 @@ export class YouTubeCapture extends BaseChannel {
       await page.goto(targetUrl, { waitUntil: "networkidle2", timeout: 45000 });
       await new Promise((r) => setTimeout(r, 2000));
       await this.applyMastheadLoggedInLook(page, mastheadProfileDataUrl);
+      await this.applySignedOutPromptSuppression(page);
       if (adType === "infeed-home") {
         const opened = page.url();
         if (!/\/feed\/trending/i.test(opened)) {
@@ -1262,6 +1304,7 @@ export class YouTubeCapture extends BaseChannel {
       await this.dismissYouTubeConsent(page);
       await new Promise((r) => setTimeout(r, 2000));
       await this.applyMastheadLoggedInLook(page, mastheadProfileDataUrl);
+      await this.applySignedOutPromptSuppression(page);
       injected = await page.evaluate(runInfeedInjectInPage, {
         surface: injectSurface,
         thumbDataUrl: creativeDataUrl,
@@ -1289,6 +1332,7 @@ export class YouTubeCapture extends BaseChannel {
       })()
     `);
     await this.applyMastheadLoggedInLook(page, mastheadProfileDataUrl);
+    await this.applySignedOutPromptSuppression(page);
 
     this.diagnostics.infeedCaptureUrl = page.url();
 

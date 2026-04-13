@@ -204,9 +204,16 @@ export function runInfeedInjectInPage(...args: unknown[]): boolean {
           ctaP
         )}</button>
       </div>`;
+      const firstShortWidth = (() => {
+        const shorts = document.querySelector(
+          "ytd-rich-shelf-renderer ytd-reel-item-renderer, ytd-reel-shelf-renderer ytd-reel-item-renderer"
+        ) as HTMLElement | null;
+        const w = shorts?.getBoundingClientRect().width || 0;
+        return w > 40 ? Math.round(Math.max(380, Math.min(560, w * 2))) : 420;
+      })();
       wrap.innerHTML = `
         <div style="display:flex;flex-direction:row;gap:16px;align-items:flex-start;width:100%;max-width:1000px;">
-          <div style="position:relative;flex-shrink:0;width:360px;aspect-ratio:16/9;border-radius:12px;overflow:hidden;background:#000;">
+          <div style="position:relative;flex-shrink:0;width:${firstShortWidth}px;aspect-ratio:16/9;border-radius:12px;overflow:hidden;background:#000;">
             <img src="${thumb}" alt="" style="width:100%;height:100%;object-fit:cover;display:block;" />
             ${extIcon}
           </div>
@@ -217,6 +224,13 @@ export function runInfeedInjectInPage(...args: unknown[]): boolean {
               )}</h3>
               ${menuBtn}
             </div>
+            ${
+              d1
+                ? `<div style="margin-top:4px;font-size:1.3rem;line-height:2rem;color:var(--yt-spec-text-secondary,#606060);display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden;">${esc(
+                    d1
+                  )}</div>`
+                : ""
+            }
             <div style="margin-top:6px;display:flex;align-items:center;gap:8px;font-size:1.2rem;">
               <div style="width:24px;height:24px;border-radius:50%;overflow:hidden;flex-shrink:0;background:#eee;">
                 <img src="${avatar}" alt="" style="width:100%;height:100%;object-fit:cover;" />
@@ -224,9 +238,9 @@ export function runInfeedInjectInPage(...args: unknown[]): boolean {
               <div style="min-width:0;">${sponsorHtml}</div>
             </div>
             ${
-              d1 || d2
+              d2
                 ? `<div style="margin-top:6px;font-size:1.2rem;line-height:1.8rem;color:var(--yt-spec-text-secondary,#606060);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">${esc(
-                    [d1, d2].filter(Boolean).join(" ")
+                    d2
                   )}</div>`
                 : ""
             }

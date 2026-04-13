@@ -1965,26 +1965,67 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                     </p>
                   </div>
                   {form.youtubeAdType === "infeed-search" && (
-                    <div>
-                      <label
-                        className="text-[11px] font-medium mb-1 block"
-                        style={{ color: "var(--color-text-secondary)" }}
-                      >
-                        검색어
-                      </label>
-                      <input
-                        type="text"
-                        className="form-input"
-                        placeholder="예: 시세이도"
-                        value={form.infeedSearchQuery}
-                        onChange={(e) =>
-                          setForm((prev) => ({
-                            ...prev,
-                            infeedSearchQuery: e.target.value,
-                          }))
-                        }
-                      />
-                    </div>
+                    <>
+                      <div>
+                        <label
+                          className="text-[11px] font-medium mb-1 block"
+                          style={{ color: "var(--color-text-secondary)" }}
+                        >
+                          검색어
+                        </label>
+                        <input
+                          type="text"
+                          className="form-input"
+                          placeholder="예: 시세이도"
+                          value={form.infeedSearchQuery}
+                          onChange={(e) =>
+                            setForm((prev) => ({
+                              ...prev,
+                              infeedSearchQuery: e.target.value,
+                            }))
+                          }
+                        />
+                      </div>
+                      <div>
+                        <label
+                          className="text-[11px] font-medium mb-1 block"
+                          style={{ color: "var(--color-text-secondary)" }}
+                        >
+                          제목 바로 아래 텍스트
+                        </label>
+                        <input
+                          type="text"
+                          className="form-input"
+                          placeholder="예: 이걸로도 안가려지는 기미가 없어요"
+                          value={form.infeedDescription1}
+                          onChange={(e) =>
+                            setForm((prev) => ({
+                              ...prev,
+                              infeedDescription1: e.target.value,
+                            }))
+                          }
+                        />
+                      </div>
+                      <div>
+                        <label
+                          className="text-[11px] font-medium mb-1 block"
+                          style={{ color: "var(--color-text-secondary)" }}
+                        >
+                          보조 설명 텍스트 (선택)
+                        </label>
+                        <input
+                          type="text"
+                          className="form-input"
+                          value={form.infeedDescription2}
+                          onChange={(e) =>
+                            setForm((prev) => ({
+                              ...prev,
+                              infeedDescription2: e.target.value,
+                            }))
+                          }
+                        />
+                      </div>
+                    </>
                   )}
                   {form.youtubeAdType === "infeed-watch-next" && (
                     <>
