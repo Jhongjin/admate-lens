@@ -52,6 +52,18 @@ export interface YouTubeDiagnostics {
   creativeBase64Size: number;
   /** 인피드 캡처 직전 브라우저 URL(배포·리다이렉트 이슈 확인용) */
   infeedCaptureUrl?: string;
+  /** 트렌딩/홈 그리드에 보이는 리치·쇼프 카드 합(대기 루프 마지막 스냅샷) */
+  infeedRichGridCount?: number;
+  /** `ytd-browse` 의 page-subtype (예: trending, home) */
+  infeedPageSubtype?: string;
+  /** 실제 인젝션에 쓴 지면(트렌딩 실패 시 검색 폴백이면 search) */
+  infeedInjectSurface?: InfeedSurface;
+  /** 검색 폴백 시 `ytd-video-renderer` 개수 */
+  infeedVideoRendererCount?: number;
+  /** 트렌딩 browse 루트 안의 리치·쇼프 카드 합(게스트 빈 홈 오판 방지용) */
+  infeedTrendingGridCount?: number;
+  /** 스냅샷에 ‘검색하여 시작’류 게스트 빈 홈 문구가 보였는지 */
+  infeedGuestEmptyPrompt?: boolean;
 }
 
 /**
@@ -832,6 +844,211 @@ export class YouTubeCapture extends BaseChannel {
     return screenshot;
   }
 
+  private async readYoutubeRichGridSnapshot(page: IPageHandle): Promise<{
+    richItems: number;
+    shelfItems: number;
+    videoRenderers: number;
+    pageSubtype: string | null;
+    hasFeedNudge: boolean;
+    /** `ytd-browse[page-subtype="trending"]` 내부만 — URL은 trending인데 홈 UI일 때 0으로 남는 경우가 많음 */
+    trendingGridTotal: number;
+    guestEmptySearchPrompt: boolean;
+  }> {
+    return page.evaluate(() => {
+      const firstBrowse = document.querySelector("ytd-browse");
+      const pageSubtype = firstBrowse?.getAttribute("page-subtype") ?? null;
+      const trendingBrowse = document.querySelector('ytd-browse[page-subtype="trending"]');
+      const trendingRichItems = trendingBrowse
+        ? trendingBrowse.querySelectorAll("ytd-rich-grid-renderer ytd-rich-item-renderer").length
+        : 0;
+      const trendingShelfItems = trendingBrowse
+        ? trendingBrowse.querySelectorAll(
+            "ytd-rich-shelf-renderer ytd-rich-item-renderer, ytd-rich-section-renderer ytd-rich-item-renderer"
+          ).length
+        : 0;
+      const trendingGridTotal = trendingRichItems + trendingShelfItems;
+
+      const richItems = document.querySelectorAll("ytd-rich-grid-renderer ytd-rich-item-renderer").length;
+      const shelfItems = document.querySelectorAll(
+        "ytd-rich-shelf-renderer ytd-rich-item-renderer, ytd-rich-section-renderer ytd-rich-item-renderer"
+      ).length;
+      const hasFeedNudge = !!document.querySelector("ytd-feed-nudge-renderer");
+      const videoRenderers = document.querySelectorAll("ytd-video-renderer").length;
+
+      const blob =
+        (document.querySelector("#primary")?.textContent || "") +
+        (document.querySelector("ytd-app")?.textContent?.slice(0, 14000) || "");
+      const guestEmptySearchPrompt =
+        /검색하여\s*시작/i.test(blob) ||
+        /Start\s+by\s+searching/i.test(blob) ||
+        /내가\s*좋아할\s*만한\s*동영상\s*피드/i.test(blob);
+
+      return {
+        richItems,
+        shelfItems,
+        videoRenderers,
+        pageSubtype,
+        hasFeedNudge,
+        trendingGridTotal,
+        guestEmptySearchPrompt,
+      };
+    });
+  }
+
+  private async reapplyPostNavigationChrome(
+    page: IPageHandle,
+    mastheadProfileDataUrl: string
+  ): Promise<void> {
+    await this.injectKoreanFonts(page);
+    await this.dismissYouTubeConsent(page);
+    await new Promise((r) => setTimeout(r, 1500));
+    await this.applyMastheadLoggedInLook(page, mastheadProfileDataUrl);
+  }
+
+  /**
+   * 인피드 홈: URL은 trending인데 DOM만 빈 홈인 경우가 있어, 리치 그리드가 보일 때까지 대기·리로드 후
+   * 그래도 부족하면 검색 결과로 이동해 surface=search 로 인젝션합니다.
+   */
+  private async ensureInfeedHomeFeedReady(
+    page: IPageHandle,
+    mastheadProfileDataUrl: string
+  ): Promise<{ injectSurface: InfeedSurface; richCount: number; pageSubtype: string | null }> {
+    const minTrendingCards = 4;
+    const timeoutMs = 38000;
+    const deadline = Date.now() + timeoutMs;
+    let injectSurface: InfeedSurface = "home";
+    let reloadCount = 0;
+    let localeFlipCount = 0;
+    let lastTrendingTotal = -1;
+    let stagnantIters = 0;
+
+    const isTrendingUrl = (u: string) => /\/feed\/trending/i.test(u);
+    const trendingFeedReady = (snap: Awaited<ReturnType<typeof this.readYoutubeRichGridSnapshot>>, url: string) =>
+      isTrendingUrl(url) &&
+      snap.trendingGridTotal >= minTrendingCards &&
+      !snap.guestEmptySearchPrompt;
+
+    while (Date.now() < deadline) {
+      const snap = await this.readYoutubeRichGridSnapshot(page);
+      const url = page.url();
+      const globalRich = snap.richItems + snap.shelfItems;
+
+      if (this.diagnostics) {
+        this.diagnostics.infeedRichGridCount = globalRich;
+        this.diagnostics.infeedTrendingGridCount = snap.trendingGridTotal;
+        this.diagnostics.infeedPageSubtype = snap.pageSubtype ?? undefined;
+        this.diagnostics.infeedGuestEmptyPrompt = snap.guestEmptySearchPrompt;
+      }
+
+      if (trendingFeedReady(snap, url)) {
+        return {
+          injectSurface,
+          richCount: snap.trendingGridTotal,
+          pageSubtype: snap.pageSubtype,
+        };
+      }
+
+      if (!isTrendingUrl(url)) {
+        console.warn(`[YouTube] 인피드 홈: 그리드 대기 중 URL이 트렌딩이 아님 (${url}) — 재이동합니다.`);
+        await page.goto("https://www.youtube.com/feed/trending?app=desktop&hl=ko&gl=KR", {
+          waitUntil: "networkidle2",
+          timeout: 45000,
+        });
+        await this.reapplyPostNavigationChrome(page, mastheadProfileDataUrl);
+        stagnantIters = 0;
+      } else if (
+        isTrendingUrl(url) &&
+        snap.guestEmptySearchPrompt &&
+        snap.trendingGridTotal < minTrendingCards &&
+        localeFlipCount < 1 &&
+        stagnantIters >= 6
+      ) {
+        localeFlipCount++;
+        stagnantIters = 0;
+        console.warn(
+          "[YouTube] 인피드 홈: URL은 trending인데 게스트 빈 홈 UI — 로케일 전환(en/US) 후 재시도합니다."
+        );
+        await page.goto(
+          `https://www.youtube.com/feed/trending?app=desktop&hl=en&gl=US&persist_app=1&cb=${Date.now()}`,
+          { waitUntil: "networkidle2", timeout: 45000 }
+        );
+        await this.reapplyPostNavigationChrome(page, mastheadProfileDataUrl);
+      }
+
+      if (snap.trendingGridTotal === lastTrendingTotal) stagnantIters++;
+      else {
+        stagnantIters = 0;
+        lastTrendingTotal = snap.trendingGridTotal;
+      }
+
+      if (stagnantIters >= 14 && reloadCount < 2) {
+        reloadCount++;
+        stagnantIters = 0;
+        console.warn("[YouTube] 인피드 홈: 트렌딩 그리드 정체 — 전체 리로드 후 재시도합니다.");
+        await Promise.all([
+          page.waitForNavigation({ waitUntil: "networkidle2", timeout: 45000 }),
+          page.evaluate<void>(`
+            (() => { window.location.reload(); })()
+          `),
+        ]);
+        await this.reapplyPostNavigationChrome(page, mastheadProfileDataUrl);
+      }
+
+      await page.evaluate<void>(`
+        (() => { window.scrollBy(0, 600); })()
+      `);
+      await new Promise((r) => setTimeout(r, 650));
+    }
+
+    let snap = await this.readYoutubeRichGridSnapshot(page);
+    const finalUrl = page.url();
+    if (trendingFeedReady(snap, finalUrl)) {
+      return {
+        injectSurface,
+        richCount: snap.trendingGridTotal,
+        pageSubtype: snap.pageSubtype,
+      };
+    }
+
+    const total = snap.trendingGridTotal;
+    console.warn(
+      `[YouTube] 인피드 홈: 트렌딩 전용 그리드 미확보 (trending내부=${total}, 게스트빈홈문구=${snap.guestEmptySearchPrompt}) — 검색 결과로 폴백합니다.`
+    );
+    await page.goto(
+      `https://www.youtube.com/results?search_query=${encodeURIComponent("official music video")}`,
+      { waitUntil: "networkidle2", timeout: 45000 }
+    );
+    await this.reapplyPostNavigationChrome(page, mastheadProfileDataUrl);
+    injectSurface = "search";
+    await page
+      .waitForSelector("ytd-two-column-search-results-renderer ytd-video-renderer", {
+        timeout: 22000,
+      })
+      .catch(() => {
+        console.warn("[YouTube] 인피드 홈(검색 폴백): 비디오 결과 행 대기 타임아웃 — 그대로 인젝션 시도");
+      });
+
+    const searchDeadline = Date.now() + 16000;
+    while (Date.now() < searchDeadline) {
+      snap = await this.readYoutubeRichGridSnapshot(page);
+      if (snap.videoRenderers >= 6) break;
+      await page.evaluate<void>(`
+        (() => { window.scrollBy(0, 500); })()
+      `);
+      await new Promise((r) => setTimeout(r, 500));
+    }
+    snap = await this.readYoutubeRichGridSnapshot(page);
+    const searchListRich = snap.richItems + snap.shelfItems;
+    if (this.diagnostics) {
+      this.diagnostics.infeedRichGridCount = searchListRich;
+      this.diagnostics.infeedTrendingGridCount = snap.trendingGridTotal;
+      this.diagnostics.infeedPageSubtype = snap.pageSubtype ?? undefined;
+      this.diagnostics.infeedVideoRendererCount = snap.videoRenderers;
+      this.diagnostics.infeedGuestEmptyPrompt = snap.guestEmptySearchPrompt;
+    }
+    return { injectSurface, richCount: snap.videoRenderers, pageSubtype: snap.pageSubtype };
+  }
+
   /**
    * 인피드 동영상 광고 — 홈 / 검색 / 관련동영상(시청 사이드바) 카드 UI 주입
    */
@@ -941,8 +1158,8 @@ export class YouTubeCapture extends BaseChannel {
 
     let targetUrl = request.publisherUrl;
     if (adType === "infeed-home") {
-      /** 비로그인 `/` 는 문구·그리드가 shadow/숏스 행 때문에 휴리스틱이 자주 실패함 → 그리드 보장을 위해 인기만 사용 */
-      targetUrl = "https://www.youtube.com/feed/trending";
+      /** 비로그인 `/` 는 빈 홈·리다이렉트가 잦음 → 데스크톱·로케일을 고정한 트렌딩 URL로 그리드 확보 */
+      targetUrl = "https://www.youtube.com/feed/trending?app=desktop&hl=ko&gl=KR";
       console.log("[YouTube] 인피드 홈: 추천 그리드 확보를 위해 /feed/trending 에서 캡처합니다.");
     } else if (adType === "infeed-search") {
       const q = (infeedOpts.searchQuery?.trim() || "시세이도").slice(0, 200);
@@ -957,7 +1174,7 @@ export class YouTubeCapture extends BaseChannel {
         console.warn(
           `[YouTube] 인피드 홈: 첫 이동 후 URL이 트렌딩이 아님 (${opened}) — /feed/trending 으로 재이동합니다.`
         );
-        await page.goto("https://www.youtube.com/feed/trending?app=desktop", {
+        await page.goto("https://www.youtube.com/feed/trending?app=desktop&hl=ko&gl=KR", {
           waitUntil: "networkidle2",
           timeout: 45000,
         });
@@ -1006,7 +1223,7 @@ export class YouTubeCapture extends BaseChannel {
           console.warn(
             `[YouTube] 인피드 홈: 동의 처리 후 URL이 트렌딩이 아님 (${opened}) — /feed/trending 으로 재이동합니다.`
           );
-          await page.goto("https://www.youtube.com/feed/trending?app=desktop", {
+          await page.goto("https://www.youtube.com/feed/trending?app=desktop&hl=ko&gl=KR", {
             waitUntil: "networkidle2",
             timeout: 45000,
           });
@@ -1014,7 +1231,18 @@ export class YouTubeCapture extends BaseChannel {
       }
     }
 
-    if (surface === "home") {
+    let injectSurface: InfeedSurface = surface;
+    if (adType === "infeed-home") {
+      const ready = await this.ensureInfeedHomeFeedReady(page, mastheadProfileDataUrl);
+      injectSurface = ready.injectSurface;
+      if (this.diagnostics) {
+        this.diagnostics.infeedRichGridCount = ready.richCount;
+        this.diagnostics.infeedPageSubtype = ready.pageSubtype ?? undefined;
+        this.diagnostics.infeedInjectSurface = injectSurface;
+      }
+    }
+
+    if (injectSurface === "home") {
       await page.evaluate<void>(`
         (() => {
           for (let i = 0; i < 6; i++) {
@@ -1026,7 +1254,7 @@ export class YouTubeCapture extends BaseChannel {
       await new Promise((r) => setTimeout(r, 2200));
     }
 
-    if (surface === "search") {
+    if (injectSurface === "search") {
       await page.evaluate<void>(`
         (() => {
           window.scrollTo({ top: 0, behavior: 'instant' });
@@ -1035,7 +1263,7 @@ export class YouTubeCapture extends BaseChannel {
     }
 
     let injected = await page.evaluate(runInfeedInjectInPage, {
-      surface,
+      surface: injectSurface,
       thumbDataUrl: creativeDataUrl,
       avatarDataUrl,
       title,
@@ -1047,11 +1275,11 @@ export class YouTubeCapture extends BaseChannel {
     });
     this.diagnostics.injectionSuccess = injected;
 
-    if (!injected && surface === "home") {
+    if (!injected && injectSurface === "home") {
       console.warn(
         "[YouTube] 홈(/) 인젝션 실패 — 인기 탭으로 이동 후 그리드 첫 칸에 재시도합니다."
       );
-      await page.goto("https://www.youtube.com/feed/trending", {
+      await page.goto("https://www.youtube.com/feed/trending?app=desktop&hl=ko&gl=KR", {
         waitUntil: "networkidle2",
         timeout: 45000,
       });
@@ -1060,7 +1288,7 @@ export class YouTubeCapture extends BaseChannel {
       await new Promise((r) => setTimeout(r, 2000));
       await this.applyMastheadLoggedInLook(page, mastheadProfileDataUrl);
       injected = await page.evaluate(runInfeedInjectInPage, {
-        surface,
+        surface: injectSurface,
         thumbDataUrl: creativeDataUrl,
         avatarDataUrl,
         title,
@@ -1090,9 +1318,17 @@ export class YouTubeCapture extends BaseChannel {
     this.diagnostics.infeedCaptureUrl = page.url();
 
     const screenshot = await page.screenshot({ fullPage: false, type: "png" });
-    console.log(
-      `[YouTube] ===== 인피드 캡처 완료 (${surface}) url=${this.diagnostics.infeedCaptureUrl ?? ""} =====`
-    );
+    if (adType === "infeed-home") {
+      const d = this.diagnostics;
+      console.log(
+        `[YouTube] ===== 인피드 캡처 완료 (${injectSurface}) url=${d?.infeedCaptureUrl ?? ""} ` +
+          `trending내부=${d?.infeedTrendingGridCount ?? "-"} guest빈홈=${d?.infeedGuestEmptyPrompt ?? "-"} =====`
+      );
+    } else {
+      console.log(
+        `[YouTube] ===== 인피드 캡처 완료 (${injectSurface}) url=${this.diagnostics.infeedCaptureUrl ?? ""} =====`
+      );
+    }
     return screenshot;
   }
 
