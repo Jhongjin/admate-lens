@@ -406,7 +406,8 @@ interface CaptureFormData {
   instreamSkipMode: "skippable" | "non-skippable";
   /** GDN 게재면 캡처: PC 뷰포트 vs 모바일 뷰포트 */
   gdnViewportMode: "pc" | "mobile";
-  /** 인피드 — 검색어(검색 지면), 설명 줄(관련동영상), CTA 문구 덮어쓰기 */
+  /** 인피드 — 광고주 YouTube 영상 URL(썸네일 자동), 검색어, 설명, CTA */
+  infeedVideoUrl: string;
   infeedSearchQuery: string;
   infeedDescription1: string;
   infeedDescription2: string;
@@ -479,6 +480,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
     instreamUseChannelBanner: true,
     instreamEnableCompanionBanner: true,
     gdnViewportMode: "pc",
+    infeedVideoUrl: "",
     infeedSearchQuery: "시세이도",
     infeedDescription1: "",
     infeedDescription2: "",
@@ -911,7 +913,10 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
 
   const hasValidSource = isYoutubeInstream
     ? form.instreamVideoUrl && isValidUrl(form.instreamVideoUrl)
-    : form.creativeUrl && isValidUrl(form.creativeUrl);
+    : isYoutubeInfeed
+      ? (form.creativeUrl.trim() && isValidUrl(form.creativeUrl.trim())) ||
+        (form.infeedVideoUrl.trim() && isValidUrl(form.infeedVideoUrl.trim()))
+      : form.creativeUrl && isValidUrl(form.creativeUrl);
 
   const isFormValid =
     (isYouTubeChannel || form.selectedPublishers.length > 0) &&
@@ -1033,6 +1038,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
           infeedOpts:
             form.channel === "youtube" && isYoutubeInfeed
               ? {
+                  videoUrl: form.infeedVideoUrl.trim() || undefined,
                   searchQuery: form.infeedSearchQuery || undefined,
                   description1: form.infeedDescription1 || undefined,
                   description2: form.infeedDescription2 || undefined,
@@ -1080,6 +1086,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
         instreamUseChannelBanner: true,
         instreamSkipMode: "skippable",
         gdnViewportMode: "pc",
+        infeedVideoUrl: "",
         infeedSearchQuery: "시세이도",
         infeedDescription1: "",
         infeedDescription2: "",
@@ -1167,13 +1174,22 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                     channel: "youtube",
                     youtubeAdType: "mobile-preroll-aos",
                   }));
+                } else if (next === "infeed") {
+                  setForm((prev) => ({
+                    ...prev,
+                    channel: "youtube",
+                    youtubeAdType: "infeed-home",
+                  }));
                 } else {
                   setForm((prev) => ({ ...prev, channel: "gdn", gdnViewportMode: "pc" }));
                 }
               }}
             >
               {selectedMediaMenu === "youtube" ? (
-                <option value="instream">Instream</option>
+                <>
+                  <option value="instream">Instream</option>
+                  <option value="infeed">In-feed</option>
+                </>
               ) : (
                 <option value="network-ads">Network Ads</option>
               )}
@@ -1865,10 +1881,44 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                   className="text-[11px] mb-3"
                   style={{ color: "var(--color-text-muted)" }}
                 >
-                  썸네일(소재 이미지) 필수입니다. 제목·스폰서명·채널 아이콘은 아래에서
-                  지정할 수 있습니다. CTA 문구를 비우면 지면 유형별 기본값이 적용됩니다.
+                  <span style={{ color: "var(--color-error)" }}>※</span> 광고 영상 URL과
+                  하단 소재 이미지 중 <strong>최소 하나</strong>는 입력해야 합니다. 제목·스폰서명·
+                  채널 아이콘은 아래에서 지정할 수 있고, CTA는 비우면 지면 유형별 기본값이
+                  적용됩니다.
                 </p>
                 <div className="space-y-3">
+                  <div>
+                    <label
+                      className="text-[11px] font-medium mb-1 block"
+                      style={{ color: "var(--color-text-secondary)" }}
+                    >
+                      ▶️ 광고 영상 URL{" "}
+                      <span
+                        className="text-[10px] font-normal"
+                        style={{ color: "var(--color-text-muted)" }}
+                      >
+                        (YouTube watch / youtu.be — 썸네일 자동)
+                      </span>
+                    </label>
+                    <input
+                      type="url"
+                      className="form-input"
+                      placeholder="https://www.youtube.com/watch?v=..."
+                      value={form.infeedVideoUrl}
+                      onChange={(e) =>
+                        setForm((prev) => ({
+                          ...prev,
+                          infeedVideoUrl: e.target.value,
+                        }))
+                      }
+                    />
+                    <p
+                      className="text-[10px] mt-0.5"
+                      style={{ color: "var(--color-text-muted)" }}
+                    >
+                      소재 이미지를 함께 넣으면 이미지가 썸네일로 우선합니다.
+                    </p>
+                  </div>
                   {form.youtubeAdType === "infeed-search" && (
                     <div>
                       <label
@@ -2118,7 +2168,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                   {isYoutubeInfeed ? (
                     <>
                       인피드는 홈·검색·관련동영상 각각 실제 URL로 열린 뒤 카드 UI가
-                      합성됩니다. 소재(썸네일) URL은 필수입니다.
+                      합성됩니다. 광고 영상 URL 또는 소재 이미지 중 하나는 필요합니다.
                     </>
                   ) : (
                     <>
@@ -2450,7 +2500,14 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
         <div className="mb-5">
           <div className="flex items-center justify-between mb-2">
             <label className="form-label mb-0">
-              소재 이미지 <span style={{ color: "var(--color-error)" }}>*</span>
+              소재 이미지{" "}
+              {isYoutubeInfeed ? (
+                <span className="text-[10px] font-normal" style={{ color: "var(--color-text-muted)" }}>
+                  (선택 — 광고 영상 URL만으로도 가능)
+                </span>
+              ) : (
+                <span style={{ color: "var(--color-error)" }}>*</span>
+              )}
             </label>
             {/* 모드 전환 탭 */}
             <div

@@ -77,6 +77,8 @@ async function imageUrlToDataUrl(imageUrl: string): Promise<{ dataUrl: string; s
 
 /** 인스트림 메타데이터 (API·폼에서 options.instreamOpts 로 전달) */
 type InfeedOptsPayload = {
+  /** 광고주 YouTube 영상 URL — 소재 이미지가 없을 때 썸네일 자동 추출 */
+  videoUrl?: string;
   searchQuery?: string;
   description1?: string;
   description2?: string;
@@ -856,13 +858,40 @@ export class YouTubeCapture extends BaseChannel {
     const infeedOpts = (request.options?.infeedOpts as InfeedOptsPayload | undefined) ?? {};
 
     const rawCreative = (request.creativeUrl || "").trim();
-    const { dataUrl: creativeDataUrl, sizeKB, ok } = rawCreative
-      ? await imageUrlToDataUrl(rawCreative)
+    const infeedVideo = infeedOpts.videoUrl?.trim() || "";
+    let creativeFetchUrl = "";
+    if (rawCreative) {
+      if (/youtube\.com|youtu\.be/i.test(rawCreative)) {
+        const id = extractVideoId(rawCreative);
+        creativeFetchUrl = id ? getThumbnailUrl(id) : rawCreative;
+      } else {
+        creativeFetchUrl = rawCreative;
+      }
+    }
+    if (!creativeFetchUrl && infeedVideo) {
+      const id = extractVideoId(infeedVideo);
+      if (id) creativeFetchUrl = getThumbnailUrl(id);
+    }
+    let { dataUrl: creativeDataUrl, sizeKB, ok } = creativeFetchUrl
+      ? await imageUrlToDataUrl(creativeFetchUrl)
       : { dataUrl: "", sizeKB: 0, ok: false };
+    const fallbackVid =
+      extractVideoId(infeedVideo) ||
+      (rawCreative && /youtube\.com|youtu\.be/i.test(rawCreative) ? extractVideoId(rawCreative) : null);
+    if (!ok && fallbackVid) {
+      const fb = await imageUrlToDataUrl(`https://img.youtube.com/vi/${fallbackVid}/hqdefault.jpg`);
+      if (fb.ok) {
+        creativeDataUrl = fb.dataUrl;
+        sizeKB = fb.sizeKB;
+        ok = true;
+      }
+    }
     this.diagnostics.creativeDownloaded = ok;
     this.diagnostics.creativeBase64Size = sizeKB;
     if (!ok || !creativeDataUrl) {
-      console.error("[YouTube] 인피드: 소재 이미지(creativeUrl)가 필요합니다.");
+      console.error(
+        "[YouTube] 인피드: 소재 이미지(creativeUrl) 또는 광고 영상 URL(videoUrl)로 썸네일을 확보해야 합니다."
+      );
     }
 
     let avatarDataUrl = creativeDataUrl;

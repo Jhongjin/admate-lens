@@ -74,6 +74,7 @@ export async function POST(request: NextRequest) {
         | "infeed-search"
         | "infeed-watch-next";
       infeedOpts?: {
+        videoUrl?: string;
         searchQuery?: string;
         description1?: string;
         description2?: string;
@@ -115,9 +116,18 @@ export async function POST(request: NextRequest) {
         youtubeAdType === "mobile-preroll-aos" ||
         youtubeAdType === "mobile-preroll-ios");
     const hasValidVideoSource = isPreroll && isValidHttpUrl(instreamOpts?.videoUrl);
+    const isInfeedYt =
+      channel === "youtube" &&
+      (youtubeAdType === "infeed-home" ||
+        youtubeAdType === "infeed-search" ||
+        youtubeAdType === "infeed-watch-next");
     /** 인피드·디스플레이·오버레이 등 프리롤이 아닌 YouTube 유형 */
     const hasValidCreativeSource = !isPreroll && isValidHttpUrl(creativeUrl);
-    const hasSource = hasValidVideoSource || hasValidCreativeSource;
+    const hasValidInfeedThumbSource =
+      isInfeedYt &&
+      (isValidHttpUrl(creativeUrl) || isValidHttpUrl(infeedOpts?.videoUrl));
+    const hasSource =
+      hasValidVideoSource || hasValidInfeedThumbSource || (!isPreroll && !isInfeedYt && isValidHttpUrl(creativeUrl));
 
     if (!channel || normalizedUrls.length === 0 || !hasSource) {
       return NextResponse.json(
@@ -151,12 +161,17 @@ export async function POST(request: NextRequest) {
               : "pc"
             : undefined,
       };
+      const creativeUrlForRow =
+        (creativeUrl && creativeUrl.trim()) ||
+        (isInfeedYt && infeedOpts?.videoUrl?.trim()) ||
+        "";
+
       const { data, error } = await supabase
         .from("vision_da_captures")
         .insert({
           channel,
           source_url: url,
-          creative_url: creativeUrl,
+          creative_url: creativeUrlForRow,
           click_url: clickUrl ?? null,
           capture_landing: captureLanding ?? false,
           status: "pending",
