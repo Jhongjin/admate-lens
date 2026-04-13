@@ -218,12 +218,12 @@ export function runInfeedInjectInPage(...args: unknown[]): boolean {
             <img src="${thumb}" alt="" style="width:100%;height:100%;object-fit:cover;display:block;" />
             ${extIcon}
           </div>
-          <div style="flex:1;min-width:0;padding-top:0;max-width:600px;">
-            <div style="position:relative;min-height:58px;padding-right:40px;">
-              <h3 style="margin:0;font-size:2.2rem;font-weight:400;line-height:3rem;color:var(--yt-spec-text-primary,#0f0f0f);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">${esc(
+          <div style="flex:1;min-width:0;padding-top:0;width:100%;max-width:none;">
+            <div style="display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:start;column-gap:8px;min-height:58px;width:100%;">
+              <h3 style="margin:0;font-size:2.2rem;font-weight:400;line-height:3rem;color:var(--yt-spec-text-primary,#0f0f0f);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;max-width:100%;">${esc(
                 title
               )}</h3>
-              <div style="position:absolute;top:-2px;right:-6px;z-index:4;">${menuBtnSearch}</div>
+              <div style="justify-self:end;align-self:start;z-index:4;">${menuBtnSearch}</div>
             </div>
             ${
               d1
