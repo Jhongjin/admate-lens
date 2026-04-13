@@ -442,6 +442,25 @@ function isValidUrl(str: string): boolean {
   }
 }
 
+/** `www...`, `youtube.com/...`처럼 스킴이 없으면 https를 붙여 처리 (type=url 제약 회피) */
+function normalizeHttpUrl(raw: string): string {
+  const t = raw.trim();
+  if (!t) return "";
+  if (/^https?:\/\//i.test(t)) return t;
+  return `https://${t.replace(/^\/+/, "")}`;
+}
+
+function isValidHttpSource(raw: string): boolean {
+  const t = raw.trim();
+  if (!t) return false;
+  try {
+    const url = new URL(normalizeHttpUrl(t));
+    return url.protocol === "http:" || url.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
 /** 파일 크기 포맷 */
 function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes}B`;
@@ -912,10 +931,10 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
   );
 
   const hasValidSource = isYoutubeInstream
-    ? form.instreamVideoUrl && isValidUrl(form.instreamVideoUrl)
+    ? form.instreamVideoUrl.trim().length > 0 && isValidHttpSource(form.instreamVideoUrl)
     : isYoutubeInfeed
-      ? (form.creativeUrl.trim() && isValidUrl(form.creativeUrl.trim())) ||
-        (form.infeedVideoUrl.trim() && isValidUrl(form.infeedVideoUrl.trim()))
+      ? (form.creativeUrl.trim() && isValidHttpSource(form.creativeUrl.trim())) ||
+        (form.infeedVideoUrl.trim() && isValidHttpSource(form.infeedVideoUrl.trim()))
       : form.creativeUrl && isValidUrl(form.creativeUrl);
 
   const isFormValid =
@@ -990,7 +1009,9 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
           instreamOpts:
             form.channel === "youtube" && isYoutubeInstream
               ? {
-                  videoUrl: form.instreamVideoUrl || undefined,
+                  videoUrl: form.instreamVideoUrl.trim()
+                    ? normalizeHttpUrl(form.instreamVideoUrl)
+                    : undefined,
                   skipSeconds: (() => {
                     const n = parseInt(form.instreamCaptureSecond, 10);
                     return Number.isFinite(n) && n >= 0 ? n : 5;
@@ -1000,27 +1021,39 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                   ctaText: form.instreamEnableCtaText
                     ? form.instreamCtaText || undefined
                     : undefined,
-                  landingUrl: form.instreamLandingUrl || undefined,
+                  landingUrl: form.instreamLandingUrl.trim()
+                    ? normalizeHttpUrl(form.instreamLandingUrl)
+                    : undefined,
                   displayUrl: form.instreamDisplayUrl || undefined,
                   displayPath1: form.instreamDisplayPath1 || undefined,
                   displayPath2: form.instreamDisplayPath2 || undefined,
                   avatarImageUrl:
                     isMobilePreroll
                       ? form.instreamLogoSource === "upload"
-                        ? form.instreamLogoImageUrl || undefined
+                        ? form.instreamLogoImageUrl.trim()
+                          ? normalizeHttpUrl(form.instreamLogoImageUrl)
+                          : undefined
                         : undefined
-                      : form.instreamLogoImageUrl || undefined,
+                      : form.instreamLogoImageUrl.trim()
+                        ? normalizeHttpUrl(form.instreamLogoImageUrl)
+                        : undefined,
                   companionImageUrl:
                     form.instreamUseChannelBanner
                       ? undefined
-                      : form.instreamCompanionImageUrl || undefined,
+                      : form.instreamCompanionImageUrl.trim()
+                        ? normalizeHttpUrl(form.instreamCompanionImageUrl)
+                        : undefined,
                   companionChannelUrl:
                     isMobilePreroll
                       ? form.instreamLogoSource === "channel"
-                        ? form.instreamCompanionChannelUrl || undefined
+                        ? form.instreamCompanionChannelUrl.trim()
+                          ? normalizeHttpUrl(form.instreamCompanionChannelUrl)
+                          : undefined
                         : undefined
                       : form.instreamUseChannelBanner
-                        ? form.instreamCompanionChannelUrl || undefined
+                        ? form.instreamCompanionChannelUrl.trim()
+                          ? normalizeHttpUrl(form.instreamCompanionChannelUrl)
+                          : undefined
                         : undefined,
                   companionUseChannelBanner: form.instreamUseChannelBanner,
                   enableCompanionBanner: form.instreamEnableCompanionBanner,
@@ -1029,16 +1062,24 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
               : form.channel === "youtube" && isYoutubeInfeed
                 ? {
                     adTitle: form.instreamAdTitle || undefined,
-                    landingUrl: form.instreamLandingUrl || undefined,
+                    landingUrl: form.instreamLandingUrl.trim()
+                      ? normalizeHttpUrl(form.instreamLandingUrl)
+                      : undefined,
                     displayUrl: form.instreamDisplayUrl || undefined,
-                    avatarImageUrl: form.instreamLogoImageUrl || undefined,
-                    companionChannelUrl: form.instreamCompanionChannelUrl || undefined,
+                    avatarImageUrl: form.instreamLogoImageUrl.trim()
+                      ? normalizeHttpUrl(form.instreamLogoImageUrl)
+                      : undefined,
+                    companionChannelUrl: form.instreamCompanionChannelUrl.trim()
+                      ? normalizeHttpUrl(form.instreamCompanionChannelUrl)
+                      : undefined,
                   }
                 : undefined,
           infeedOpts:
             form.channel === "youtube" && isYoutubeInfeed
               ? {
-                  videoUrl: form.infeedVideoUrl.trim() || undefined,
+                  videoUrl: form.infeedVideoUrl.trim()
+                    ? normalizeHttpUrl(form.infeedVideoUrl.trim())
+                    : undefined,
                   searchQuery: form.infeedSearchQuery || undefined,
                   description1: form.infeedDescription1 || undefined,
                   description2: form.infeedDescription2 || undefined,
@@ -1833,9 +1874,11 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                               className="hidden"
                             />
                             <input
-                              type="url"
+                              type="text"
+                              inputMode="url"
+                              autoComplete="url"
                               className="form-input"
-                              placeholder="또는 이미지 URL 직접 입력"
+                              placeholder="또는 이미지 URL (스킴 생략 가능)"
                               value={form.instreamCompanionImageUrl}
                               onChange={(e) =>
                                 setForm((prev) => ({
@@ -1901,9 +1944,11 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                       </span>
                     </label>
                     <input
-                      type="url"
+                      type="text"
+                      inputMode="url"
+                      autoComplete="url"
                       className="form-input"
-                      placeholder="https://www.youtube.com/watch?v=..."
+                      placeholder="https://www.youtube.com/watch?v=... 또는 www.youtube.com/..."
                       value={form.infeedVideoUrl}
                       onChange={(e) =>
                         setForm((prev) => ({
@@ -2056,9 +2101,11 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                       채널 아이콘 — 프로필 이미지 URL (선택)
                     </label>
                     <input
-                      type="url"
+                      type="text"
+                      inputMode="url"
+                      autoComplete="url"
                       className="form-input"
-                      placeholder="https://..."
+                      placeholder="https://... (스킴 없이 www... 도 가능)"
                       value={form.instreamLogoImageUrl}
                       onChange={(e) =>
                         setForm((prev) => ({
@@ -2082,9 +2129,11 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                       채널 URL (아이콘 자동 추출용, 선택)
                     </label>
                     <input
-                      type="url"
+                      type="text"
+                      inputMode="url"
+                      autoComplete="url"
                       className="form-input"
-                      placeholder="https://www.youtube.com/@brand"
+                      placeholder="www.youtube.com/@brand (https 없이 입력 가능)"
                       value={form.instreamCompanionChannelUrl}
                       onChange={(e) =>
                         setForm((prev) => ({

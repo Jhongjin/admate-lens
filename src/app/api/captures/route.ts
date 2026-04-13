@@ -18,10 +18,17 @@ import type { ChannelType, VisionDaCaptureRow } from "@/lib/supabase/types";
 export const maxDuration = 300; // 5분
 export const dynamic = "force-dynamic";
 
+function normalizeHttpUrl(raw: string): string {
+  const t = raw.trim();
+  if (!t) return "";
+  if (/^https?:\/\//i.test(t)) return t;
+  return `https://${t.replace(/^\/+/, "")}`;
+}
+
 function isValidHttpUrl(value?: string | null): boolean {
-  if (!value) return false;
+  if (!value?.trim()) return false;
   try {
-    const url = new URL(value);
+    const url = new URL(normalizeHttpUrl(value));
     return url.protocol === "http:" || url.protocol === "https:";
   } catch {
     return false;
@@ -109,7 +116,9 @@ export async function POST(request: NextRequest) {
         : [];
 
     // 인스트림 광고는 creativeUrl 대신 videoUrl 사용 (PC/모바일 공통)
-    const normalizedUrls = urls.filter((url) => isValidHttpUrl(url));
+    const normalizedUrls = urls
+      .map((u) => (u.trim() ? normalizeHttpUrl(u) : ""))
+      .filter((url) => isValidHttpUrl(url));
     const isPreroll =
       channel === "youtube" &&
       (youtubeAdType === "preroll" ||
@@ -142,6 +151,36 @@ export async function POST(request: NextRequest) {
     const supabase = createServerClient();
     const createdCaptures: any[] = [];
 
+    const instreamOptsNormalized =
+      instreamOpts &&
+      ({
+        ...instreamOpts,
+        videoUrl: instreamOpts.videoUrl?.trim()
+          ? normalizeHttpUrl(instreamOpts.videoUrl)
+          : undefined,
+        landingUrl: instreamOpts.landingUrl?.trim()
+          ? normalizeHttpUrl(instreamOpts.landingUrl)
+          : undefined,
+        companionImageUrl: instreamOpts.companionImageUrl?.trim()
+          ? normalizeHttpUrl(instreamOpts.companionImageUrl)
+          : undefined,
+        companionChannelUrl: instreamOpts.companionChannelUrl?.trim()
+          ? normalizeHttpUrl(instreamOpts.companionChannelUrl)
+          : undefined,
+        avatarImageUrl: instreamOpts.avatarImageUrl?.trim()
+          ? normalizeHttpUrl(instreamOpts.avatarImageUrl)
+          : undefined,
+      } as typeof instreamOpts);
+
+    const infeedOptsNormalized =
+      infeedOpts &&
+      ({
+        ...infeedOpts,
+        videoUrl: infeedOpts.videoUrl?.trim()
+          ? normalizeHttpUrl(infeedOpts.videoUrl)
+          : undefined,
+      } as typeof infeedOpts);
+
     // 각 URL마다 캡처 요청 생성
     for (const url of normalizedUrls) {
       const requestMetadata = {
@@ -152,8 +191,8 @@ export async function POST(request: NextRequest) {
         targetAdSizes,
         creativeObjectFit: normalizedCreativeObjectFit,
         youtubeAdType,
-        instreamOpts,
-        infeedOpts,
+        instreamOpts: instreamOptsNormalized ?? instreamOpts,
+        infeedOpts: infeedOptsNormalized ?? infeedOpts,
         gdnViewportMode:
           channel === "gdn"
             ? gdnViewportMode === "mobile"
@@ -162,8 +201,10 @@ export async function POST(request: NextRequest) {
             : undefined,
       };
       const creativeUrlForRow =
-        (creativeUrl && creativeUrl.trim()) ||
-        (isInfeedYt && infeedOpts?.videoUrl?.trim()) ||
+        (creativeUrl?.trim() ? normalizeHttpUrl(creativeUrl) : "") ||
+        (isInfeedYt && infeedOpts?.videoUrl?.trim()
+          ? normalizeHttpUrl(infeedOpts.videoUrl)
+          : "") ||
         "";
 
       const { data, error } = await supabase

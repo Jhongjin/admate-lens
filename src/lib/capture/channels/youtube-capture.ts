@@ -986,6 +986,25 @@ export class YouTubeCapture extends BaseChannel {
       await this.applyMastheadLoggedInLook(page, mastheadProfileDataUrl);
     }
 
+    if (surface === "home") {
+      const hasFeedItems = await page.evaluate<boolean>(`
+        (() => !!document.querySelector("ytd-rich-grid-renderer ytd-rich-item-renderer"))()
+      `);
+      if (!hasFeedItems) {
+        console.warn(
+          "[YouTube] 인피드 홈: 추천 그리드가 없어 /feed/trending 으로 열어 주변 콘텐츠를 채웁니다."
+        );
+        await page.goto("https://www.youtube.com/feed/trending", {
+          waitUntil: "networkidle2",
+          timeout: 45000,
+        });
+        await this.injectKoreanFonts(page);
+        await this.dismissYouTubeConsent(page);
+        await new Promise((r) => setTimeout(r, 2000));
+        await this.applyMastheadLoggedInLook(page, mastheadProfileDataUrl);
+      }
+    }
+
     if (surface === "search") {
       await page.evaluate<void>(`
         (() => {

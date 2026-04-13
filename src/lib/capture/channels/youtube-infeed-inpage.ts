@@ -65,8 +65,9 @@ export function runInfeedInjectInPage(...args: unknown[]): boolean {
       )}</button></div>`;
     };
 
+    /** YouTube 인피드 썸네일 우하단: 작은 직사각 배지 + 단순 대각 화살표(박스형 외부링크 아이콘과 구분) */
     const extIcon =
-      '<span style="position:absolute;bottom:8px;right:8px;width:28px;height:28px;border-radius:4px;background:rgba(0,0,0,0.55);display:flex;align-items:center;justify-content:center;"><svg width="14" height="14" viewBox="0 0 24 24" fill="#fff"><path d="M19 19H5V5h7V3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"/></svg></span>';
+      '<span style="position:absolute;bottom:4px;right:4px;width:24px;height:20px;border-radius:2px;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;box-sizing:border-box;"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M7 17L17 7M17 7H10M17 7V14" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>';
 
     const buildHomeFeedCard = (): HTMLElement => {
       const wrap = document.createElement("div");
