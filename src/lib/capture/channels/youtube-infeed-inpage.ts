@@ -68,19 +68,11 @@ export function runInfeedInjectInPage(...args: unknown[]): boolean {
     const extIcon =
       '<span style="position:absolute;bottom:8px;right:8px;width:28px;height:28px;border-radius:4px;background:rgba(0,0,0,0.55);display:flex;align-items:center;justify-content:center;"><svg width="14" height="14" viewBox="0 0 24 24" fill="#fff"><path d="M19 19H5V5h7V3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"/></svg></span>';
 
-    if (p.surface === "home") {
-      const richItem = document.querySelector("ytd-rich-grid-renderer ytd-rich-item-renderer");
-      if (!richItem) {
-        console.warn("[admate infeed] home: rich-item 없음");
-        return false;
-      }
-      const host = (richItem.querySelector("#dismissable") as HTMLElement) || (richItem as HTMLElement);
-      host.innerHTML = "";
+    const buildHomeFeedCard = (): HTMLElement => {
       const wrap = document.createElement("div");
       wrap.setAttribute("data-injected", "admate-youtube-infeed");
       wrap.style.cssText =
-        "width:100%;box-sizing:border-box;font-family:Roboto,'Noto Sans KR',Arial,sans-serif;border-radius:12px;overflow:hidden;background:var(--yt-spec-base-background,#fff);";
-
+        "width:100%;box-sizing:border-box;font-family:Roboto,'Noto Sans KR',Arial,sans-serif;border-radius:12px;overflow:hidden;background:var(--yt-spec-base-background,#fff);border:1px solid var(--yt-spec-10-percent-layer,#e5e5e5);";
       wrap.innerHTML = `
         <div style="position:relative;width:100%;aspect-ratio:16/9;background:#000;">
           <img src="${thumb}" alt="" style="width:100%;height:100%;object-fit:cover;display:block;" />
@@ -100,8 +92,54 @@ export function runInfeedInjectInPage(...args: unknown[]): boolean {
           </div>
           ${btnRow(false)}
         </div>`;
-      host.appendChild(wrap);
-      return true;
+      return wrap;
+    };
+
+    if (p.surface === "home") {
+      const richItem = document.querySelector("ytd-rich-grid-renderer ytd-rich-item-renderer");
+      if (richItem) {
+        const host = (richItem.querySelector("#dismissable") as HTMLElement) || (richItem as HTMLElement);
+        host.innerHTML = "";
+        host.appendChild(buildHomeFeedCard());
+        console.log("[admate infeed] home: 첫 rich-item 치환");
+        return true;
+      }
+
+      const gridContents = document.querySelector("ytd-rich-grid-renderer #contents") as HTMLElement | null;
+      if (gridContents) {
+        const row = document.createElement("div");
+        row.style.cssText =
+          "display:block;padding:8px 16px 16px;box-sizing:border-box;max-width:420px;";
+        row.appendChild(buildHomeFeedCard());
+        gridContents.insertBefore(row, gridContents.firstChild);
+        console.log("[admate infeed] home: 빈 그리드 #contents 상단 삽입");
+        return true;
+      }
+
+      const primary =
+        (document.querySelector("ytd-browse[page-subtype='home'] #primary") as HTMLElement | null) ||
+        (document.querySelector("ytd-two-column-browse-results-renderer #primary") as HTMLElement | null) ||
+        (document.querySelector("ytd-app[layout] #primary") as HTMLElement | null) ||
+        (document.querySelector("#columns #primary") as HTMLElement | null);
+      if (primary) {
+        const slot = document.createElement("div");
+        slot.style.cssText =
+          "padding:16px 24px 24px 36px;box-sizing:border-box;max-width:420px;";
+        slot.appendChild(buildHomeFeedCard());
+        const chipBar = primary.querySelector(
+          "ytd-feed-filter-chip-bar-renderer, yt-chip-cloud-renderer, ytd-rich-grid-renderer"
+        );
+        if (chipBar && chipBar.parentNode === primary) {
+          chipBar.insertAdjacentElement("afterend", slot);
+        } else {
+          primary.insertBefore(slot, primary.firstChild);
+        }
+        console.log("[admate infeed] home: #primary 폴백(빈 홈·검색 유도 화면)");
+        return true;
+      }
+
+      console.warn("[admate infeed] home: 삽입 앵커 없음");
+      return false;
     }
 
     if (p.surface === "search") {
