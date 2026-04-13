@@ -191,6 +191,7 @@ export async function POST(request: NextRequest) {
                     captureMetadata.creativeObjectFit === "cover" ? "cover" : "contain",
                   youtubeAdType: captureMetadata.youtubeAdType ?? "preroll",
                   instreamOpts: captureMetadata.instreamOpts,
+                  infeedOpts: captureMetadata.infeedOpts,
                   publisherGotoRelaxed: multiBatch && resolvedChannel === "gdn",
                   gdnViewportMode:
                     resolvedChannel === "gdn"

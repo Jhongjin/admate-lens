@@ -432,7 +432,13 @@ export default function CaptureList({ refreshTrigger }: CaptureListProps) {
                                 ? "디스플레이"
                                 : yt.adType === "overlay"
                                   ? "오버레이"
-                                  : null;
+                                  : yt.adType === "infeed-home"
+                                    ? "인피드·홈"
+                                    : yt.adType === "infeed-search"
+                                      ? "인피드·검색"
+                                      : yt.adType === "infeed-watch-next"
+                                        ? "인피드·관련"
+                                        : null;
                           if (!adLabel && yt.captureSecond === undefined) return null;
                           return `▶️ ${adLabel || "YouTube"}${yt.captureSecond !== undefined ? ` · ${yt.captureSecond}초` : ""}`;
                         })()}
@@ -736,6 +742,9 @@ function CaptureDetailModal({
                       if (yt.adType === "preroll") return "인스트림";
                       if (yt.adType === "display") return "디스플레이";
                       if (yt.adType === "overlay") return "오버레이";
+                      if (yt.adType === "infeed-home") return "인피드 · 홈";
+                      if (yt.adType === "infeed-search") return "인피드 · 검색";
+                      if (yt.adType === "infeed-watch-next") return "인피드 · 관련동영상";
                       return "-";
                     })()}
                   </span>

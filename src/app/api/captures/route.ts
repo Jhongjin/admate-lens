@@ -49,6 +49,7 @@ export async function POST(request: NextRequest) {
       creativeObjectFit = "contain", // 📐 슬롯 내 소재: contain | cover
       youtubeAdType,             // 🎬 YouTube 광고 유형
       instreamOpts,              // 🎬 인스트림 광고 옵션
+      infeedOpts,                // 인피드 광고 옵션
       gdnViewportMode,           // GDN: PC vs Mobile 뷰포트
     } = body as {
       channel: ChannelType;
@@ -63,7 +64,22 @@ export async function POST(request: NextRequest) {
       adSizeMode?: "auto" | "manual";
       targetAdSizes?: string[];
       creativeObjectFit?: "contain" | "cover";
-      youtubeAdType?: "preroll" | "display" | "overlay" | "mobile-preroll-aos" | "mobile-preroll-ios";
+      youtubeAdType?:
+        | "preroll"
+        | "display"
+        | "overlay"
+        | "mobile-preroll-aos"
+        | "mobile-preroll-ios"
+        | "infeed-home"
+        | "infeed-search"
+        | "infeed-watch-next";
+      infeedOpts?: {
+        searchQuery?: string;
+        description1?: string;
+        description2?: string;
+        ctaPrimary?: string;
+        ctaSecondary?: string;
+      };
       instreamOpts?: {
         videoUrl?: string;
         skipSeconds?: number;
@@ -99,6 +115,7 @@ export async function POST(request: NextRequest) {
         youtubeAdType === "mobile-preroll-aos" ||
         youtubeAdType === "mobile-preroll-ios");
     const hasValidVideoSource = isPreroll && isValidHttpUrl(instreamOpts?.videoUrl);
+    /** 인피드·디스플레이·오버레이 등 프리롤이 아닌 YouTube 유형 */
     const hasValidCreativeSource = !isPreroll && isValidHttpUrl(creativeUrl);
     const hasSource = hasValidVideoSource || hasValidCreativeSource;
 
@@ -126,6 +143,7 @@ export async function POST(request: NextRequest) {
         creativeObjectFit: normalizedCreativeObjectFit,
         youtubeAdType,
         instreamOpts,
+        infeedOpts,
         gdnViewportMode:
           channel === "gdn"
             ? gdnViewportMode === "mobile"

@@ -5,6 +5,7 @@
  * 1. 인스트림 (프리롤) — 영상 플레이어에 프리롤 광고 시뮬레이션
  * 2. 디스플레이 — 사이드바 컴패니언 배너 영역에 인젝션
  * 3. 오버레이 — 영상 플레이어 하단 반투명 오버레이 배너
+ * 4. 인피드 — 홈 피드 / 검색 결과 / 관련동영상(시청 사이드바) 카드 시뮬레이션
  */
 
 import type { IPageHandle } from "../engine/browser-engine";
@@ -16,6 +17,7 @@ import {
   UA_MOBILE_IOS,
 } from "../engine/puppeteer-engine";
 import { runPrerollInjectInPage, type PrerollInjectPagePayload } from "./youtube-preroll-inpage";
+import { runInfeedInjectInPage, type InfeedSurface } from "./youtube-infeed-inpage";
 
 /** YouTube 광고 유형 */
 export type YouTubeAdType =
@@ -23,7 +25,21 @@ export type YouTubeAdType =
   | "display"
   | "overlay"
   | "mobile-preroll-aos"
-  | "mobile-preroll-ios";
+  | "mobile-preroll-ios"
+  | "infeed-home"
+  | "infeed-search"
+  | "infeed-watch-next";
+
+function isInfeedAdType(t: YouTubeAdType): t is "infeed-home" | "infeed-search" | "infeed-watch-next" {
+  return t === "infeed-home" || t === "infeed-search" || t === "infeed-watch-next";
+}
+
+function infeedSurfaceFromAdType(t: YouTubeAdType): InfeedSurface | null {
+  if (t === "infeed-home") return "home";
+  if (t === "infeed-search") return "search";
+  if (t === "infeed-watch-next") return "watch-next";
+  return null;
+}
 
 /** YouTube 캡처 진단 정보 */
 export interface YouTubeDiagnostics {
@@ -60,6 +76,14 @@ async function imageUrlToDataUrl(imageUrl: string): Promise<{ dataUrl: string; s
 }
 
 /** 인스트림 메타데이터 (API·폼에서 options.instreamOpts 로 전달) */
+type InfeedOptsPayload = {
+  searchQuery?: string;
+  description1?: string;
+  description2?: string;
+  ctaPrimary?: string;
+  ctaSecondary?: string;
+};
+
 type InstreamOptsPayload = {
   videoUrl?: string;
   skipSeconds?: number;
@@ -162,6 +186,9 @@ export class YouTubeCapture extends BaseChannel {
 
   async captureAdPlacement(page: IPageHandle, request: CaptureRequest): Promise<Buffer> {
     const adType = (request.options?.youtubeAdType as YouTubeAdType) || "preroll";
+    if (isInfeedAdType(adType)) {
+      return this.captureInfeedPlacement(page, request, adType);
+    }
     console.log(`[YouTube] ===== 캡처 시작 =====`);
     console.log(`[YouTube] 영상 URL: ${request.publisherUrl}`);
     console.log(`[YouTube] 광고 유형: ${adType}`);
@@ -798,6 +825,174 @@ export class YouTubeCapture extends BaseChannel {
 
     // 11) 폰 프레임 합성 제거: 사용자는 순수 모바일 웹 UI 캡처를 원함
 
+    return screenshot;
+  }
+
+  /**
+   * 인피드 동영상 광고 — 홈 / 검색 / 관련동영상(시청 사이드바) 카드 UI 주입
+   */
+  private async captureInfeedPlacement(
+    page: IPageHandle,
+    request: CaptureRequest,
+    adType: "infeed-home" | "infeed-search" | "infeed-watch-next"
+  ): Promise<Buffer> {
+    const surface = infeedSurfaceFromAdType(adType)!;
+    console.log(`[YouTube] ===== 인피드 캡처 시작 (${surface}) =====`);
+
+    await page.setViewport({ width: 1920, height: 1080, deviceScaleFactor: 1 });
+
+    this.diagnostics = {
+      adType,
+      playerFound: false,
+      playerSize: { width: 0, height: 0 },
+      sidebarFound: surface === "watch-next",
+      injectionSuccess: false,
+      creativeDownloaded: false,
+      creativeBase64Size: 0,
+    };
+
+    const mastheadProfileDataUrl = await this.pickRandomMastheadAvatarDataUrl();
+    const instreamOpts = (request.options?.instreamOpts as InstreamOptsPayload | undefined) ?? {};
+    const infeedOpts = (request.options?.infeedOpts as InfeedOptsPayload | undefined) ?? {};
+
+    const rawCreative = (request.creativeUrl || "").trim();
+    const { dataUrl: creativeDataUrl, sizeKB, ok } = rawCreative
+      ? await imageUrlToDataUrl(rawCreative)
+      : { dataUrl: "", sizeKB: 0, ok: false };
+    this.diagnostics.creativeDownloaded = ok;
+    this.diagnostics.creativeBase64Size = sizeKB;
+    if (!ok || !creativeDataUrl) {
+      console.error("[YouTube] 인피드: 소재 이미지(creativeUrl)가 필요합니다.");
+    }
+
+    let avatarDataUrl = creativeDataUrl;
+    if (instreamOpts.avatarImageUrl?.trim()) {
+      const av = await imageUrlToDataUrl(instreamOpts.avatarImageUrl.trim());
+      if (av.ok) avatarDataUrl = av.dataUrl;
+    } else if (instreamOpts.companionChannelUrl?.trim()) {
+      const logoUrl = await fetchYoutubeChannelLogoUrl(instreamOpts.companionChannelUrl.trim());
+      if (logoUrl) {
+        const av = await imageUrlToDataUrl(logoUrl);
+        if (av.ok) avatarDataUrl = av.dataUrl;
+      }
+    }
+
+    let sponsorName = "brand.example";
+    try {
+      if (instreamOpts.displayUrl?.trim()) {
+        sponsorName = instreamOpts.displayUrl
+          .trim()
+          .replace(/^https?:\/\//i, "")
+          .replace(/^www\./i, "")
+          .split("/")[0]!;
+      } else if (request.clickUrl?.trim()) {
+        sponsorName = new URL(request.clickUrl.trim()).hostname.replace(/^www\./i, "");
+      }
+    } catch {
+      /* keep default */
+    }
+
+    const title = instreamOpts.adTitle?.trim() || "광고 제목";
+    const description1 = infeedOpts.description1?.trim() || "";
+    const description2 = infeedOpts.description2?.trim() || "";
+
+    let ctaPrimary = infeedOpts.ctaPrimary?.trim() || "";
+    let ctaSecondary = infeedOpts.ctaSecondary?.trim() || "";
+    if (adType === "infeed-home") {
+      if (!ctaPrimary) ctaPrimary = "시작하기";
+      if (!ctaSecondary) ctaSecondary = "시청";
+    } else if (adType === "infeed-search") {
+      if (!ctaPrimary) ctaPrimary = "사이트 방문";
+      if (!ctaSecondary) ctaSecondary = "시청";
+    } else {
+      if (!ctaPrimary) ctaPrimary = "견적 받기";
+    }
+
+    let targetUrl = request.publisherUrl;
+    if (adType === "infeed-home") {
+      targetUrl = "https://www.youtube.com/";
+    } else if (adType === "infeed-search") {
+      const q = (infeedOpts.searchQuery?.trim() || "시세이도").slice(0, 200);
+      targetUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(q)}`;
+    }
+
+    await this.applyYouTubeConsentCookies(page);
+    await page.goto(targetUrl, { waitUntil: "networkidle2", timeout: 45000 });
+    await this.injectKoreanFonts(page);
+    await this.dismissYouTubeConsent(page);
+    await new Promise((r) => setTimeout(r, 2500));
+    await this.applyMastheadLoggedInLook(page, mastheadProfileDataUrl);
+
+    const hasConsent = await page.evaluate<boolean>(`
+      (() => {
+        const consentDialog = document.querySelector(
+          'ytd-consent-bump-v2-lightbox, tp-yt-iron-overlay-backdrop, ' +
+          '[action*="consent"], #consent-bump, .consent-bump-v2-lightbox, ' +
+          'ytd-enforcement-message-view-model'
+        );
+        return !!consentDialog;
+      })()
+    `);
+    if (hasConsent) {
+      await page.evaluate<void>(`
+        (() => {
+          const selectors = [
+            'ytd-consent-bump-v2-lightbox',
+            'tp-yt-iron-overlay-backdrop',
+            '#consent-bump',
+            '.consent-bump-v2-lightbox',
+            'ytd-enforcement-message-view-model',
+            'tp-yt-paper-dialog',
+            'ytd-popup-container',
+          ];
+          selectors.forEach(sel => {
+            document.querySelectorAll(sel).forEach(el => el.remove());
+          });
+          document.body.style.overflow = '';
+          document.documentElement.style.overflow = '';
+        })()
+      `);
+      await page.goto(targetUrl, { waitUntil: "networkidle2", timeout: 45000 });
+      await new Promise((r) => setTimeout(r, 2000));
+      await this.applyMastheadLoggedInLook(page, mastheadProfileDataUrl);
+    }
+
+    if (surface === "search") {
+      await page.evaluate<void>(`
+        (() => {
+          window.scrollTo({ top: 0, behavior: 'instant' });
+        })()
+      `);
+    }
+
+    const injected = await page.evaluate(runInfeedInjectInPage, {
+      surface,
+      thumbDataUrl: creativeDataUrl,
+      avatarDataUrl,
+      title,
+      description1,
+      description2,
+      sponsorName,
+      ctaPrimary,
+      ctaSecondary,
+    });
+    this.diagnostics.injectionSuccess = injected;
+    if (!injected) {
+      console.warn("[YouTube] 인피드 인젝션 실패 — 빈 피드·레이아웃 변경 가능");
+    }
+
+    await new Promise((r) => setTimeout(r, 1200));
+    await page.evaluate<void>(`
+      (() => {
+        window.scrollTo({ top: 0, behavior: 'instant' });
+        document.documentElement.scrollTop = 0;
+        document.body.scrollTop = 0;
+      })()
+    `);
+    await this.applyMastheadLoggedInLook(page, mastheadProfileDataUrl);
+
+    const screenshot = await page.screenshot({ fullPage: false, type: "png" });
+    console.log(`[YouTube] ===== 인피드 캡처 완료 (${surface}) =====`);
     return screenshot;
   }
 

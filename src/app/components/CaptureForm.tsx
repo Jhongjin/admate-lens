@@ -277,7 +277,10 @@ type YouTubeAdType =
   | "display"
   | "overlay"
   | "mobile-preroll-aos"
-  | "mobile-preroll-ios";
+  | "mobile-preroll-ios"
+  | "infeed-home"
+  | "infeed-search"
+  | "infeed-watch-next";
 
 interface YouTubeAdTypeOption {
   value: YouTubeAdType;
@@ -308,6 +311,27 @@ const YOUTUBE_AD_TYPES: YouTubeAdTypeOption[] = [
     icon: "🍎",
     description: "iPhone 15 모바일",
     sizeHint: "390×844",
+  },
+  {
+    value: "infeed-home",
+    label: "인피드 · 홈",
+    icon: "🏠",
+    description: "홈 피드 그리드 첫 카드 형태",
+    sizeHint: "16:9 썸네일",
+  },
+  {
+    value: "infeed-search",
+    label: "인피드 · 검색",
+    icon: "🔎",
+    description: "검색 결과 가로형 카드",
+    sizeHint: "16:9 썸네일",
+  },
+  {
+    value: "infeed-watch-next",
+    label: "인피드 · 관련동영상",
+    icon: "📎",
+    description: "시청 페이지 사이드바 추천 상단",
+    sizeHint: "컴팩트 가로",
   },
   {
     value: "display",
@@ -382,6 +406,12 @@ interface CaptureFormData {
   instreamSkipMode: "skippable" | "non-skippable";
   /** GDN 게재면 캡처: PC 뷰포트 vs 모바일 뷰포트 */
   gdnViewportMode: "pc" | "mobile";
+  /** 인피드 — 검색어(검색 지면), 설명 줄(관련동영상), CTA 문구 덮어쓰기 */
+  infeedSearchQuery: string;
+  infeedDescription1: string;
+  infeedDescription2: string;
+  infeedCtaPrimary: string;
+  infeedCtaSecondary: string;
 }
 
 type MediaMenu = "gdn" | "youtube" | "naver" | "kakao";
@@ -449,6 +479,11 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
     instreamUseChannelBanner: true,
     instreamEnableCompanionBanner: true,
     gdnViewportMode: "pc",
+    infeedSearchQuery: "시세이도",
+    infeedDescription1: "",
+    infeedDescription2: "",
+    infeedCtaPrimary: "",
+    infeedCtaSecondary: "",
   });
 
   // 이미지 업로드 관련 상태
@@ -819,17 +854,36 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
     isYouTubeChannel &&
     (form.youtubeAdType === "preroll" || isMobilePreroll);
 
+  const isYoutubeInfeed =
+    isYouTubeChannel &&
+    (form.youtubeAdType === "infeed-home" ||
+      form.youtubeAdType === "infeed-search" ||
+      form.youtubeAdType === "infeed-watch-next");
+
   const selectedMediaMenu = (form.channel === "youtube" ? "youtube" : "gdn") as MediaMenu;
-  const selectedProduct = selectedMediaMenu === "youtube" ? "instream" : "network-ads";
+  const selectedProduct =
+    selectedMediaMenu === "youtube"
+      ? isYoutubeInfeed
+        ? "infeed"
+        : "instream"
+      : "network-ads";
   const selectedOptionPreset =
     selectedMediaMenu === "youtube"
       ? form.youtubeAdType === "preroll"
         ? form.instreamSkipMode === "non-skippable"
           ? "pc-non-skip"
           : "pc-skip"
-        : form.instreamSkipMode === "non-skippable"
-          ? "mo-non-skip"
-          : "mo-skip"
+        : isMobilePreroll
+          ? form.instreamSkipMode === "non-skippable"
+            ? "mo-non-skip"
+            : "mo-skip"
+          : form.youtubeAdType === "infeed-home"
+            ? "infeed-home"
+            : form.youtubeAdType === "infeed-search"
+              ? "infeed-search"
+              : form.youtubeAdType === "infeed-watch-next"
+                ? "infeed-watch-next"
+                : "yt-other"
       : form.gdnViewportMode === "mobile"
         ? "gdn-mobile"
         : "gdn-pc";
@@ -839,6 +893,10 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
     "pc-non-skip": "Pc instream (Non skip)",
     "mo-skip": "Mo instream (Skip)",
     "mo-non-skip": "Mo instream (Non skip)",
+    "infeed-home": "인피드 홈",
+    "infeed-search": "인피드 검색",
+    "infeed-watch-next": "인피드 관련동영상",
+    "yt-other": "YouTube 기타",
     "gdn-pc": "PC지면",
     "gdn-mobile": "MO지면",
   };
@@ -885,9 +943,18 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
       ];
       const randomKoreanUrl = KOREAN_FALLBACK_VIDEOS[Math.floor(Math.random() * KOREAN_FALLBACK_VIDEOS.length)];
       const contentVideoUrl = form.instreamPublisherVideoUrl?.trim() || randomKoreanUrl;
-      const publisherUrls = isYouTubeChannel && form.selectedPublishers.length === 0
-        ? [contentVideoUrl]
-        : form.selectedPublishers;
+      const publisherUrls =
+        isYouTubeChannel && form.selectedPublishers.length === 0
+          ? form.youtubeAdType === "infeed-home"
+            ? ["https://www.youtube.com/"]
+            : form.youtubeAdType === "infeed-search"
+              ? [
+                  `https://www.youtube.com/results?search_query=${encodeURIComponent(
+                    form.infeedSearchQuery?.trim() || "시세이도",
+                  )}`,
+                ]
+              : [contentVideoUrl]
+          : form.selectedPublishers;
 
       const res = await fetch("/api/captures", {
         method: "POST",
@@ -954,6 +1021,24 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                   enableCompanionBanner: form.instreamEnableCompanionBanner,
                   instreamSkipMode: form.instreamSkipMode,
                 }
+              : form.channel === "youtube" && isYoutubeInfeed
+                ? {
+                    adTitle: form.instreamAdTitle || undefined,
+                    landingUrl: form.instreamLandingUrl || undefined,
+                    displayUrl: form.instreamDisplayUrl || undefined,
+                    avatarImageUrl: form.instreamLogoImageUrl || undefined,
+                    companionChannelUrl: form.instreamCompanionChannelUrl || undefined,
+                  }
+                : undefined,
+          infeedOpts:
+            form.channel === "youtube" && isYoutubeInfeed
+              ? {
+                  searchQuery: form.infeedSearchQuery || undefined,
+                  description1: form.infeedDescription1 || undefined,
+                  description2: form.infeedDescription2 || undefined,
+                  ctaPrimary: form.infeedCtaPrimary || undefined,
+                  ctaSecondary: form.infeedCtaSecondary || undefined,
+                }
               : undefined,
         }),
       });
@@ -995,6 +1080,11 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
         instreamUseChannelBanner: true,
         instreamSkipMode: "skippable",
         gdnViewportMode: "pc",
+        infeedSearchQuery: "시세이도",
+        infeedDescription1: "",
+        infeedDescription2: "",
+        infeedCtaPrimary: "",
+        infeedCtaSecondary: "",
       }));
       setUploadedFile(null);
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -1147,6 +1237,30 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                     youtubeAdType: "mobile-preroll-aos",
                     instreamSkipMode: "non-skippable",
                   }));
+                  return;
+                }
+                if (preset === "infeed-home") {
+                  setForm((prev) => ({
+                    ...prev,
+                    channel: "youtube",
+                    youtubeAdType: "infeed-home",
+                  }));
+                  return;
+                }
+                if (preset === "infeed-search") {
+                  setForm((prev) => ({
+                    ...prev,
+                    channel: "youtube",
+                    youtubeAdType: "infeed-search",
+                  }));
+                  return;
+                }
+                if (preset === "infeed-watch-next") {
+                  setForm((prev) => ({
+                    ...prev,
+                    channel: "youtube",
+                    youtubeAdType: "infeed-watch-next",
+                  }));
                 }
               }}
             >
@@ -1156,6 +1270,10 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                   <option value="pc-non-skip">Pc instream (Non skip)</option>
                   <option value="mo-skip">Mo instream (Skip)</option>
                   <option value="mo-non-skip">Mo instream (Non skip)</option>
+                  <option value="infeed-home">In-feed 홈</option>
+                  <option value="infeed-search">In-feed 검색</option>
+                  <option value="infeed-watch-next">In-feed 관련동영상</option>
+                  <option value="yt-other">Display / Overlay 등</option>
                 </>
               ) : (
                 <>
@@ -1180,7 +1298,12 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
               매체: {selectedMediaMenu === "youtube" ? "YouTube" : "Google Ads"}
             </span>
             <span className="text-[10px] px-2 py-1 rounded-full bg-[var(--color-bg-tertiary)] text-[var(--color-text-secondary)]">
-              상품: {selectedProduct === "instream" ? "Instream" : "Network Ads"}
+              상품:{" "}
+              {selectedProduct === "instream"
+                ? "Instream"
+                : selectedProduct === "infeed"
+                  ? "In-feed"
+                  : "Network Ads"}
             </span>
             <span className="text-[10px] px-2 py-1 rounded-full bg-[var(--color-accent-subtle)] text-[var(--color-accent)]">
               상세:{" "}
@@ -1196,6 +1319,8 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                 "모바일 인스트림은 Android(Pixel 8) 뷰포트 기준으로 캡처됩니다."}
               {form.youtubeAdType === "mobile-preroll-ios" &&
                 "모바일 인스트림은 iPhone 15 뷰포트 기준으로 캡처됩니다."}
+              {isYoutubeInfeed &&
+                "인피드는 PC 1920×1080 뷰포트에서 실제 홈·검색·시청 페이지를 연 뒤 카드 UI를 합성합니다."}
             </p>
 
             {/* 🎬 인스트림 광고 상세 옵션 (프리롤 + 모바일 인스트림 공통) */}
@@ -1718,6 +1843,252 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                 </div>
               </div>
             )}
+
+            {isYoutubeInfeed && (
+              <div
+                className="mt-4 rounded-xl border p-4 animate-fade-in"
+                style={{
+                  borderColor: "var(--color-border)",
+                  backgroundColor: "var(--color-bg-primary)",
+                }}
+              >
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="text-sm">📰</span>
+                  <p
+                    className="text-sm font-semibold"
+                    style={{ color: "var(--color-text-primary)" }}
+                  >
+                    인피드 광고 정보
+                  </p>
+                </div>
+                <p
+                  className="text-[11px] mb-3"
+                  style={{ color: "var(--color-text-muted)" }}
+                >
+                  썸네일(소재 이미지) 필수입니다. 제목·스폰서명·채널 아이콘은 아래에서
+                  지정할 수 있습니다. CTA 문구를 비우면 지면 유형별 기본값이 적용됩니다.
+                </p>
+                <div className="space-y-3">
+                  {form.youtubeAdType === "infeed-search" && (
+                    <div>
+                      <label
+                        className="text-[11px] font-medium mb-1 block"
+                        style={{ color: "var(--color-text-secondary)" }}
+                      >
+                        검색어
+                      </label>
+                      <input
+                        type="text"
+                        className="form-input"
+                        placeholder="예: 시세이도"
+                        value={form.infeedSearchQuery}
+                        onChange={(e) =>
+                          setForm((prev) => ({
+                            ...prev,
+                            infeedSearchQuery: e.target.value,
+                          }))
+                        }
+                      />
+                    </div>
+                  )}
+                  {form.youtubeAdType === "infeed-watch-next" && (
+                    <>
+                      <div>
+                        <label
+                          className="text-[11px] font-medium mb-1 block"
+                          style={{ color: "var(--color-text-secondary)" }}
+                        >
+                          📺 콘텐츠(시청) 영상 URL{" "}
+                          <span
+                            className="text-[10px] font-normal"
+                            style={{ color: "var(--color-text-muted)" }}
+                          >
+                            (선택 – 미입력 시 인기 영상 랜덤)
+                          </span>
+                        </label>
+                        <input
+                          type="url"
+                          className="form-input"
+                          placeholder="https://www.youtube.com/watch?v=..."
+                          value={form.instreamPublisherVideoUrl}
+                          onChange={(e) =>
+                            setForm((prev) => ({
+                              ...prev,
+                              instreamPublisherVideoUrl: e.target.value,
+                            }))
+                          }
+                        />
+                      </div>
+                      <div>
+                        <label
+                          className="text-[11px] font-medium mb-1 block"
+                          style={{ color: "var(--color-text-secondary)" }}
+                        >
+                          설명 줄 1
+                        </label>
+                        <input
+                          type="text"
+                          className="form-input"
+                          value={form.infeedDescription1}
+                          onChange={(e) =>
+                            setForm((prev) => ({
+                              ...prev,
+                              infeedDescription1: e.target.value,
+                            }))
+                          }
+                        />
+                      </div>
+                      <div>
+                        <label
+                          className="text-[11px] font-medium mb-1 block"
+                          style={{ color: "var(--color-text-secondary)" }}
+                        >
+                          설명 줄 2
+                        </label>
+                        <input
+                          type="text"
+                          className="form-input"
+                          value={form.infeedDescription2}
+                          onChange={(e) =>
+                            setForm((prev) => ({
+                              ...prev,
+                              infeedDescription2: e.target.value,
+                            }))
+                          }
+                        />
+                      </div>
+                    </>
+                  )}
+                  <div>
+                    <label
+                      className="text-[11px] font-medium mb-1 block"
+                      style={{ color: "var(--color-text-secondary)" }}
+                    >
+                      광고 제목
+                    </label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      value={form.instreamAdTitle}
+                      onChange={(e) =>
+                        setForm((prev) => ({
+                          ...prev,
+                          instreamAdTitle: e.target.value,
+                        }))
+                      }
+                    />
+                  </div>
+                  <div>
+                    <label
+                      className="text-[11px] font-medium mb-1 block"
+                      style={{ color: "var(--color-text-secondary)" }}
+                    >
+                      스폰서 표시(브랜드/도메인)
+                    </label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      placeholder="예: monday.com"
+                      value={form.instreamDisplayUrl}
+                      onChange={(e) =>
+                        setForm((prev) => ({
+                          ...prev,
+                          instreamDisplayUrl: e.target.value,
+                        }))
+                      }
+                    />
+                  </div>
+                  <div>
+                    <label
+                      className="text-[11px] font-medium mb-1 block"
+                      style={{ color: "var(--color-text-secondary)" }}
+                    >
+                      채널 아이콘 — 프로필 이미지 URL (선택)
+                    </label>
+                    <input
+                      type="url"
+                      className="form-input"
+                      placeholder="https://..."
+                      value={form.instreamLogoImageUrl}
+                      onChange={(e) =>
+                        setForm((prev) => ({
+                          ...prev,
+                          instreamLogoImageUrl: e.target.value,
+                        }))
+                      }
+                    />
+                    <p
+                      className="text-[10px] mt-0.5"
+                      style={{ color: "var(--color-text-muted)" }}
+                    >
+                      비우면 채널 URL에서 자동 추출을 시도합니다.
+                    </p>
+                  </div>
+                  <div>
+                    <label
+                      className="text-[11px] font-medium mb-1 block"
+                      style={{ color: "var(--color-text-secondary)" }}
+                    >
+                      채널 URL (아이콘 자동 추출용, 선택)
+                    </label>
+                    <input
+                      type="url"
+                      className="form-input"
+                      placeholder="https://www.youtube.com/@brand"
+                      value={form.instreamCompanionChannelUrl}
+                      onChange={(e) =>
+                        setForm((prev) => ({
+                          ...prev,
+                          instreamCompanionChannelUrl: e.target.value,
+                        }))
+                      }
+                    />
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label
+                        className="text-[11px] font-medium mb-1 block"
+                        style={{ color: "var(--color-text-secondary)" }}
+                      >
+                        주 CTA (비우면 기본)
+                      </label>
+                      <input
+                        type="text"
+                        className="form-input"
+                        placeholder="시작하기 / 사이트 방문 / 견적 받기"
+                        value={form.infeedCtaPrimary}
+                        onChange={(e) =>
+                          setForm((prev) => ({
+                            ...prev,
+                            infeedCtaPrimary: e.target.value,
+                          }))
+                        }
+                      />
+                    </div>
+                    <div>
+                      <label
+                        className="text-[11px] font-medium mb-1 block"
+                        style={{ color: "var(--color-text-secondary)" }}
+                      >
+                        보조 CTA (비우면 기본, 관련동영상은 비우면 1버튼)
+                      </label>
+                      <input
+                        type="text"
+                        className="form-input"
+                        placeholder="시청"
+                        value={form.infeedCtaSecondary}
+                        onChange={(e) =>
+                          setForm((prev) => ({
+                            ...prev,
+                            infeedCtaSecondary: e.target.value,
+                          }))
+                        }
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -1744,7 +2115,17 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                   className="text-[11px] mt-0.5"
                   style={{ color: "var(--color-text-muted)" }}
                 >
-                  YouTube 광고는 자동으로 YouTube 플레이어에서 캡처됩니다. 별도 게재면 선택이 필요 없습니다.
+                  {isYoutubeInfeed ? (
+                    <>
+                      인피드는 홈·검색·관련동영상 각각 실제 URL로 열린 뒤 카드 UI가
+                      합성됩니다. 소재(썸네일) URL은 필수입니다.
+                    </>
+                  ) : (
+                    <>
+                      YouTube 광고는 자동으로 YouTube 플레이어에서 캡처됩니다. 별도
+                      게재면 선택이 필요 없습니다.
+                    </>
+                  )}
                 </p>
               </div>
             </div>
