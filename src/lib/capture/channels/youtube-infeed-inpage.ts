@@ -77,7 +77,7 @@ export function runInfeedInjectInPage(...args: unknown[]): boolean {
      * (rgba(0,0,0,0.3) + 흰 아이콘, yt-spec-button-shape-next--size-m 높이에 맞춘 원형)
      */
     const extIcon =
-      '<span style="position:absolute;bottom:8px;right:8px;width:34px;height:34px;border-radius:999px;background:rgba(18,18,18,0.72);backdrop-filter:saturate(120%) blur(1px);display:flex;align-items:center;justify-content:center;box-sizing:border-box;color:#fff;border:1px solid rgba(255,255,255,0.12);"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M7 17L17 7M17 7H10M17 7V14" stroke="currentColor" stroke-width="2.15" stroke-linecap="round" stroke-linejoin="round"/></svg></span>';
+      '<span style="position:absolute;bottom:10px;right:10px;width:42px;height:42px;border-radius:999px;background:rgba(18,18,18,0.76);backdrop-filter:saturate(120%) blur(1px);display:flex;align-items:center;justify-content:center;box-sizing:border-box;color:#fff;border:1px solid rgba(255,255,255,0.16);"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M7 17L17 7M17 7H10M17 7V14" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"/></svg></span>';
 
     const buildHomeFeedCard = (): HTMLElement => {
       const wrap = document.createElement("div");
@@ -219,20 +219,20 @@ export function runInfeedInjectInPage(...args: unknown[]): boolean {
             ${extIcon}
           </div>
           <div style="flex:1;min-width:0;padding-top:0;max-width:600px;">
-            <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;min-height:58px;">
+            <div style="position:relative;min-height:58px;padding-right:36px;">
               <h3 style="margin:0;font-size:2.2rem;font-weight:400;line-height:3rem;color:var(--yt-spec-text-primary,#0f0f0f);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">${esc(
                 title
               )}</h3>
-              ${menuBtnSearch}
+              <div style="position:absolute;top:0;right:0;">${menuBtnSearch}</div>
             </div>
             ${
               d1
-                ? `<div style="margin-top:6px;font-size:1.24rem;font-weight:400;line-height:1.8rem;color:var(--yt-spec-text-secondary,#606060);display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden;">${esc(
+                ? `<div style="margin-top:2px;font-size:1.24rem;font-weight:400;line-height:1.75rem;color:var(--yt-spec-text-secondary,#606060);display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden;">${esc(
                     d1
                   )}</div>`
                 : ""
             }
-            <div style="margin-top:7px;display:flex;align-items:center;gap:8px;font-size:1.2rem;">
+            <div style="margin-top:4px;display:flex;align-items:center;gap:8px;font-size:1.2rem;">
               <div style="width:24px;height:24px;border-radius:50%;overflow:hidden;flex-shrink:0;background:#eee;">
                 <img src="${avatar}" alt="" style="width:100%;height:100%;object-fit:cover;" />
               </div>
