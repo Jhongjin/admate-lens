@@ -53,6 +53,8 @@ const MIN_SLOT_HEIGHT_MOBILE = 44;
 export interface DetectAdSlotsOptions {
   /** GDN Mobile 지면: 뷰포트·IAB 필터를 모바일 광고에 맞게 완화 */
   mobileViewport?: boolean;
+  /** 게재면 호스트(소문자). 동아 main_mo_ad·중앙 ad_wrap.ad_video 등 DOM 힌트에 사용 */
+  publisherHost?: string;
 }
 
 /**
@@ -65,6 +67,7 @@ export async function detectAdSlots(
   opts: DetectAdSlotsOptions = {},
 ): Promise<DetectedSlot[]> {
   const mobileViewport = Boolean(opts.mobileViewport);
+  const publisherHost = (opts.publisherHost || "").toLowerCase();
   const standardSizesForEval = [
     ...IAB_STANDARD_SIZES,
     ...(mobileViewport
@@ -79,11 +82,32 @@ export async function detectAdSlots(
   const rawSlots = await page.evaluate<DetectedSlot[]>(`
     (() => {
       const mobileViewport = ${mobileViewport ? "true" : "false"};
+      const publisherHostLower = ${JSON.stringify(publisherHost)};
       const results = [];
       const seenElements = new Set();
 
       function getUniqueSelector(el) {
         if (el.id) return '#' + CSS.escape(el.id);
+        const classes =
+          typeof el.className === 'string' && el.className.trim()
+            ? el.className.trim().split(/\\s+/)
+            : [];
+        const stable = [];
+        for (const c of classes) {
+          if (c.includes('main_mo_ad')) stable.push(c);
+        }
+        const hasAdWrap = classes.some((c) => c === 'ad_wrap' || c.includes('ad_wrap'));
+        const hasAdVideo = classes.some((c) => c.includes('ad_video'));
+        if (hasAdWrap && hasAdVideo) {
+          const aw = classes.find((c) => c === 'ad_wrap' || c.includes('ad_wrap'));
+          const av = classes.find((c) => c.includes('ad_video'));
+          if (aw) stable.push(aw);
+          if (av && av !== aw) stable.push(av);
+        }
+        if (stable.length > 0) {
+          const t = el.tagName.toLowerCase();
+          return t + stable.slice(0, 6).map((c) => '.' + CSS.escape(c)).join('');
+        }
         const parts = [];
         let current = el;
         while (current && current !== document.body && current !== document.documentElement) {
@@ -153,10 +177,34 @@ export async function detectAdSlots(
       // 전략 1: ins.adsbygoogle 태그
       document.querySelectorAll('ins.adsbygoogle').forEach(el => addSlot(el, 'gdn-ins', 100));
 
+      // 동아 모바일: unfilled 시 ins 높이 0 → 래퍼 .main_mo_ad* 가 실제 게재면
+      if (mobileViewport && publisherHostLower.includes('donga.com')) {
+        document.querySelectorAll('[class*="main_mo_ad"]').forEach((el) => {
+          addSlot(el, 'ad-container', 110);
+        });
+      }
+      // 중앙: Admaru + .ad_wrap.ad_video 블록
+      if (publisherHostLower.includes('joongang.co.kr')) {
+        document.querySelectorAll('.ad_wrap.ad_video').forEach((el) => {
+          addSlot(el, 'ad-container', 108);
+        });
+      }
+
       // 전략 2: Google Ads iframe
       document.querySelectorAll('iframe[id*="google_ads"], iframe[id*="aswift_"], iframe[src*="doubleclick.net"], iframe[src*="googlesyndication"]').forEach(el => {
         addSlot(el, 'gdn-iframe', 90);
         if (el.parentElement) addSlot(el.parentElement, 'gdn-iframe', 85);
+      });
+
+      // 중앙 Admaru(ampbjs) 등 비-GDFP iframe + 래퍼
+      document.querySelectorAll('iframe[name*="ampbjs"], iframe[name*="AMPBJS"]').forEach((el) => {
+        if (seenElements.has(el)) return;
+        const rect = el.getBoundingClientRect();
+        if (rect.width >= 160 && rect.height >= 40) {
+          addSlot(el, 'gdn-iframe', 96);
+        }
+        const wrap = el.closest('.ad_wrap.ad_video');
+        if (wrap && !seenElements.has(wrap)) addSlot(wrap, 'ad-container', 105);
       });
 
       // 전략 2.5: 일반 광고 iframe (비-구글, ZDNet/국내 네트워크 등)

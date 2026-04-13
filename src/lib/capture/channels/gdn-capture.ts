@@ -288,7 +288,11 @@ export class GdnCapture extends BaseChannel {
 
     // 4) 광고 슬롯 탐지
     const slots = await this.runWithFrameRetry(
-      () => detectAdSlots(page, { mobileViewport: mobileSurface }),
+      () =>
+        detectAdSlots(page, {
+          mobileViewport: mobileSurface,
+          publisherHost: host,
+        }),
       "detect-slots",
     );
     const viewport = await page.evaluate<{ width: number; height: number }>(`

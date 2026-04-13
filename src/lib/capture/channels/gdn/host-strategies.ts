@@ -75,6 +75,7 @@ function hasGoogleInventoryHint(sel: string): boolean {
   const s = sel.toLowerCase();
   return (
     s.includes("google_ads") ||
+    s.includes("aswift") ||
     s.includes("div-gpt-ad") ||
     s.includes("adsbygoogle") ||
     s.includes("googlesyndication") ||
@@ -312,8 +313,24 @@ export function narrowGdnSlotsByHost(
 
   if (isDongaHost(host)) {
     const mobile = Boolean(ctx?.mobileViewport);
+    const selLo = (s: DetectedSlot) => (s.selector || "").toLowerCase();
+    const hasMainMo = slots.some((s) => selLo(s).includes("main_mo_ad"));
     const preferred = slots.filter((s) => {
-      const sel = (s.selector || "").toLowerCase();
+      const sel = selLo(s);
+      if (mobile && hasMainMo) {
+        if (sel.includes("main_mo_ad") || sel.includes("txtad")) return true;
+        if (
+          (sel.includes("aswift") ||
+            sel.includes("google_ads_iframe") ||
+            sel.includes("adsbygoogle")) &&
+          s.width >= 260 &&
+          s.width <= 400 &&
+          s.height <= 360
+        ) {
+          return true;
+        }
+        return false;
+      }
       const gam =
         sel.includes("google_ads") ||
         sel.includes("div-gpt-ad") ||
@@ -333,30 +350,47 @@ export function narrowGdnSlotsByHost(
     if (preferred.length > 0) {
       slots.length = 0;
       preferred.forEach((s) => slots.push(s));
-      console.log(`[GDN] 🎯 동아일보 후보 축소: ${preferred.length}개`);
+      console.log(
+        `[GDN] 🎯 동아일보 후보 축소: ${preferred.length}개${
+          mobile && hasMainMo ? " (main_mo_ad·모바일)" : ""
+        }`,
+      );
     }
   }
 
   if (isJoongangHost(host)) {
     const mobile = Boolean(ctx?.mobileViewport);
-    const preferred = slots.filter((s) => {
-      if (s.type === "gdn-iframe" && s.height > 720) return false;
-      const sel = (s.selector || "").toLowerCase();
-      const gam =
-        sel.includes("google_ads") ||
-        sel.includes("div-gpt-ad") ||
-        sel.includes("adsbygoogle") ||
-        sel.includes("googlesyndication");
-      if (gam || s.type === "gdn-iframe") return s.width <= 1024 && s.height <= 520;
-      const mpu = s.width >= 250 && s.width <= 400 && s.height >= 220 && s.height <= 340;
-      const mobBand =
-        mobile && s.width >= 280 && s.width <= 430 && s.height >= 44 && s.height <= 130;
-      return mpu || mobBand;
-    });
-    if (preferred.length > 0) {
+    const selLo = (s: DetectedSlot) => (s.selector || "").toLowerCase();
+    const premium = slots.filter(
+      (s) =>
+        (selLo(s).includes("ad_wrap") && selLo(s).includes("ad_video")) ||
+        selLo(s).includes("ampbjs") ||
+        selLo(s).includes("admaru"),
+    );
+    if (premium.length > 0) {
       slots.length = 0;
-      preferred.forEach((s) => slots.push(s));
-      console.log(`[GDN] 🎯 중앙일보 후보 축소: ${preferred.length}개`);
+      premium.forEach((s) => slots.push(s));
+      console.log(`[GDN] 🎯 중앙일보 후보 축소(ad_wrap·Admaru): ${premium.length}개`);
+    } else {
+      const preferred = slots.filter((s) => {
+        if (s.type === "gdn-iframe" && s.height > 720) return false;
+        const sel = selLo(s);
+        const gam =
+          sel.includes("google_ads") ||
+          sel.includes("div-gpt-ad") ||
+          sel.includes("adsbygoogle") ||
+          sel.includes("googlesyndication");
+        if (gam || s.type === "gdn-iframe") return s.width <= 1024 && s.height <= 520;
+        const mpu = s.width >= 250 && s.width <= 400 && s.height >= 220 && s.height <= 340;
+        const mobBand =
+          mobile && s.width >= 280 && s.width <= 430 && s.height >= 44 && s.height <= 130;
+        return mpu || mobBand;
+      });
+      if (preferred.length > 0) {
+        slots.length = 0;
+        preferred.forEach((s) => slots.push(s));
+        console.log(`[GDN] 🎯 중앙일보 후보 축소: ${preferred.length}개`);
+      }
     }
   }
 
@@ -519,6 +553,7 @@ function calcDongaSlotScore(slot: DetectedSlot, ctx?: GdnSlotHostContext): numbe
   const area = slot.width * slot.height;
   const gam = hasGoogleInventoryHint(sel);
 
+  if (sel.includes("main_mo_ad") || sel.includes("txtad")) score += 175;
   if (slot.type === "gdn-iframe") score += 130;
   if (sel.includes("google_ads")) score += 130;
   if (sel.includes("div-gpt-ad")) score += 105;
@@ -580,13 +615,16 @@ function calcMkSlotScore(slot: DetectedSlot, ctx?: GdnSlotHostContext): number {
   return score;
 }
 
-/** 중앙일보: ADVERTISEMENT 블록·캐러셀 상단 MPU + 모바일 배너 */
+/** 중앙일보: .ad_wrap.ad_video + Admaru(ampbjs) + MPU */
 function calcJoongangSlotScore(slot: DetectedSlot, ctx?: GdnSlotHostContext): number {
   const sel = (slot.selector || "").toLowerCase();
   const mobile = Boolean(ctx?.mobileViewport);
   let score = slot.confidence;
   const area = slot.width * slot.height;
   const gam = hasGoogleInventoryHint(sel);
+
+  if (sel.includes("ad_wrap") && sel.includes("ad_video")) score += 195;
+  if (sel.includes("ampbjs") || sel.includes("admaru")) score += 170;
 
   if (slot.type === "gdn-iframe") score += 128;
   if (sel.includes("google_ads")) score += 128;
