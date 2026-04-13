@@ -906,8 +906,8 @@ export class YouTubeCapture extends BaseChannel {
   }
 
   /**
-   * 인피드 홈: URL은 trending인데 DOM만 빈 홈인 경우가 있어, 리치 그리드가 보일 때까지 대기·리로드 후
-   * 그래도 부족하면 검색 결과로 이동해 surface=search 로 인젝션합니다.
+   * 인피드 홈: URL은 trending인데 DOM만 빈 홈인 경우가 있어, 리치 그리드가 보일 때까지 대기·리로드합니다.
+   * 정책상 infeed-home은 검색 결과 지면으로 절대 폴백하지 않고 home 지면만 사용합니다.
    */
   private async ensureInfeedHomeFeedReady(
     page: IPageHandle,
@@ -1012,41 +1012,16 @@ export class YouTubeCapture extends BaseChannel {
 
     const total = snap.trendingGridTotal;
     console.warn(
-      `[YouTube] 인피드 홈: 트렌딩 전용 그리드 미확보 (trending내부=${total}, 게스트빈홈문구=${snap.guestEmptySearchPrompt}) — 검색 결과로 폴백합니다.`
+      `[YouTube] 인피드 홈: 트렌딩 전용 그리드 미확보 (trending내부=${total}, 게스트빈홈문구=${snap.guestEmptySearchPrompt}) — home 지면 유지 상태로 인젝션합니다.`
     );
-    await page.goto(
-      `https://www.youtube.com/results?search_query=${encodeURIComponent("official music video")}`,
-      { waitUntil: "networkidle2", timeout: 45000 }
-    );
-    await this.reapplyPostNavigationChrome(page, mastheadProfileDataUrl);
-    injectSurface = "search";
-    await page
-      .waitForSelector("ytd-two-column-search-results-renderer ytd-video-renderer", {
-        timeout: 22000,
-      })
-      .catch(() => {
-        console.warn("[YouTube] 인피드 홈(검색 폴백): 비디오 결과 행 대기 타임아웃 — 그대로 인젝션 시도");
-      });
-
-    const searchDeadline = Date.now() + 16000;
-    while (Date.now() < searchDeadline) {
-      snap = await this.readYoutubeRichGridSnapshot(page);
-      if (snap.videoRenderers >= 6) break;
-      await page.evaluate<void>(`
-        (() => { window.scrollBy(0, 500); })()
-      `);
-      await new Promise((r) => setTimeout(r, 500));
-    }
-    snap = await this.readYoutubeRichGridSnapshot(page);
-    const searchListRich = snap.richItems + snap.shelfItems;
+    const globalRich = snap.richItems + snap.shelfItems;
     if (this.diagnostics) {
-      this.diagnostics.infeedRichGridCount = searchListRich;
+      this.diagnostics.infeedRichGridCount = globalRich;
       this.diagnostics.infeedTrendingGridCount = snap.trendingGridTotal;
       this.diagnostics.infeedPageSubtype = snap.pageSubtype ?? undefined;
-      this.diagnostics.infeedVideoRendererCount = snap.videoRenderers;
       this.diagnostics.infeedGuestEmptyPrompt = snap.guestEmptySearchPrompt;
     }
-    return { injectSurface, richCount: snap.videoRenderers, pageSubtype: snap.pageSubtype };
+    return { injectSurface, richCount: globalRich, pageSubtype: snap.pageSubtype };
   }
 
   /**
