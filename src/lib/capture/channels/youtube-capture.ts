@@ -1120,7 +1120,9 @@ export class YouTubeCapture extends BaseChannel {
         if (!ctaSecondary) ctaSecondary = "시청";
       }
     } else {
-      if (!ctaPrimary) ctaPrimary = "견적 받기";
+      /** 관련동영상: CTA 1개만 — API/옵션의 보조 CTA는 무시 */
+      if (!ctaPrimary) ctaPrimary = "사이트 방문";
+      ctaSecondary = "";
     }
 
     let targetUrl = request.publisherUrl;

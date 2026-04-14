@@ -1102,7 +1102,10 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                   description1: form.infeedDescription1 || undefined,
                   description2: form.infeedDescription2 || undefined,
                   ctaPrimary: form.infeedCtaPrimary || undefined,
-                  ctaSecondary: form.infeedCtaSecondary || undefined,
+                  ctaSecondary:
+                    form.youtubeAdType === "infeed-watch-next"
+                      ? undefined
+                      : form.infeedCtaSecondary || undefined,
                 }
               : undefined,
         }),
@@ -2137,11 +2140,12 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                           className="text-[11px] font-medium mb-1 block"
                           style={{ color: "var(--color-text-secondary)" }}
                         >
-                          설명 줄 1
+                          설명 첫 줄
                         </label>
                         <input
                           type="text"
                           className="form-input"
+                          placeholder="번거롭고 어려운 의사 검색,굿닥터넷이"
                           value={form.infeedDescription1}
                           onChange={(e) =>
                             setForm((prev) => ({
@@ -2156,11 +2160,12 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                           className="text-[11px] font-medium mb-1 block"
                           style={{ color: "var(--color-text-secondary)" }}
                         >
-                          설명 줄 2
+                          설명 둘째 줄
                         </label>
                         <input
                           type="text"
                           className="form-input"
+                          placeholder="대신 해 드려요"
                           value={form.infeedDescription2}
                           onChange={(e) =>
                             setForm((prev) => ({
@@ -2261,18 +2266,30 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                       }
                     />
                   </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div
+                    className={
+                      form.youtubeAdType === "infeed-watch-next"
+                        ? "grid grid-cols-1 gap-3"
+                        : "grid grid-cols-1 sm:grid-cols-2 gap-3"
+                    }
+                  >
                     <div>
                       <label
                         className="text-[11px] font-medium mb-1 block"
                         style={{ color: "var(--color-text-secondary)" }}
                       >
-                        주 CTA (비우면 기본)
+                        {form.youtubeAdType === "infeed-watch-next"
+                          ? "CTA 버튼 (관련동영상은 1개만)"
+                          : "주 CTA (비우면 기본)"}
                       </label>
                       <input
                         type="text"
                         className="form-input"
-                        placeholder="시작하기 / 사이트 방문 / 견적 받기"
+                        placeholder={
+                          form.youtubeAdType === "infeed-watch-next"
+                            ? "사이트 방문"
+                            : "시작하기 / 사이트 방문 / 견적 받기"
+                        }
                         value={form.infeedCtaPrimary}
                         onChange={(e) =>
                           setForm((prev) => ({
@@ -2282,26 +2299,28 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                         }
                       />
                     </div>
-                    <div>
-                      <label
-                        className="text-[11px] font-medium mb-1 block"
-                        style={{ color: "var(--color-text-secondary)" }}
-                      >
-                        보조 CTA (비우면 기본, 관련동영상은 비우면 1버튼)
-                      </label>
-                      <input
-                        type="text"
-                        className="form-input"
-                        placeholder="시청"
-                        value={form.infeedCtaSecondary}
-                        onChange={(e) =>
-                          setForm((prev) => ({
-                            ...prev,
-                            infeedCtaSecondary: e.target.value,
-                          }))
-                        }
-                      />
-                    </div>
+                    {form.youtubeAdType !== "infeed-watch-next" && (
+                      <div>
+                        <label
+                          className="text-[11px] font-medium mb-1 block"
+                          style={{ color: "var(--color-text-secondary)" }}
+                        >
+                          보조 CTA (비우면 기본)
+                        </label>
+                        <input
+                          type="text"
+                          className="form-input"
+                          placeholder="시청"
+                          value={form.infeedCtaSecondary}
+                          onChange={(e) =>
+                            setForm((prev) => ({
+                              ...prev,
+                              infeedCtaSecondary: e.target.value,
+                            }))
+                          }
+                        />
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

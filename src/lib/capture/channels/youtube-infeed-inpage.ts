@@ -47,20 +47,42 @@ export function runInfeedInjectInPage(...args: unknown[]): boolean {
       p.surface === "search"
         ? ctaRawP
         : p.surface === "watch-next"
-          ? ctaRawP || "견적 받기"
+          ? ctaRawP || "사이트 방문"
           : ctaRawP || "시작하기";
-    const showSecondary = ctaS.length > 0;
+    /** 관련동영상은 CTA 1개만(보조 CTA 무시) */
+    const showSecondary = p.surface !== "watch-next" && ctaS.length > 0;
     const showSearchCtaRow = p.surface === "search" && (ctaP.length > 0 || showSecondary);
 
     const sponsorHtml = `<span style="font-weight:600;color:var(--yt-spec-text-primary,#0f0f0f)">스폰서</span><span style="margin:0 4px;color:var(--yt-spec-text-secondary,#606060)">·</span><span style="color:var(--yt-spec-text-secondary,#606060)">${esc(
       sponsor
     )}</span>`;
 
-    const descBlock =
-      p.surface === "watch-next" && (d1 || d2)
-        ? `<div style="margin-top:6px;font-family:Roboto,'Noto Sans KR',Arial,sans-serif;font-size:1.2rem;line-height:1.5rem;color:var(--yt-spec-text-secondary,#606060);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">${esc(
-            [d1, d2].filter(Boolean).join(" ")
-          )}</div>`
+    const descBlockWatchNext =
+      p.surface === "watch-next"
+        ? (() => {
+            const l1 = (d1 || "").trim();
+            const l2 = (d2 || "").trim();
+            let inner = "";
+            if (!l1 && !l2) {
+              inner =
+                esc("번거롭고 어려운 의사 검색,굿닥터넷이") + "<br>" + esc("대신 해 드려요");
+            } else if (l1 && l2) {
+              inner = esc(l1) + "<br>" + esc(l2);
+            } else if (l1.includes("\n")) {
+              inner = l1
+                .split(/\n/)
+                .map((x) => x.trim())
+                .filter(Boolean)
+                .slice(0, 3)
+                .map((x) => esc(x))
+                .join("<br>");
+            } else if (l1) {
+              inner = esc(l1);
+            } else {
+              inner = esc(l2);
+            }
+            return `<div style="margin-top:6px;font-family:Roboto,'Noto Sans KR',Arial,sans-serif;font-size:1.2rem;line-height:1.5rem;color:var(--yt-spec-text-secondary,#606060);display:block;overflow:hidden;max-height:4.6rem;">${inner}</div>`;
+          })()
         : "";
 
     const menuBtn = `<button type="button" aria-label="메뉴" style="flex-shrink:0;background:none;border:none;padding:4px;cursor:default;color:var(--yt-spec-text-primary,#0f0f0f);border-radius:50%;width:40px;height:40px;display:flex;align-items:center;justify-content:center;margin:-4px -4px 0 0;"><svg height="24" viewBox="0 0 24 24" width="24"><path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z" fill="currentColor"/></svg></button>`;
@@ -394,7 +416,7 @@ export function runInfeedInjectInPage(...args: unknown[]): boolean {
     const ctw = compactTh?.getBoundingClientRect().width || 0;
     if (ctw > 80) compactThumbW = Math.round(ctw);
 
-    const sponsorWatchMarginTop = !d1 && !(d2 || "").trim() ? "2px" : "4px";
+    const sponsorWatchMarginTop = "4px";
 
     const wrap = document.createElement("div");
     wrap.setAttribute("data-injected", "admate-youtube-infeed");
@@ -410,8 +432,8 @@ export function runInfeedInjectInPage(...args: unknown[]): boolean {
     wrap.style.width = alignW + "px";
     wrap.innerHTML = `
       <div style="display:flex;flex-direction:row;gap:10px;align-items:flex-start;width:100%;">
-        <div style="position:relative;flex-shrink:0;width:${compactThumbW}px;aspect-ratio:16/9;border-radius:8px;overflow:hidden;background:#000;">
-          <img src="${thumb}" alt="" style="width:100%;height:100%;object-fit:cover;display:block;" />
+        <div style="position:relative;flex-shrink:0;width:${compactThumbW}px;height:${compactThumbW}px;border-radius:12px;overflow:hidden;background:#000;">
+          <img src="${thumb}" alt="" style="width:100%;height:100%;object-fit:cover;display:block;vertical-align:bottom;" />
           ${extIcon}
         </div>
         <div style="flex:1;min-width:0;padding-top:0;">
@@ -420,7 +442,7 @@ export function runInfeedInjectInPage(...args: unknown[]): boolean {
               <h3 style="margin:0;padding:0;font-size:max(1.6rem,calc(var(--ytd-metadata-line-title-font-size,1.4rem) * 1.12));font-weight:400;line-height:1.32;letter-spacing:0.15px;color:var(--yt-spec-text-primary,#0f0f0f);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">${esc(
                 title
               )}</h3>
-              ${descBlock}
+              ${descBlockWatchNext}
             </div>
             <div style="justify-self:end;align-self:start;z-index:2;transform:translateX(1px);">${menuBtnSearch}</div>
           </div>
@@ -443,6 +465,19 @@ export function runInfeedInjectInPage(...args: unknown[]): boolean {
     } else {
       sidebar.insertBefore(wrap, sidebar.firstChild);
     }
+
+    const roundSid = "admate-watch-next-compact-thumb-round";
+    let stRound = document.getElementById(roundSid) as HTMLStyleElement | null;
+    if (!stRound) {
+      stRound = document.createElement("style");
+      stRound.id = roundSid;
+      document.head.appendChild(stRound);
+    }
+    stRound.textContent =
+      "ytd-watch-next-secondary-results-renderer ytd-compact-video-renderer #thumbnail," +
+      "#secondary-inner ytd-compact-video-renderer #thumbnail," +
+      "#secondary ytd-compact-video-renderer #thumbnail{" +
+      "border-radius:12px!important;overflow:hidden!important;}";
     return true;
   } catch (e) {
     console.error("[admate infeed]", e);
