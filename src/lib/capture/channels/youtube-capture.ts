@@ -1170,12 +1170,17 @@ export class YouTubeCapture extends BaseChannel {
 
     let ctaPrimary = infeedOpts.ctaPrimary?.trim() || "";
     let ctaSecondary = infeedOpts.ctaSecondary?.trim() || "";
+    /** 검색: 제목 아래 한 줄·주/보조 CTA가 모두 비면 버튼·기본 CTA 없이 스폰서만 제목 바로 아래 */
+    const infeedSearchTitleOnly =
+      adType === "infeed-search" && !description1 && !ctaPrimary && !ctaSecondary;
     if (adType === "infeed-home") {
       if (!ctaPrimary) ctaPrimary = "시작하기";
       if (!ctaSecondary) ctaSecondary = "시청";
     } else if (adType === "infeed-search") {
-      if (!ctaPrimary) ctaPrimary = "사이트 방문";
-      if (!ctaSecondary) ctaSecondary = "시청";
+      if (!infeedSearchTitleOnly) {
+        if (!ctaPrimary) ctaPrimary = "사이트 방문";
+        if (!ctaSecondary) ctaSecondary = "시청";
+      }
     } else {
       if (!ctaPrimary) ctaPrimary = "견적 받기";
     }

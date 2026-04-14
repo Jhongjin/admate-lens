@@ -37,9 +37,11 @@ export function runInfeedInjectInPage(...args: unknown[]): boolean {
     const d1 = p.description1 || "";
     const d2 = p.description2 || "";
     const sponsor = p.sponsorName || "brand.example";
-    const ctaP = p.ctaPrimary || "시작하기";
+    const ctaRawP = (p.ctaPrimary || "").trim();
     const ctaS = (p.ctaSecondary || "").trim();
+    const ctaP = p.surface === "search" ? ctaRawP : ctaRawP || "시작하기";
     const showSecondary = ctaS.length > 0;
+    const showSearchCtaRow = p.surface === "search" && (ctaP.length > 0 || showSecondary);
 
     const sponsorHtml = `<span style="font-weight:600;color:var(--yt-spec-text-primary,#0f0f0f)">스폰서</span><span style="margin:0 4px;color:var(--yt-spec-text-secondary,#606060)">·</span><span style="color:var(--yt-spec-text-secondary,#606060)">${esc(
       sponsor
@@ -69,9 +71,13 @@ export function runInfeedInjectInPage(...args: unknown[]): boolean {
           )}</button>`
         : "";
       const primW = showSecondary ? "flex:1" : "width:100%";
-      return `<div style="display:flex;flex-direction:row;gap:${gap};margin-top:${compact ? "8px" : "10px"};align-items:center;width:100%;">${sec}<button type="button" style="${btnBase}${primW};min-width:0;background:#0f0f0f;color:#fff;border:1px solid #0f0f0f;">${esc(
-        ctaP
-      )}</button></div>`;
+      const prim =
+        ctaP.length > 0
+          ? `<button type="button" style="${btnBase}${primW};min-width:0;background:#0f0f0f;color:#fff;border:1px solid #0f0f0f;">${esc(
+              ctaP
+            )}</button>`
+          : "";
+      return `<div style="display:flex;flex-direction:row;gap:${gap};margin-top:${compact ? "8px" : "10px"};align-items:center;width:100%;">${sec}${prim}</div>`;
     };
 
     /**
@@ -198,7 +204,8 @@ export function runInfeedInjectInPage(...args: unknown[]): boolean {
       wrap.setAttribute("data-injected", "admate-youtube-infeed");
       wrap.style.cssText =
         "display:block;margin:0 0 16px 0;padding:0 16px;box-sizing:border-box;font-family:Roboto,'Noto Sans KR',Arial,sans-serif;";
-      const searchBtns = `<div style="display:flex;gap:8px;align-items:center;width:100%;max-width:420px;margin-top:12px;">
+      const searchBtns = showSearchCtaRow
+        ? `<div style="display:flex;gap:8px;align-items:center;width:100%;max-width:420px;margin-top:12px;">
         ${
           showSecondary
             ? `<button type="button" style="${btnBase}flex:1;background:#f2f2f2;color:#0f0f0f;border:1px solid #e6e6e6;">${esc(
@@ -206,10 +213,16 @@ export function runInfeedInjectInPage(...args: unknown[]): boolean {
               )}</button>`
             : ""
         }
-        <button type="button" style="${btnBase}${showSecondary ? "flex:1;" : "width:100%;"}background:#0f0f0f;color:#fff;border:1px solid #0f0f0f;">${esc(
-          ctaP
-        )}</button>
-      </div>`;
+        ${
+          ctaP.length > 0
+            ? `<button type="button" style="${btnBase}${showSecondary ? "flex:1;" : "width:100%;"}background:#0f0f0f;color:#fff;border:1px solid #0f0f0f;">${esc(
+                ctaP
+              )}</button>`
+            : ""
+        }
+      </div>`
+        : "";
+      const sponsorSearchMarginTop = !d1 && !showSearchCtaRow ? "2px" : "5px";
       const firstShortWidth = (() => {
         const shorts = document.querySelector(
           "ytd-rich-shelf-renderer ytd-reel-item-renderer, ytd-reel-shelf-renderer ytd-reel-item-renderer"
@@ -239,7 +252,7 @@ export function runInfeedInjectInPage(...args: unknown[]): boolean {
               </div>
               <div style="justify-self:end;align-self:start;z-index:6;transform:translateX(2px);">${menuBtnSearch}</div>
             </div>
-            <div style="margin-top:5px;display:flex;align-items:center;gap:${avatar ? "8px" : "0"};font-size:1.2rem;">
+            <div style="margin-top:${sponsorSearchMarginTop};display:flex;align-items:center;gap:${avatar ? "8px" : "0"};font-size:1.2rem;">
               ${
                 avatar
                   ? `<div style="width:24px;height:24px;border-radius:50%;overflow:hidden;flex-shrink:0;background:#eee;">
