@@ -242,12 +242,25 @@ export function runInfeedInjectInPage(...args: unknown[]): boolean {
         }
         return rows;
       };
+      /** PC 검색 피드 중간: 네이티브 행과 같은 #contents 폭·썸네일 열에 맞춤 */
+      const rowsForFeed = placement === "feed" ? collectSearchResultRows(primaryContents) : [];
+      let feedThumbW = 0;
+      if (placement === "feed" && rowsForFeed.length > 0) {
+        const anchorIdxPre = Math.min(insertAfterIdx, rowsForFeed.length - 1);
+        const anchorEl = rowsForFeed[anchorIdxPre];
+        const thumbEl =
+          anchorEl.tagName === "YTD-VIDEO-RENDERER"
+            ? (anchorEl.querySelector("#thumbnail") as HTMLElement | null)
+            : (primaryContents.querySelector("ytd-video-renderer #thumbnail") as HTMLElement | null);
+        const tw = thumbEl?.getBoundingClientRect().width || 0;
+        if (tw > 80) feedThumbW = Math.round(tw);
+      }
       const wrap = document.createElement("div");
       wrap.setAttribute("data-injected", "admate-youtube-infeed");
       wrap.setAttribute("data-admate-search-placement", placement);
       wrap.style.cssText =
         placement === "feed"
-          ? "display:block;margin:12px 0 24px 0;padding:0 16px;box-sizing:border-box;font-family:Roboto,'Noto Sans KR',Arial,sans-serif;"
+          ? "display:block;margin:0 0 16px 0;padding:0;box-sizing:border-box;width:100%;font-family:Roboto,'Noto Sans KR',Arial,sans-serif;"
           : "display:block;margin:0 0 16px 0;padding:0 16px;box-sizing:border-box;font-family:Roboto,'Noto Sans KR',Arial,sans-serif;";
       const searchBtns = showSearchCtaRow
         ? `<div style="display:flex;gap:8px;align-items:center;width:100%;max-width:420px;margin-top:12px;">
@@ -269,6 +282,13 @@ export function runInfeedInjectInPage(...args: unknown[]): boolean {
         : "";
       const sponsorSearchMarginTop = !d1 && !showSearchCtaRow ? "0px" : "2px";
       const firstShortWidth = (() => {
+        if (placement === "feed" && feedThumbW > 80) return feedThumbW;
+        if (placement === "feed") {
+          const anyThumb = primaryContents.querySelector("ytd-video-renderer #thumbnail") as HTMLElement | null;
+          const fw = anyThumb?.getBoundingClientRect().width || 0;
+          if (fw > 80) return Math.round(fw);
+          return 360;
+        }
         const shorts = document.querySelector(
           "ytd-rich-shelf-renderer ytd-reel-item-renderer, ytd-reel-shelf-renderer ytd-reel-item-renderer"
         ) as HTMLElement | null;
@@ -320,13 +340,13 @@ export function runInfeedInjectInPage(...args: unknown[]): boolean {
       let placed = false;
       let feedLog = "";
       if (placement === "feed") {
-        const rows = collectSearchResultRows(primaryContents);
+        const rows = rowsForFeed.length ? rowsForFeed : collectSearchResultRows(primaryContents);
         if (rows.length > 0) {
           const anchorIdx = Math.min(insertAfterIdx, rows.length - 1);
           const anchor = rows[anchorIdx];
           anchor.insertAdjacentElement("afterend", wrap);
           placed = !!wrap.parentElement;
-          feedLog = "anchorIdx=" + anchorIdx + " rows=" + rows.length;
+          feedLog = "anchorIdx=" + anchorIdx + " rows=" + rows.length + " thumbW=" + firstShortWidth;
         }
         if (!placed) {
           primaryContents.insertBefore(wrap, primaryContents.firstChild);
