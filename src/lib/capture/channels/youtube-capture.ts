@@ -74,6 +74,8 @@ export interface YouTubeDiagnostics {
   infeedHomeInjectionSkipped?: boolean;
   /** 인피드 홈: URL 부트스트랩 순회 중 관측한 #primary 신호 최대값 */
   infeedBootstrapBest?: number;
+  /** 인피드 홈: 브라우즈 본문 0건일 때 검색 결과로 세션 워밍 후 브라우즈 재진입 시 true */
+  infeedHomeSearchWarmUsed?: boolean;
 }
 
 /**
@@ -808,20 +810,34 @@ export class YouTubeCapture extends BaseChannel {
         : 0;
       const trendingStrictTotal = trendingRichItems + trendingShelfItems;
 
-      const primaryEl = document.querySelector("#primary");
-      let primaryRichGridCount = 0;
-      if (primaryEl) {
-        const pa = primaryEl.querySelectorAll("ytd-rich-grid-renderer ytd-rich-item-renderer").length;
-        const pb = primaryEl.querySelectorAll(
+      const countInRoot = (root: Element | null) => {
+        if (!root) return 0;
+        const pa = root.querySelectorAll("ytd-rich-grid-renderer ytd-rich-item-renderer").length;
+        const pb = root.querySelectorAll(
           "ytd-rich-grid-renderer ytd-rich-grid-row ytd-rich-item-renderer"
         ).length;
-        const pc = primaryEl.querySelectorAll(
+        const pc = root.querySelectorAll(
           "ytd-rich-shelf-renderer ytd-rich-item-renderer, ytd-rich-section-renderer ytd-rich-item-renderer"
         ).length;
-        const pv = primaryEl.querySelectorAll("ytd-video-renderer").length;
-        const pg = primaryEl.querySelectorAll("ytd-grid-video-renderer").length;
-        const pr = primaryEl.querySelectorAll("ytd-rich-item-renderer").length;
-        primaryRichGridCount = Math.max(pa, pb, pc, pv, pg, pr);
+        const pv = root.querySelectorAll("ytd-video-renderer").length;
+        const pg = root.querySelectorAll("ytd-grid-video-renderer").length;
+        const pr = root.querySelectorAll("ytd-rich-item-renderer").length;
+        return Math.max(pa, pb, pc, pv, pg, pr);
+      };
+      const primaryEl = document.querySelector("#primary");
+      let primaryRichGridCount = countInRoot(primaryEl);
+      const app = document.querySelector("ytd-app");
+      const guide = app?.querySelector("#guide, ytd-mini-guide-renderer, ytd-guide-renderer");
+      const contentRoot = app?.querySelector("#content");
+      if (contentRoot) {
+        const sel =
+          "ytd-rich-item-renderer, ytd-video-renderer, ytd-grid-video-renderer, ytd-reel-item-renderer";
+        let outside = 0;
+        contentRoot.querySelectorAll(sel).forEach((el: Element) => {
+          if (guide && guide.contains(el)) return;
+          outside++;
+        });
+        primaryRichGridCount = Math.max(primaryRichGridCount, outside);
       }
 
       const path = location.pathname || "";
@@ -879,25 +895,87 @@ export class YouTubeCapture extends BaseChannel {
     await new Promise((r) => setTimeout(r, 4500));
   }
 
-  /** 브라우즈 피드 본문: 리치 그리드·리스트형 video-renderer 등 신호 중 최대값 */
+  /** 브라우즈 피드 본문: `#primary` + `ytd-app #content`(가이드 제외) 동영상·리치 카드 신호 */
   private async countPrimaryBrowseRichItems(page: IPageHandle): Promise<number> {
     return page.evaluate<number>(`
       (() => {
-        const p = document.querySelector("#primary");
-        if (!p) return 0;
-        const a = p.querySelectorAll("ytd-rich-grid-renderer ytd-rich-item-renderer").length;
-        const b = p.querySelectorAll(
-          "ytd-rich-grid-renderer ytd-rich-grid-row ytd-rich-item-renderer"
-        ).length;
-        const c = p.querySelectorAll(
-          "ytd-rich-shelf-renderer ytd-rich-item-renderer, ytd-rich-section-renderer ytd-rich-item-renderer"
-        ).length;
-        const v = p.querySelectorAll("ytd-video-renderer").length;
-        const g = p.querySelectorAll("ytd-grid-video-renderer").length;
-        const r = p.querySelectorAll("ytd-rich-item-renderer").length;
-        return Math.max(a, b, c, v, g, r);
+        const countInRoot = (root) => {
+          if (!root) return 0;
+          const a = root.querySelectorAll("ytd-rich-grid-renderer ytd-rich-item-renderer").length;
+          const b = root.querySelectorAll(
+            "ytd-rich-grid-renderer ytd-rich-grid-row ytd-rich-item-renderer"
+          ).length;
+          const c = root.querySelectorAll(
+            "ytd-rich-shelf-renderer ytd-rich-item-renderer, ytd-rich-section-renderer ytd-rich-item-renderer"
+          ).length;
+          const v = root.querySelectorAll("ytd-video-renderer").length;
+          const g = root.querySelectorAll("ytd-grid-video-renderer").length;
+          const r = root.querySelectorAll("ytd-rich-item-renderer").length;
+          return Math.max(a, b, c, v, g, r);
+        };
+        const primary = document.querySelector("#primary");
+        let m = countInRoot(primary);
+        const app = document.querySelector("ytd-app");
+        const guide = app?.querySelector("#guide, ytd-mini-guide-renderer, ytd-guide-renderer");
+        const contentRoot = app?.querySelector("#content");
+        if (contentRoot) {
+          const sel =
+            "ytd-rich-item-renderer, ytd-video-renderer, ytd-grid-video-renderer, ytd-reel-item-renderer";
+          let outside = 0;
+          contentRoot.querySelectorAll(sel).forEach((el) => {
+            if (guide && guide.contains(el)) return;
+            outside++;
+          });
+          m = Math.max(m, outside);
+        }
+        return m;
       })()
     `);
+  }
+
+  /** 브라우즈 본문이 계속 0일 때 DOM 상태만 짧게 로그 (원인 추적) */
+  private async logYoutubeBrowseDomProbe(page: IPageHandle): Promise<void> {
+    const s = await page.evaluate<string>(`
+      (() => {
+        const app = !!document.querySelector("ytd-app");
+        const primary = !!document.querySelector("#primary");
+        const content = !!document.querySelector("ytd-app #content");
+        const browse = document.querySelectorAll("ytd-browse").length;
+        const ph = (document.querySelector("#primary")?.innerHTML || "").length;
+        const ytdPlayer = document.querySelectorAll("ytd-player").length;
+        return "ytd-app=" + app + " #primary=" + primary + " #content=" + content +
+          " ytd-browse=" + browse + " primaryHtmlLen=" + ph + " ytd-player=" + ytdPlayer;
+      })()
+    `);
+    console.warn("[YouTube] 인피드 홈: DOM 프로브 " + s);
+  }
+
+  /**
+   * 브라우즈 URL에서 본문이 전혀 안 붙을 때만: 검색 결과(성공 지면)에 잠시 머문 뒤 브라우즈로 복귀.
+   * 최종 캡처 지면은 여전히 트렌딩/홈(검색 결과로 캡처하지 않음).
+   */
+  private async warmBrowseViaSearchResults(
+    page: IPageHandle,
+    mastheadProfileDataUrl: string,
+    thenBrowseUrl: string
+  ): Promise<number> {
+    try {
+      console.log(
+        "[YouTube] 인피드 홈: 검색 결과로 세션 워밍 → 브라우즈 재진입 (최종 URL은 브라우즈만 유지)"
+      );
+      const searchUrl =
+        "https://www.youtube.com/results?search_query=news&hl=ko&gl=KR&app=desktop";
+      await page.goto(searchUrl, { waitUntil: "domcontentloaded", timeout: 50000 });
+      await new Promise((r) => setTimeout(r, 5000));
+      await this.reapplyPostNavigationChrome(page, mastheadProfileDataUrl);
+      await this.primeYoutubeBrowsePrimaryGrid(page, 2, 10000);
+      await this.gotoYoutubeInfeedBrowseFeed(page, thenBrowseUrl);
+      await this.reapplyPostNavigationChrome(page, mastheadProfileDataUrl);
+      return await this.primeYoutubeBrowsePrimaryGrid(page, 3, 14000);
+    } catch (e) {
+      console.warn("[YouTube] 인피드 홈: 검색 경유 워밍 실패", e);
+      return 0;
+    }
   }
 
   /**
@@ -927,11 +1005,25 @@ export class YouTubeCapture extends BaseChannel {
       }
       if (n >= 8) break;
     }
+    if (bestCount === 0) {
+      if (this.diagnostics) this.diagnostics.infeedHomeSearchWarmUsed = true;
+      const warmed = await this.warmBrowseViaSearchResults(
+        page,
+        mastheadProfileDataUrl,
+        candidates[0]!.url
+      );
+      if (warmed > bestCount) {
+        bestCount = warmed;
+        bestUrl = candidates[0]!.url;
+      }
+    }
     if (bestCount > 0) {
       console.log(`[YouTube] 인피드 홈: 본문 최대 ${bestCount} — 해당 URL로 마무리 이동`);
       await this.gotoYoutubeInfeedBrowseFeed(page, bestUrl);
       await this.reapplyPostNavigationChrome(page, mastheadProfileDataUrl);
       await this.primeYoutubeBrowsePrimaryGrid(page, 3, 8000);
+    } else {
+      await this.logYoutubeBrowseDomProbe(page);
     }
     return { bestCount, bestUrl };
   }
@@ -1679,6 +1771,7 @@ export class YouTubeCapture extends BaseChannel {
         `[YouTube] ===== 인피드 캡처 완료 (${injectSurface}) url=${d?.infeedCaptureUrl ?? ""} ` +
           `feedMode=${d?.infeedHomeFeedMode ?? "-"} primary=${d?.infeedPrimaryRichGridCount ?? "-"} ` +
           `bootstrapBest=${d?.infeedBootstrapBest ?? "-"} injectSkipped=${d?.infeedHomeInjectionSkipped === true} ` +
+          `searchWarm=${d?.infeedHomeSearchWarmUsed === true} ` +
           `trendingBrowse=${d?.infeedTrendingGridCount ?? "-"} guest빈홈=${d?.infeedGuestEmptyPrompt ?? "-"} =====`
       );
     } else {
