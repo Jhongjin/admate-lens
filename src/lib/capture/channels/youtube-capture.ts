@@ -1318,12 +1318,33 @@ export class YouTubeCapture extends BaseChannel {
       const root = document.createElement("div");
       root.setAttribute("data-admate-synthetic-feed-root", "1");
       root.style.cssText =
-        "box-sizing:border-box;width:100%;max-width:1294px;margin:0 auto;padding:12px 24px 32px 36px;font-family:Roboto,'Noto Sans KR',Arial,sans-serif;";
+        "box-sizing:border-box;width:100%;max-width:1294px;margin:0 auto;padding:4px 24px 32px 36px;font-family:Roboto,'Noto Sans KR',Arial,sans-serif;";
       const chipRow = document.createElement("div");
       chipRow.setAttribute("data-admate-synthetic-chip-row", "1");
       chipRow.style.cssText =
-        "display:flex;align-items:center;gap:8px;overflow-x:auto;white-space:nowrap;padding:2px 0 12px 0;margin-bottom:6px;";
-      const chips = ["전체", "라이브", "게임", "뉴스", "음악", "믹스", "최근에 업로드된 동영상", "감상한 동영상", "새로운 맞춤 동영상"];
+        "display:flex;align-items:center;gap:8px;overflow-x:auto;white-space:nowrap;padding:0 0 8px 0;margin-bottom:4px;";
+      const chipPool = [
+        "전체",
+        "라이브",
+        "게임",
+        "뉴스",
+        "음악",
+        "믹스",
+        "최근에 업로드된 동영상",
+        "감상한 동영상",
+        "새로운 맞춤 동영상",
+        "AI",
+        "브이로그",
+        "요리",
+        "트렌딩",
+        "스포츠",
+        "영화",
+        "학습",
+      ];
+      const chips = [...chipPool]
+        .sort(() => Math.random() - 0.5)
+        .slice(0, 9);
+      if (!chips.includes("전체")) chips.unshift("전체");
       chips.forEach((txt, i) => {
         const b = document.createElement("button");
         b.type = "button";
@@ -1336,11 +1357,28 @@ export class YouTubeCapture extends BaseChannel {
         chipRow.appendChild(b);
       });
       const grid = document.createElement("div");
+      // 인피드 광고 삽입 위치는 첫 롱폼 그리드 기준으로 유지
       grid.setAttribute("data-admate-synthetic-feed-grid", "1");
       grid.style.cssText =
         "display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:16px 12px;width:100%;";
-      for (const it of list) {
-        if (!/^[a-zA-Z0-9_-]{6,15}$/.test(it.id)) continue;
+      const shortsSection = document.createElement("div");
+      shortsSection.setAttribute("data-admate-synthetic-shorts-row", "1");
+      shortsSection.style.cssText =
+        "margin:18px 0 14px 0;";
+      const shortsTitle = document.createElement("div");
+      shortsTitle.style.cssText =
+        "display:flex;align-items:center;gap:8px;margin-bottom:10px;font:700 16px Roboto,'Noto Sans KR',Arial,sans-serif;color:var(--yt-spec-text-primary,#0f0f0f);";
+      shortsTitle.innerHTML = '<span style="font-size:15px;">⚡</span><span>Shorts</span>';
+      const shortsRow = document.createElement("div");
+      shortsRow.style.cssText =
+        "display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px;width:100%;";
+      shortsSection.appendChild(shortsTitle);
+      shortsSection.appendChild(shortsRow);
+      const postShortsGrid = document.createElement("div");
+      postShortsGrid.setAttribute("data-admate-synthetic-post-shorts-grid", "1");
+      postShortsGrid.style.cssText =
+        "display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:16px 12px;width:100%;";
+      const makeWideCard = (it: SyntheticInfeedHomeItem): HTMLElement => {
         const card = document.createElement("div");
         card.setAttribute("data-admate-synthetic-feed-card", "1");
         card.style.cssText =
@@ -1369,10 +1407,43 @@ export class YouTubeCapture extends BaseChannel {
           "</div>" +
           metaSecond +
           "</div>";
-        grid.appendChild(card);
+        return card;
+      };
+      const makeShortCard = (it: SyntheticInfeedHomeItem): HTMLElement => {
+        const card = document.createElement("div");
+        card.setAttribute("data-admate-synthetic-short-card", "1");
+        card.style.cssText = "display:flex;flex-direction:column;min-width:0;";
+        const safeTitle = esc(it.title);
+        const safeViews = it.viewText ? esc(it.viewText) : "조회수 1.2만회";
+        card.innerHTML =
+          '<div style="position:relative;width:100%;aspect-ratio:9/16;border-radius:12px;overflow:hidden;background:#000;">' +
+          '<img src="https://i.ytimg.com/vi/' +
+          it.id +
+          '/hqdefault.jpg" alt="" style="width:100%;height:100%;object-fit:cover;display:block;" loading="lazy" />' +
+          "</div>" +
+          '<div style="margin-top:8px;font-size:13px;font-weight:500;line-height:18px;color:var(--yt-spec-text-primary,#0f0f0f);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">' +
+          safeTitle +
+          "</div>" +
+          '<div style="margin-top:4px;font-size:11px;line-height:16px;color:var(--yt-spec-text-secondary,#606060);">' +
+          safeViews +
+          "</div>";
+        return card;
+      };
+      for (const it of list) {
+        if (!/^[a-zA-Z0-9_-]{6,15}$/.test(it.id)) continue;
+        const idx = grid.childElementCount + shortsRow.childElementCount + postShortsGrid.childElementCount;
+        if (idx < 4) {
+          grid.appendChild(makeWideCard(it));
+        } else if (idx < 9) {
+          shortsRow.appendChild(makeShortCard(it));
+        } else {
+          postShortsGrid.appendChild(makeWideCard(it));
+        }
       }
       root.appendChild(chipRow);
       root.appendChild(grid);
+      if (shortsRow.childElementCount > 0) root.appendChild(shortsSection);
+      if (postShortsGrid.childElementCount > 0) root.appendChild(postShortsGrid);
       const chipBar = primary.querySelector(
         "ytd-feed-filter-chip-bar-renderer, yt-chip-cloud-renderer, ytd-rich-grid-renderer"
       );
