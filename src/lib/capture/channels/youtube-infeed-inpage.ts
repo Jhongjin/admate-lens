@@ -158,6 +158,86 @@ export function runInfeedInjectInPage(...args: unknown[]): boolean {
         </div>`;
       return wrap;
     };
+    const buildHomeFeedCardFromTemplate = (templateItem: Element): HTMLElement | null => {
+      const cloned = templateItem.cloneNode(true) as HTMLElement;
+      cloned.setAttribute("data-injected", "admate-youtube-infeed");
+      cloned.setAttribute("data-admate-home-native-like", "1");
+
+      cloned.querySelectorAll("a[href]").forEach((a) => {
+        a.setAttribute("href", "javascript:void(0)");
+        a.removeAttribute("target");
+        a.setAttribute("rel", "noopener noreferrer");
+      });
+
+      const thumbImg = cloned.querySelector(
+        "#thumbnail img, ytd-thumbnail img, yt-image img"
+      ) as HTMLImageElement | null;
+      if (thumbImg) {
+        thumbImg.src = thumb;
+        thumbImg.removeAttribute("srcset");
+      }
+
+      const titleNode = cloned.querySelector(
+        "#video-title, a#video-title, #video-title-link, h3 a"
+      ) as HTMLElement | null;
+      if (titleNode) titleNode.textContent = title;
+
+      const channelNode = cloned.querySelector(
+        "#channel-name #text, ytd-channel-name #text, #text.ytd-channel-name"
+      ) as HTMLElement | null;
+      if (channelNode) channelNode.textContent = sponsor;
+
+      const metaSpans = cloned.querySelectorAll(
+        "#metadata-line span, #metadata-line yt-formatted-string"
+      );
+      if (metaSpans[0]) (metaSpans[0] as HTMLElement).textContent = "광고";
+      if (metaSpans[1]) (metaSpans[1] as HTMLElement).textContent = sponsor;
+
+      const avatarImg = cloned.querySelector(
+        "#avatar img, #avatar-link img, ytd-channel-name img"
+      ) as HTMLImageElement | null;
+      if (avatar && avatarImg) {
+        avatarImg.src = avatar;
+        avatarImg.removeAttribute("srcset");
+      } else if (!avatar) {
+        const avatarWrap = cloned.querySelector("#avatar, #avatar-link, #channel-avatar");
+        if (avatarWrap) (avatarWrap as HTMLElement).style.display = "none";
+      }
+
+      const detailsHost =
+        (cloned.querySelector("#details") as HTMLElement | null) ||
+        (cloned.querySelector("#meta") as HTMLElement | null) ||
+        (cloned.querySelector("#metadata") as HTMLElement | null) ||
+        (cloned.querySelector("#content") as HTMLElement | null);
+
+      if (detailsHost) {
+        detailsHost
+          .querySelectorAll('[data-admate-home-cta="1"]')
+          .forEach((el) => el.remove());
+        const ctaWrap = document.createElement("div");
+        ctaWrap.setAttribute("data-admate-home-cta", "1");
+        ctaWrap.style.cssText = "display:flex;gap:8px;margin-top:8px;align-items:center;";
+        if (showSecondary) {
+          const secondaryBtn = document.createElement("button");
+          secondaryBtn.type = "button";
+          secondaryBtn.textContent = ctaS;
+          secondaryBtn.style.cssText =
+            "border:1px solid #e5e5e5;background:#f2f2f2;color:#0f0f0f;height:32px;padding:0 12px;border-radius:16px;font:500 12px Roboto,'Noto Sans KR',Arial,sans-serif;";
+          ctaWrap.appendChild(secondaryBtn);
+        }
+        if (ctaP.length > 0) {
+          const primaryBtn = document.createElement("button");
+          primaryBtn.type = "button";
+          primaryBtn.textContent = ctaP;
+          primaryBtn.style.cssText =
+            "border:1px solid #0f0f0f;background:#0f0f0f;color:#fff;height:32px;padding:0 12px;border-radius:16px;font:500 12px Roboto,'Noto Sans KR',Arial,sans-serif;";
+          ctaWrap.appendChild(primaryBtn);
+        }
+        if (ctaWrap.childElementCount > 0) detailsHost.appendChild(ctaWrap);
+      }
+
+      return cloned;
+    };
 
     if (p.surface === "home") {
       const synthRoot = document.querySelector("#primary [data-admate-synthetic-feed-root]");
@@ -179,10 +259,16 @@ export function runInfeedInjectInPage(...args: unknown[]): boolean {
         document.querySelector("#primary ytd-rich-grid-renderer ytd-rich-item-renderer") ||
         document.querySelector("ytd-rich-grid-renderer ytd-rich-item-renderer");
       if (richItem) {
+        const nativeLike = buildHomeFeedCardFromTemplate(richItem);
+        if (nativeLike && richItem.parentElement) {
+          richItem.parentElement.insertBefore(nativeLike, richItem);
+          console.log("[admate infeed] home: 첫 rich-item 앞에 네이티브형 광고 삽입");
+          return true;
+        }
         const host = (richItem.querySelector("#dismissable") as HTMLElement) || (richItem as HTMLElement);
         host.innerHTML = "";
         host.appendChild(buildHomeFeedCard());
-        console.log("[admate infeed] home: 첫 rich-item 치환");
+        console.log("[admate infeed] home: 첫 rich-item 치환(폴백)");
         return true;
       }
 
