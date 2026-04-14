@@ -43,7 +43,12 @@ export function runInfeedInjectInPage(...args: unknown[]): boolean {
     const sponsor = p.sponsorName || "brand.example";
     const ctaRawP = (p.ctaPrimary || "").trim();
     const ctaS = (p.ctaSecondary || "").trim();
-    const ctaP = p.surface === "search" ? ctaRawP : ctaRawP || "시작하기";
+    const ctaP =
+      p.surface === "search"
+        ? ctaRawP
+        : p.surface === "watch-next"
+          ? ctaRawP || "견적 받기"
+          : ctaRawP || "시작하기";
     const showSecondary = ctaS.length > 0;
     const showSearchCtaRow = p.surface === "search" && (ctaP.length > 0 || showSecondary);
 
@@ -53,7 +58,7 @@ export function runInfeedInjectInPage(...args: unknown[]): boolean {
 
     const descBlock =
       p.surface === "watch-next" && (d1 || d2)
-        ? `<div style="margin-top:4px;font-family:Roboto,'Noto Sans KR',Arial,sans-serif;font-size:1.2rem;line-height:1.45rem;color:var(--yt-spec-text-secondary,#606060);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">${esc(
+        ? `<div style="margin-top:6px;font-family:Roboto,'Noto Sans KR',Arial,sans-serif;font-size:1.2rem;line-height:1.5rem;color:var(--yt-spec-text-secondary,#606060);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">${esc(
             [d1, d2].filter(Boolean).join(" ")
           )}</div>`
         : "";
@@ -383,33 +388,52 @@ export function runInfeedInjectInPage(...args: unknown[]): boolean {
       "ytd-feed-filter-chip-bar-renderer, yt-chip-cloud-renderer, #chip-bar, iron-selector#chips"
     );
 
+    const firstVideo = sidebar.querySelector("ytd-compact-video-renderer") as HTMLElement | null;
+    let compactThumbW = 168;
+    const compactTh = firstVideo?.querySelector("#thumbnail") as HTMLElement | null;
+    const ctw = compactTh?.getBoundingClientRect().width || 0;
+    if (ctw > 80) compactThumbW = Math.round(ctw);
+
+    const sponsorWatchMarginTop = !d1 && !(d2 || "").trim() ? "2px" : "4px";
+
     const wrap = document.createElement("div");
     wrap.setAttribute("data-injected", "admate-youtube-infeed");
+    wrap.setAttribute("data-admate-surface", "watch-next");
     wrap.style.cssText =
-      "width:100%;max-width:100%;box-sizing:border-box;margin:0 0 12px 0;font-family:Roboto,'Noto Sans KR',Arial,sans-serif;";
+      "width:100%;max-width:100%;box-sizing:border-box;margin:12px 0 16px 0;font-family:Roboto,'Noto Sans KR',Arial,sans-serif;";
 
     let alignW = 0;
-    const firstVideo = sidebar.querySelector("ytd-compact-video-renderer");
     if (firstVideo) alignW = firstVideo.getBoundingClientRect().width;
     if (alignW < 120) alignW = sidebar.getBoundingClientRect().width;
     alignW = Math.round(alignW);
 
     wrap.style.width = alignW + "px";
     wrap.innerHTML = `
-      <div style="display:flex;flex-direction:row;gap:8px;align-items:flex-start;width:100%;">
-        <div style="position:relative;flex-shrink:0;width:168px;aspect-ratio:16/9;border-radius:8px;overflow:hidden;background:#000;">
+      <div style="display:flex;flex-direction:row;gap:10px;align-items:flex-start;width:100%;">
+        <div style="position:relative;flex-shrink:0;width:${compactThumbW}px;aspect-ratio:16/9;border-radius:8px;overflow:hidden;background:#000;">
           <img src="${thumb}" alt="" style="width:100%;height:100%;object-fit:cover;display:block;" />
           ${extIcon}
         </div>
-        <div style="flex:1;min-width:0;">
-          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:4px;">
-            <div style="font-size:1.4rem;font-weight:500;line-height:2rem;color:var(--yt-spec-text-primary,#0f0f0f);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">${esc(
-              title
-            )}</div>
-            ${menuBtn}
+        <div style="flex:1;min-width:0;padding-top:0;">
+          <div style="display:grid;grid-template-columns:minmax(0,1fr) 32px;align-items:start;column-gap:4px;min-height:0;width:100%;">
+            <div style="min-width:0;display:flex;flex-direction:column;gap:0;">
+              <h3 style="margin:0;padding:0;font-size:max(1.6rem,calc(var(--ytd-metadata-line-title-font-size,1.4rem) * 1.12));font-weight:400;line-height:1.32;letter-spacing:0.15px;color:var(--yt-spec-text-primary,#0f0f0f);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">${esc(
+                title
+              )}</h3>
+              ${descBlock}
+            </div>
+            <div style="justify-self:end;align-self:start;z-index:2;transform:translateX(1px);">${menuBtnSearch}</div>
           </div>
-          ${descBlock}
-          <div style="margin-top:6px;font-size:1.2rem;display:flex;align-items:center;flex-wrap:wrap;">${sponsorHtml}</div>
+          <div style="margin-top:${sponsorWatchMarginTop};display:flex;align-items:center;gap:${avatar ? "8px" : "0"};font-size:1.2rem;">
+            ${
+              avatar
+                ? `<div style="width:24px;height:24px;border-radius:50%;overflow:hidden;flex-shrink:0;background:#eee;">
+              <img src="${avatar}" alt="" style="width:100%;height:100%;object-fit:cover;" />
+            </div>`
+                : ""
+            }
+            <div style="min-width:0;line-height:1.65rem;flex:1;">${sponsorHtml}</div>
+          </div>
           ${btnRow(true)}
         </div>
       </div>`;
