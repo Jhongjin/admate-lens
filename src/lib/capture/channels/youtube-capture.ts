@@ -483,28 +483,18 @@ export class YouTubeCapture extends BaseChannel {
     }
 
     // 🔑 4.7) 봇 감지 확인 + 강력한 폴백 전략
-    const botDetected = await this.checkBotDetection(page);
+    const botDetected =
+      (await this.checkBotDetection(page)) || (await this.checkWatchPagePlayerLoginWall(page));
 
     if (botDetected) {
       console.log(`[YouTube] 🤖 봇 감지됨 — 강력 폴백: 썸네일 직접 교체`);
-
-      // 🔑 핵심 전략: 봇 감지 시 플레이어 영역을 완전히 새 DOM으로 교체
-      // embed iframe은 봇 감지 상태에서도 실패할 수 있으므로
-      // 강제로 모든 봇 관련 요소를 제거 + 플레이어를 썸네일로 완전 교체
-      
-      // 1단계: 봇 감지 관련 모든 DOM 요소를 강력하게 제거
-      await this.nukeAllBotElements(page);
-      await new Promise((r) => setTimeout(r, 500));
-
-      // 2단계: 플레이어 영역을 썸네일로 완전 교체
       if (thumbnailDataUrl) {
-        console.log(`[YouTube] 🖼️ 플레이어를 썸네일으로 완전 교체`);
-        await this.forceReplacePlayerWithThumbnail(page, thumbnailDataUrl);
-        await new Promise((r) => setTimeout(r, 1000));
+        await this.applyWatchPageBotThumbnailMitigation(page, thumbnailDataUrl);
+      } else {
+        await this.nukeAllBotElements(page);
+        await new Promise((r) => setTimeout(r, 500));
+        await this.nukeAllBotElements(page);
       }
-
-      // 3단계: 혹시 남아있는 봇 메시지 텍스트 최종 제거
-      await this.nukeAllBotElements(page);
     }
 
     // 5) 퍼블리셔 페이지에서는 영상 seek를 수행하지 않는다.
@@ -529,6 +519,7 @@ export class YouTubeCapture extends BaseChannel {
       (() => {
         // 다양한 셀렉터로 플레이어 탐색 (우선순위 순)
         const playerSelectors = [
+          '#admate-bot-cover-dialog',
           '#yt-thumb-overlay',
           '#movie_player',
           '#player-container-inner',
@@ -550,7 +541,8 @@ export class YouTubeCapture extends BaseChannel {
           const el = document.querySelector(sel);
           if (el) {
             const rect = el.getBoundingClientRect();
-            const minW = sel === '#yt-thumb-overlay' ? 80 : 100;
+            const minW =
+              sel === '#yt-thumb-overlay' || sel === '#admate-bot-cover-dialog' ? 80 : 100;
             if (rect.width > minW && rect.height > minW) {
               player = el;
               break;
@@ -581,77 +573,7 @@ export class YouTubeCapture extends BaseChannel {
     console.log(`[YouTube] 사이드바: ${playerInfo.sidebarFound ? "✅" : "❌"}`);
 
     // 6.5) 🧹 인젝션 전 방해 요소 제거 (구독 팝업, 봇 감지, 동의 팝업 등)
-    await page.evaluate<void>(`
-      (() => {
-        // 1) "채널을 구독하시겠습니까?" 팝업 완전 제거
-        const popupSelectors = [
-          'ytd-popup-container',
-          'tp-yt-paper-dialog',
-          'yt-confirm-dialog-renderer',
-          'ytd-modal-with-title-and-button-renderer',
-          'ytd-mealbar-promo-renderer',
-          '#dialog',
-        ];
-        popupSelectors.forEach(sel => {
-          document.querySelectorAll(sel).forEach(el => el.remove());
-        });
-
-        // 2) "로그인하여 봇이 아님을 확인하세요" 메시지 숨김
-        //    플레이어 내부의 에러/확인 오버레이를 숨김
-        const playerErrorSelectors = [
-          '.ytp-error',
-          '.ytp-error-content',
-          '.ytp-error-content-wrap',
-          '.ytp-error-content-wrap-reason',
-          '.ytp-offline-slate',
-          '.ytp-offline-slate-bar',
-          'ytd-enforcement-message-view-model',
-          '.ytp-pause-overlay',
-          '#clarify-box',
-          '.ytp-suggested-action',
-          // 봇 확인 메시지 (로그인 프롬프트)
-          '.ytp-error-content-wrap .ytp-error-content-wrap-reason',
-        ];
-        playerErrorSelectors.forEach(sel => {
-          document.querySelectorAll(sel).forEach(el => {
-            el.style.display = 'none !important';
-            el.style.visibility = 'hidden !important';
-            el.style.opacity = '0 !important';
-          });
-        });
-
-        // 3) 쿠키 동의 관련 요소 제거
-        const consentSelectors = [
-          'ytd-consent-bump-v2-lightbox',
-          'tp-yt-iron-overlay-backdrop',
-          '#consent-bump',
-          '.consent-bump-v2-lightbox',
-        ];
-        consentSelectors.forEach(sel => {
-          document.querySelectorAll(sel).forEach(el => el.remove());
-        });
-
-        // 4) 텍스트 기반으로 "봇이 아님" 메시지가 포함된 요소 숨김
-        const allTexts = document.querySelectorAll('*');
-        allTexts.forEach(el => {
-          const text = el.textContent || '';
-          if (
-            (text.includes('봇이 아님을 확인') || text.includes('confirm you') ||
-             text.includes('Confirm your identity') || text.includes('로그인하여')) &&
-            el.closest('#movie_player, #player-container-inner, .html5-video-player')
-          ) {
-            el.style.display = 'none';
-          }
-        });
-
-        // 5) body/html overflow 복원 (모달이 스크롤 막는 경우)
-        document.body.style.overflow = '';
-        document.body.style.position = '';
-        document.documentElement.style.overflow = '';
-
-        console.log('[YouTube Cleanup] ✅ 방해 요소 제거 완료');
-      })()
-    `);
+    await this.suppressWatchPageInjectionBlockers(page);
 
     // 7) 광고 유형별 인젝션
     let injectionSuccess = false;
@@ -1211,8 +1133,47 @@ export class YouTubeCapture extends BaseChannel {
       targetUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(q)}`;
     }
 
+    let infeedWatchNextNavUrl = "";
+    if (adType === "infeed-watch-next" && request.publisherUrl?.trim()) {
+      try {
+        const wu = new URL(request.publisherUrl.trim());
+        if (!wu.searchParams.has("hl")) wu.searchParams.set("hl", "ko");
+        if (!wu.searchParams.has("gl")) wu.searchParams.set("gl", "KR");
+        infeedWatchNextNavUrl = wu.toString();
+      } catch {
+        infeedWatchNextNavUrl = request.publisherUrl.trim();
+      }
+    }
+
+    /** 관련동영상: 메인 플레이어를 퍼블리셔 영상 썸네일로 덮을 때 사용(봇 벽·Shadow 내부 문구와 무관하게 캡처용) */
+    let publisherThumbDataUrl = "";
+    if (adType === "infeed-watch-next") {
+      const pubUrl = (infeedWatchNextNavUrl || request.publisherUrl || "").trim();
+      const pubVid = extractVideoId(pubUrl);
+      if (pubVid) {
+        let pubThumb = await imageUrlToDataUrl(getThumbnailUrl(pubVid));
+        if (!pubThumb.ok) {
+          pubThumb = await imageUrlToDataUrl(`https://img.youtube.com/vi/${pubVid}/hqdefault.jpg`);
+        }
+        if (pubThumb.ok) {
+          publisherThumbDataUrl = pubThumb.dataUrl;
+        }
+      }
+    }
+
     await this.applyYouTubeConsentCookies(page);
-    await page.goto(targetUrl, { waitUntil: "networkidle2", timeout: 45000 });
+    if (adType === "infeed-watch-next" && infeedWatchNextNavUrl) {
+      const embedFirst = this.convertToEmbedUrl(infeedWatchNextNavUrl);
+      if (embedFirst) {
+        console.log("[YouTube] 인피드 관련동영상: embed 선로드 후 /watch 진입 (봇 검증 완화)");
+        await page.goto(embedFirst, { waitUntil: "networkidle2", timeout: 45000 });
+        await new Promise((r) => setTimeout(r, 2000));
+      }
+      await page.goto(infeedWatchNextNavUrl, { waitUntil: "networkidle2", timeout: 45000 });
+      targetUrl = infeedWatchNextNavUrl;
+    } else {
+      await page.goto(targetUrl, { waitUntil: "networkidle2", timeout: 45000 });
+    }
     if (adType === "infeed-home") {
       const opened = page.url();
       if (!/\/feed\/trending/i.test(opened)) {
@@ -1276,6 +1237,32 @@ export class YouTubeCapture extends BaseChannel {
           });
         }
       }
+    }
+
+    if (adType === "infeed-watch-next") {
+      /** 인스트림과 동일 타이밍: 동의 후 플레이어 안정화 */
+      await new Promise((r) => setTimeout(r, 3000));
+      const legacyBot = await this.checkBotDetection(page);
+      const playerWall = await this.checkWatchPagePlayerLoginWall(page);
+      if (legacyBot || playerWall) {
+        console.log(
+          `[YouTube] 인피드 관련동영상: 봇/로그인 벽 감지 (innerText=${legacyBot}, player+shadow=${playerWall})`
+        );
+      }
+      /** 인스트림(/watch)과 동일: 봇 제거→썸네일→pause. 서버 환경에선 퍼블리셔 썸네일로 항상 덮음 */
+      const playerCoverUrl = publisherThumbDataUrl || creativeDataUrl;
+      if (playerCoverUrl) {
+        console.log("[YouTube] 인피드 관련동영상: 인스트림 동일 경로로 메인 플레이어 썸네일 적용");
+        await this.applyWatchPageBotThumbnailMitigation(page, playerCoverUrl);
+      } else {
+        console.warn(
+          "[YouTube] 인피드 관련동영상: 퍼블리셔·소재 썸네일 없음 — 봇 UI가 남을 수 있습니다."
+        );
+        await this.nukeAllBotElements(page);
+      }
+      await this.pauseVideo(page, { preserveTimeline: true });
+      await new Promise((r) => setTimeout(r, 1000));
+      await this.suppressWatchPageInjectionBlockers(page);
     }
 
     let injectSurface: InfeedSurface = surface;
@@ -1391,6 +1378,25 @@ export class YouTubeCapture extends BaseChannel {
     await this.applySignedOutPromptSuppression(page);
 
     this.diagnostics.infeedCaptureUrl = page.url();
+
+    if (adType === "infeed-watch-next") {
+      let coverDataUrl = publisherThumbDataUrl || creativeDataUrl;
+      const capUrl = this.diagnostics.infeedCaptureUrl || "";
+      if (!coverDataUrl && capUrl) {
+        const id = extractVideoId(capUrl);
+        if (id) {
+          const r = await imageUrlToDataUrl(`https://img.youtube.com/vi/${id}/hqdefault.jpg`);
+          if (r.ok) coverDataUrl = r.dataUrl;
+        }
+      }
+      if (coverDataUrl) {
+        console.log("[YouTube] 인피드 관련동영상: 캡처 직전 인스트림 동일 경로로 썸네일 재적용");
+        await this.applyWatchPageBotThumbnailMitigation(page, coverDataUrl);
+        await this.pauseVideo(page, { preserveTimeline: true });
+        await new Promise((r) => setTimeout(r, 600));
+        await this.suppressWatchPageInjectionBlockers(page);
+      }
+    }
 
     const screenshot = await page.screenshot({ fullPage: false, type: "png" });
     if (adType === "infeed-home") {
@@ -2574,6 +2580,77 @@ export class YouTubeCapture extends BaseChannel {
   }
 
   /**
+   * 🧹 시청(/watch) 레이아웃에서 인젝션·캡처 전 방해 요소 정리
+   * (구독 팝업, 봇/로그인 오버레이, 동의 잔여물 등)
+   */
+  private async suppressWatchPageInjectionBlockers(page: IPageHandle): Promise<void> {
+    await page.evaluate<void>(`
+      (() => {
+        const popupSelectors = [
+          'ytd-popup-container',
+          'tp-yt-paper-dialog',
+          'yt-confirm-dialog-renderer',
+          'ytd-modal-with-title-and-button-renderer',
+          'ytd-mealbar-promo-renderer',
+          '#dialog',
+        ];
+        popupSelectors.forEach(sel => {
+          document.querySelectorAll(sel).forEach(el => el.remove());
+        });
+
+        const playerErrorSelectors = [
+          '.ytp-error',
+          '.ytp-error-content',
+          '.ytp-error-content-wrap',
+          '.ytp-error-content-wrap-reason',
+          '.ytp-offline-slate',
+          '.ytp-offline-slate-bar',
+          'ytd-enforcement-message-view-model',
+          '.ytp-pause-overlay',
+          '#clarify-box',
+          '.ytp-suggested-action',
+          '.ytp-error-content-wrap .ytp-error-content-wrap-reason',
+        ];
+        playerErrorSelectors.forEach(sel => {
+          document.querySelectorAll(sel).forEach(el => {
+            el.style.display = 'none !important';
+            el.style.visibility = 'hidden !important';
+            el.style.opacity = '0 !important';
+          });
+        });
+
+        const consentSelectors = [
+          'ytd-consent-bump-v2-lightbox',
+          'tp-yt-iron-overlay-backdrop',
+          '#consent-bump',
+          '.consent-bump-v2-lightbox',
+        ];
+        consentSelectors.forEach(sel => {
+          document.querySelectorAll(sel).forEach(el => el.remove());
+        });
+
+        const allTexts = document.querySelectorAll('*');
+        allTexts.forEach(el => {
+          const text = el.textContent || '';
+          if (
+            (text.includes('봇이 아님을 확인') || text.includes('confirm you') ||
+             text.includes('Confirm your identity') || text.includes('로그인하여')) &&
+            el.closest('#movie_player, #player-container-inner, .html5-video-player')
+          ) {
+            el.style.display = 'none';
+          }
+        });
+
+        document.body.style.overflow = '';
+        document.body.style.position = '';
+        document.documentElement.style.overflow = '';
+
+        console.log('[YouTube Cleanup] ✅ 방해 요소 제거 완료');
+      })()
+    `);
+  }
+
+  /**
    * 💥 봇 감지 관련 모든 DOM 요소를 완전히 파괴
    * YouTube가 React/Polymer로 재렌더링하기 전에 모든 흔적을 제거
    */
@@ -2683,136 +2760,258 @@ export class YouTubeCapture extends BaseChannel {
   }
 
   /**
-   * 🖼️ 플레이어를 썸네일로 강제 완전 교체 (봇 메시지 위에 덮어씀)
-   * 기존 innerHTML 제거 방식이 실패할 수 있으므로
-   * position:absolute로 기존 내용 위에 완전히 덮어쓰기
+   * 인스트림(/watch) 봇 폴백과 동일한 한 사이클: 봇 DOM 제거 → 썸네일 덮음 → 잔여 봇 요소 제거
+   * (pauseVideo·suppressWatchPageInjectionBlockers 는 호출부에서 인스트림과 같은 순서로 이어서 호출)
+   */
+  private async applyWatchPageBotThumbnailMitigation(
+    page: IPageHandle,
+    thumbnailDataUrl: string
+  ): Promise<void> {
+    await this.nukeAllBotElements(page);
+    await new Promise((r) => setTimeout(r, 500));
+    await this.forceReplacePlayerWithThumbnail(page, thumbnailDataUrl);
+    await new Promise((r) => setTimeout(r, 1000));
+    await this.nukeAllBotElements(page);
+  }
+
+  /**
+   * 🖼️ 플레이어 영역을 썸네일로 덮음
+   * 봇 슬레이트는 z-index 보다 위인 **top layer**(dialog/popover 등)에 그려질 수 있어
+   * 우선 `HTMLDialogElement.showModal()` 로 같은 top layer에 올리고, 실패 시 fixed div 폴백
    */
   private async forceReplacePlayerWithThumbnail(page: IPageHandle, thumbnailDataUrl: string): Promise<void> {
     console.log(`[YouTube] 🖼️ 플레이어를 썸네일로 강제 교체 중...`);
 
     await page.evaluate<void>(`
       ((thumbSrc) => {
-        // 플레이어 컨테이너 찾기 (가장 큰 요소 우선)
-        const playerSelectors = [
+        document
+          .querySelectorAll('#yt-thumb-overlay, #yt-thumb-overlay-fixed, #admate-bot-cover-dialog')
+          .forEach(function (n) {
+            n.remove();
+          });
+        var prevStyle = document.getElementById('admate-dialog-backdrop-style');
+        if (prevStyle) prevStyle.remove();
+
+        const anchorCandidates = [
+          '#player-full-bleed-container #player-container',
+          '#primary-inner #player',
+          '#primary #player',
+          '#player-wide-container',
+          'ytd-watch-flexy #primary ytd-player',
           '#movie_player',
-          '#player-container-inner', 
           'ytd-player',
+          '#player-container-inner',
           '#player-container-outer',
           '.html5-video-player',
           '#player',
         ];
 
-        let playerEl = null;
-
-        const videoEl = document.querySelector('video');
-        if (videoEl) {
-          const r = videoEl.getBoundingClientRect();
-          if (r.width > 50 && r.height > 50) {
-            playerEl = videoEl.parentElement; // usually a good container
+        var anchor = null;
+        var bestArea = 0;
+        for (var i = 0; i < anchorCandidates.length; i++) {
+          var el = document.querySelector(anchorCandidates[i]);
+          if (!el) continue;
+          var r = el.getBoundingClientRect();
+          var area = r.width * r.height;
+          if (r.width > 120 && r.height > 90 && area > bestArea) {
+            bestArea = area;
+            anchor = el;
           }
         }
 
-        if (!playerEl) {
-          for (const sel of playerSelectors) {
-            const el = document.querySelector(sel);
-            if (el) {
-              const r = el.getBoundingClientRect();
-              if (r.width > 50 && r.height > 50) {
-                playerEl = el;
-                break;
-              }
-            }
+        if (!anchor) {
+          var videoEl = document.querySelector('video');
+          if (videoEl && videoEl.parentElement) {
+            var pr = videoEl.parentElement.getBoundingClientRect();
+            if (pr.width > 50 && pr.height > 50) anchor = videoEl.parentElement;
           }
         }
 
-        if (!playerEl) {
-          console.warn('[YouTube] 플레이어를 찾을 수 없음 — 강제 생성');
+        if (!anchor) {
+          console.warn('[YouTube] 플레이어 앵커를 찾을 수 없음');
           return;
         }
 
-        const rect = playerEl.getBoundingClientRect();
-        const w = Math.round(rect.width);
-        const h = Math.round(rect.height);
+        var rect = anchor.getBoundingClientRect();
+        var top = Math.max(0, Math.round(rect.top));
+        var left = Math.max(0, Math.round(rect.left));
+        var w = Math.round(rect.width);
+        var h = Math.round(rect.height);
 
-        // 🔑 핵심: 기존 내용을 innerHTML로 삭제하지 않고
-        // position:absolute 오버레이로 완전히 덮어씀
-        // (YouTube의 MutationObserver가 innerHTML 삭제 시 재렌더링하는 것을 방지)
-        
-        // 기존 자식 요소들의 visibility를 모두 숨김
-        const allChildren = playerEl.querySelectorAll('*');
-        allChildren.forEach(child => {
-          child.style.visibility = 'hidden';
-          child.style.opacity = '0';
-        });
-
-        // 플레이어 position 보장
-        const computedPos = window.getComputedStyle(playerEl).position;
-        if (computedPos === 'static') {
-          playerEl.style.position = 'relative';
+        function makeImg() {
+          var img = document.createElement('img');
+          img.src = thumbSrc;
+          img.draggable = false;
+          img.style.cssText = 'width:100%;height:100%;object-fit:cover;display:block;';
+          return img;
         }
 
-        // 기존 오버레이 제거 (중복 방지)
-        const existing = playerEl.querySelector('#yt-thumb-overlay');
-        if (existing) existing.remove();
+        function makeProgress() {
+          var progressBar = document.createElement('div');
+          progressBar.style.cssText =
+            'position:absolute;bottom:0;left:0;width:100%;height:4px;background:rgba(255,255,255,0.3);z-index:10000;';
+          var progressFill = document.createElement('div');
+          progressFill.style.cssText =
+            'width:15%;height:100%;background:#ff0000;border-radius:0 2px 2px 0;';
+          progressBar.appendChild(progressFill);
+          return progressBar;
+        }
 
-        // 썸네일 오버레이 컨테이너 (z-index 최상위)
-        const overlay = document.createElement('div');
-        overlay.id = 'yt-thumb-overlay';
-        overlay.style.cssText = [
-          'position: absolute',
-          'top: 0',
-          'left: 0',
-          'width: 100%',
-          'height: 100%',
-          'z-index: 9999',
-          'background: #000',
-          'display: flex',
-          'align-items: center',
-          'justify-content: center',
-          'overflow: hidden',
+        var boxStyle = [
+          'border:none',
+          'outline:none',
+          'padding:0',
+          'margin:0',
+          'background:#000',
+          'position:fixed',
+          'top:' + top + 'px',
+          'left:' + left + 'px',
+          'width:' + w + 'px',
+          'height:' + h + 'px',
+          'max-width:none',
+          'max-height:none',
+          'box-sizing:border-box',
+          'overflow:hidden',
+          'display:flex',
+          'align-items:center',
+          'justify-content:center',
+          'pointer-events:none',
         ].join(';');
 
-        // 썸네일 이미지
-        const img = document.createElement('img');
-        img.src = thumbSrc;
-        img.style.cssText = [
-          'width: 100%',
-          'height: 100%',
-          'object-fit: cover',
-          'display: block',
-        ].join(';');
-        overlay.appendChild(img);
+        var usedDialog = false;
+        if (typeof HTMLDialogElement !== 'undefined') {
+          try {
+            var d = document.createElement('dialog');
+            d.id = 'admate-bot-cover-dialog';
+            d.style.cssText = boxStyle;
+            d.appendChild(makeImg());
+            d.appendChild(makeProgress());
+            document.body.appendChild(d);
+            if (typeof d.showModal === 'function') {
+              d.showModal();
+              var st = document.createElement('style');
+              st.id = 'admate-dialog-backdrop-style';
+              st.textContent =
+                '#admate-bot-cover-dialog::backdrop{background:transparent!important;pointer-events:none!important;}';
+              document.head.appendChild(st);
+              usedDialog = true;
+              console.log('[YouTube] 🖼️ 썸네일 top-layer(dialog) 오버레이 (' + w + 'x' + h + ')');
+            } else {
+              d.remove();
+            }
+          } catch (e) {
+            usedDialog = false;
+            var bad = document.getElementById('admate-bot-cover-dialog');
+            if (bad) bad.remove();
+            var st2 = document.getElementById('admate-dialog-backdrop-style');
+            if (st2) st2.remove();
+          }
+        }
 
-        // 하단 진행바 (영상 재생 중인 것처럼 보이게)
-        const progressBar = document.createElement('div');
-        progressBar.style.cssText = [
-          'position: absolute',
-          'bottom: 0',
-          'left: 0',
-          'width: 100%',
-          'height: 4px',
-          'background: rgba(255,255,255,0.3)',
-          'z-index: 10000',
-        ].join(';');
-
-        const progressFill = document.createElement('div');
-        progressFill.style.cssText = [
-          'width: 15%',
-          'height: 100%',
-          'background: #ff0000',
-          'border-radius: 0 2px 2px 0',
-        ].join(';');
-        progressBar.appendChild(progressFill);
-        overlay.appendChild(progressBar);
-
-        // 플레이어에 오버레이 삽입
-        playerEl.appendChild(overlay);
-
-        console.log('[YouTube] 🖼️ 썸네일 오버레이 강제 삽입 완료 (' + w + 'x' + h + ')');
+        if (!usedDialog) {
+          var overlay = document.createElement('div');
+          overlay.id = 'yt-thumb-overlay';
+          overlay.style.cssText =
+            boxStyle + ';z-index:2147483646;';
+          overlay.appendChild(makeImg());
+          overlay.appendChild(makeProgress());
+          document.body.appendChild(overlay);
+          console.log('[YouTube] 🖼️ 썸네일 fixed 오버레이 폴백 (' + w + 'x' + h + ')');
+        }
       })(${JSON.stringify(thumbnailDataUrl)})
     `);
 
     console.log(`[YouTube] 🖼️ 강제 썸네일 교체 완료`);
+  }
+
+  /**
+   * 시청 페이지 메인 플레이어(#movie_player / ytd-player) 내부를 Shadow 포함해 훑어
+   * 봇·로그인 확인 문구가 있으면 true (body.innerText 만으로는 놓치는 케이스 보완)
+   */
+  private async checkWatchPagePlayerLoginWall(page: IPageHandle): Promise<boolean> {
+    const detected = await page.evaluate<boolean>(() => {
+      const needlesKo = ["봇이 아님", "로그인하여", "봇이 아님을 확인"];
+      const needlesEn = [
+        "not a bot",
+        "sign in to confirm",
+        "confirm you're not",
+        "confirm you are not",
+        "verify it's you",
+      ];
+
+      function walk(n: Node, acc: string[]): void {
+        if (!n) return;
+        if (n.nodeType === 3) {
+          const t = n.textContent || "";
+          if (t.trim()) acc.push(t);
+          return;
+        }
+        if (n.nodeType !== 1) return;
+        const el = n as Element;
+        const tag = el.tagName.toUpperCase();
+        if (tag === "SCRIPT" || tag === "STYLE" || tag === "NOSCRIPT") return;
+        const sr = el.shadowRoot;
+        if (sr) {
+          for (let i = 0; i < sr.childNodes.length; i++) {
+            walk(sr.childNodes[i]!, acc);
+          }
+        }
+        for (let i = 0; i < el.childNodes.length; i++) {
+          walk(el.childNodes[i]!, acc);
+        }
+      }
+
+      function collectDeepText(root: Element | null): string {
+        if (!root) return "";
+        const acc: string[] = [];
+        walk(root, acc);
+        return acc.join(" ");
+      }
+
+      const roots: (Element | null)[] = [
+        document.querySelector("#movie_player"),
+        document.querySelector("ytd-player"),
+        document.querySelector("#player-container-inner"),
+        document.querySelector("#player-container-outer"),
+      ];
+
+      for (const el of roots) {
+        if (!el) continue;
+        const hay = collectDeepText(el);
+        const low = hay.toLowerCase();
+        for (const nd of needlesKo) {
+          if (hay.includes(nd)) return true;
+        }
+        for (const nd of needlesEn) {
+          if (low.includes(nd)) return true;
+        }
+      }
+
+      const errNodes = document.querySelectorAll(
+        "yt-player-error-message-renderer, yt-playability-error-supported-renderers, .ytp-error"
+      );
+      for (let i = 0; i < errNodes.length; i++) {
+        const node = errNodes[i] as HTMLElement;
+        const t = (node.textContent || "").toLowerCase();
+        if (
+          t.includes("봇") ||
+          t.includes("bot") ||
+          t.includes("sign in") ||
+          t.includes("로그인") ||
+          t.includes("confirm")
+        ) {
+          const rect = node.getBoundingClientRect?.();
+          if (rect && rect.width > 2 && rect.height > 2) return true;
+        }
+      }
+
+      return false;
+    });
+
+    if (detected) {
+      console.log("[YouTube] 🤖 시청 플레이어(Shadow 포함) 봇/로그인 벽 감지");
+    }
+    return detected;
   }
 
   /**
