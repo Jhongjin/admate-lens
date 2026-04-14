@@ -222,7 +222,7 @@ export function runInfeedInjectInPage(...args: unknown[]): boolean {
         }
       </div>`
         : "";
-      const sponsorSearchMarginTop = !d1 && !showSearchCtaRow ? "2px" : "5px";
+      const sponsorSearchMarginTop = !d1 && !showSearchCtaRow ? "0px" : "4px";
       const firstShortWidth = (() => {
         const shorts = document.querySelector(
           "ytd-rich-shelf-renderer ytd-reel-item-renderer, ytd-reel-shelf-renderer ytd-reel-item-renderer"
