@@ -1318,11 +1318,11 @@ export class YouTubeCapture extends BaseChannel {
       const root = document.createElement("div");
       root.setAttribute("data-admate-synthetic-feed-root", "1");
       root.style.cssText =
-        "box-sizing:border-box;width:100%;max-width:none;margin:0;padding:0 24px 32px 24px;font-family:Roboto,'Noto Sans KR',Arial,sans-serif;";
+        "box-sizing:border-box;width:100%;max-width:none;margin:0;padding:0 8px 32px 8px;font-family:Roboto,'Noto Sans KR',Arial,sans-serif;";
       const chipRow = document.createElement("div");
       chipRow.setAttribute("data-admate-synthetic-chip-row", "1");
       chipRow.style.cssText =
-        "display:flex;align-items:center;gap:8px;overflow-x:auto;white-space:nowrap;padding:0 0 8px 0;margin:-2px 0 4px 0;";
+        "display:flex;align-items:center;gap:8px;overflow-x:auto;white-space:nowrap;padding:0 0 8px 0;margin:-10px 0 4px 0;";
       const chipPool = [
         "전체",
         "라이브",
