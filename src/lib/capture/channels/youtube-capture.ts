@@ -1318,7 +1318,7 @@ export class YouTubeCapture extends BaseChannel {
       const root = document.createElement("div");
       root.setAttribute("data-admate-synthetic-feed-root", "1");
       root.style.cssText =
-        "box-sizing:border-box;width:100%;max-width:1294px;margin:0 auto;padding:4px 24px 32px 36px;font-family:Roboto,'Noto Sans KR',Arial,sans-serif;";
+        "box-sizing:border-box;width:100%;max-width:1288px;margin:0 auto;padding:4px 16px 32px 16px;font-family:Roboto,'Noto Sans KR',Arial,sans-serif;";
       const chipRow = document.createElement("div");
       chipRow.setAttribute("data-admate-synthetic-chip-row", "1");
       chipRow.style.cssText =
@@ -1360,7 +1360,7 @@ export class YouTubeCapture extends BaseChannel {
       // 인피드 광고 삽입 위치는 첫 롱폼 그리드 기준으로 유지
       grid.setAttribute("data-admate-synthetic-feed-grid", "1");
       grid.style.cssText =
-        "display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:16px 12px;width:100%;";
+        "display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px 12px;width:100%;";
       const shortsSection = document.createElement("div");
       shortsSection.setAttribute("data-admate-synthetic-shorts-row", "1");
       shortsSection.style.cssText =
@@ -1371,13 +1371,13 @@ export class YouTubeCapture extends BaseChannel {
       shortsTitle.innerHTML = '<span style="font-size:15px;">⚡</span><span>Shorts</span>';
       const shortsRow = document.createElement("div");
       shortsRow.style.cssText =
-        "display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px;width:100%;";
+        "display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:12px;width:100%;";
       shortsSection.appendChild(shortsTitle);
       shortsSection.appendChild(shortsRow);
       const postShortsGrid = document.createElement("div");
       postShortsGrid.setAttribute("data-admate-synthetic-post-shorts-grid", "1");
       postShortsGrid.style.cssText =
-        "display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:16px 12px;width:100%;";
+        "display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px 12px;width:100%;";
       const makeWideCard = (it: SyntheticInfeedHomeItem): HTMLElement => {
         const card = document.createElement("div");
         card.setAttribute("data-admate-synthetic-feed-card", "1");
@@ -1434,11 +1434,12 @@ export class YouTubeCapture extends BaseChannel {
         const idx = grid.childElementCount + shortsRow.childElementCount + postShortsGrid.childElementCount;
         if (idx < 4) {
           grid.appendChild(makeWideCard(it));
-        } else if (idx < 9) {
+        } else if (idx < 10) {
           shortsRow.appendChild(makeShortCard(it));
-        } else {
+        } else if (idx < 14) {
           postShortsGrid.appendChild(makeWideCard(it));
         }
+        if (idx >= 13) break;
       }
       root.appendChild(chipRow);
       root.appendChild(grid);
