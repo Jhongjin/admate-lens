@@ -1319,6 +1319,22 @@ export class YouTubeCapture extends BaseChannel {
       root.setAttribute("data-admate-synthetic-feed-root", "1");
       root.style.cssText =
         "box-sizing:border-box;width:100%;max-width:1294px;margin:0 auto;padding:12px 24px 32px 36px;font-family:Roboto,'Noto Sans KR',Arial,sans-serif;";
+      const chipRow = document.createElement("div");
+      chipRow.setAttribute("data-admate-synthetic-chip-row", "1");
+      chipRow.style.cssText =
+        "display:flex;align-items:center;gap:8px;overflow-x:auto;white-space:nowrap;padding:2px 0 12px 0;margin-bottom:6px;";
+      const chips = ["전체", "라이브", "게임", "뉴스", "음악", "믹스", "최근에 업로드된 동영상", "감상한 동영상", "새로운 맞춤 동영상"];
+      chips.forEach((txt, i) => {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.textContent = txt;
+        b.style.cssText =
+          "height:32px;padding:0 12px;border-radius:8px;border:none;cursor:default;font:500 13px Roboto,'Noto Sans KR',Arial,sans-serif;" +
+          (i === 0
+            ? "background:#0f0f0f;color:#fff;"
+            : "background:var(--yt-spec-badge-chip-background,rgba(0,0,0,0.05));color:var(--yt-spec-text-primary,#0f0f0f);");
+        chipRow.appendChild(b);
+      });
       const grid = document.createElement("div");
       grid.setAttribute("data-admate-synthetic-feed-grid", "1");
       grid.style.cssText =
@@ -1355,6 +1371,7 @@ export class YouTubeCapture extends BaseChannel {
           "</div>";
         grid.appendChild(card);
       }
+      root.appendChild(chipRow);
       root.appendChild(grid);
       const chipBar = primary.querySelector(
         "ytd-feed-filter-chip-bar-renderer, yt-chip-cloud-renderer, ytd-rich-grid-renderer"

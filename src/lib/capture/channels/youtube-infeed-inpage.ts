@@ -246,10 +246,25 @@ export function runInfeedInjectInPage(...args: unknown[]): boolean {
           .querySelectorAll('[data-injected="admate-youtube-infeed"]')
           .forEach((el) => el.remove());
         const ad = buildHomeFeedCard();
+        const grid = synthRoot.querySelector("[data-admate-synthetic-feed-grid]") as HTMLElement | null;
+        if (grid) {
+          const cell = document.createElement("div");
+          cell.setAttribute("data-injected", "admate-youtube-infeed");
+          cell.style.cssText =
+            "border-radius:12px;overflow:hidden;border:1px solid var(--yt-spec-10-percent-layer,#e5e5e5);background:var(--yt-spec-base-background,#fff);";
+          ad.style.border = "none";
+          ad.style.borderRadius = "0";
+          ad.style.maxWidth = "none";
+          ad.style.margin = "0";
+          cell.appendChild(ad);
+          grid.insertBefore(cell, grid.firstChild);
+          console.log("[admate infeed] home: 합성 그리드 첫 칸에 광고 삽입");
+          return true;
+        }
         ad.style.maxWidth = "420px";
         ad.style.marginBottom = "20px";
         synthRoot.insertBefore(ad, synthRoot.firstChild);
-        console.log("[admate infeed] home: 합성 피드 루트 상단에 광고 삽입");
+        console.log("[admate infeed] home: 합성 피드 루트 상단에 광고 삽입(폴백)");
         return true;
       }
       const richItem =
