@@ -41,7 +41,7 @@ export function runInfeedInjectInPage(...args: unknown[]): boolean {
     const ctaS = (p.ctaSecondary || "").trim();
     const showSecondary = ctaS.length > 0;
 
-    const sponsorHtml = `<span style="font-weight:700;color:var(--yt-spec-text-primary,#0f0f0f)">스폰서</span><span style="margin:0 4px;color:var(--yt-spec-text-secondary,#606060)">·</span><span style="color:var(--yt-spec-text-secondary,#606060)">${esc(
+    const sponsorHtml = `<span style="font-weight:600;color:var(--yt-spec-text-primary,#0f0f0f)">스폰서</span><span style="margin:0 4px;color:var(--yt-spec-text-secondary,#606060)">·</span><span style="color:var(--yt-spec-text-secondary,#606060)">${esc(
       sponsor
     )}</span>`;
 
