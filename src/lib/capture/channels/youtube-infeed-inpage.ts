@@ -18,6 +18,10 @@ export interface InfeedInjectPagePayload {
   ctaPrimary: string;
   /** 비우면 보조 버튼 숨김 */
   ctaSecondary: string;
+  /** `search` 지면만. 기본 top — 첫 결과 위치 / feed 는 실제 검색 행 사이 */
+  searchPlacement?: "top" | "feed";
+  /** `feed` 일 때 삽입 기준: 이 인덱스(0부터)의 결과 행 **바로 뒤**에 광고 삽입 */
+  searchFeedInsertAfterIndex?: number;
 }
 
 export function runInfeedInjectInPage(...args: unknown[]): boolean {
@@ -200,10 +204,51 @@ export function runInfeedInjectInPage(...args: unknown[]): boolean {
         console.warn("[admate infeed] search: primary #contents 없음");
         return false;
       }
+      const placement = p.searchPlacement === "feed" ? "feed" : "top";
+      const insertAfterIdx =
+        typeof p.searchFeedInsertAfterIndex === "number" && !Number.isNaN(p.searchFeedInsertAfterIndex)
+          ? Math.max(0, Math.min(12, Math.floor(p.searchFeedInsertAfterIndex)))
+          : 1;
+      const collectSearchResultRows = (container: Element): Element[] => {
+        const rows: Element[] = [];
+        const pushIfRow = (el: Element) => {
+          const t = el.tagName;
+          if (
+            t === "YTD-VIDEO-RENDERER" ||
+            t === "YTD-REEL-SHELF-RENDERER" ||
+            t === "YTD-CHANNEL-RENDERER" ||
+            t === "YTD-PLAYLIST-RENDERER" ||
+            t === "YTD-RADIO-RENDERER"
+          ) {
+            rows.push(el);
+          }
+        };
+        for (const child of Array.from(container.children)) {
+          const t = child.tagName;
+          if (
+            t === "YTD-VIDEO-RENDERER" ||
+            t === "YTD-REEL-SHELF-RENDERER" ||
+            t === "YTD-CHANNEL-RENDERER" ||
+            t === "YTD-PLAYLIST-RENDERER" ||
+            t === "YTD-RADIO-RENDERER"
+          ) {
+            rows.push(child);
+          } else if (t === "YTD-ITEM-SECTION-RENDERER") {
+            const inner = child.querySelector(":scope #contents");
+            if (inner) {
+              for (const c2 of Array.from(inner.children)) pushIfRow(c2);
+            }
+          }
+        }
+        return rows;
+      };
       const wrap = document.createElement("div");
       wrap.setAttribute("data-injected", "admate-youtube-infeed");
+      wrap.setAttribute("data-admate-search-placement", placement);
       wrap.style.cssText =
-        "display:block;margin:0 0 16px 0;padding:0 16px;box-sizing:border-box;font-family:Roboto,'Noto Sans KR',Arial,sans-serif;";
+        placement === "feed"
+          ? "display:block;margin:12px 0 24px 0;padding:0 16px;box-sizing:border-box;font-family:Roboto,'Noto Sans KR',Arial,sans-serif;"
+          : "display:block;margin:0 0 16px 0;padding:0 16px;box-sizing:border-box;font-family:Roboto,'Noto Sans KR',Arial,sans-serif;";
       const searchBtns = showSearchCtaRow
         ? `<div style="display:flex;gap:8px;align-items:center;width:100%;max-width:420px;margin-top:12px;">
         ${
@@ -272,7 +317,27 @@ export function runInfeedInjectInPage(...args: unknown[]): boolean {
             ${searchBtns}
           </div>
         </div>`;
-      primaryContents.insertBefore(wrap, primaryContents.firstChild);
+      let placed = false;
+      let feedLog = "";
+      if (placement === "feed") {
+        const rows = collectSearchResultRows(primaryContents);
+        if (rows.length > 0) {
+          const anchorIdx = Math.min(insertAfterIdx, rows.length - 1);
+          const anchor = rows[anchorIdx];
+          anchor.insertAdjacentElement("afterend", wrap);
+          placed = !!wrap.parentElement;
+          feedLog = "anchorIdx=" + anchorIdx + " rows=" + rows.length;
+        }
+        if (!placed) {
+          primaryContents.insertBefore(wrap, primaryContents.firstChild);
+          console.warn("[admate infeed] search: feed 삽입 실패 → 최상단 폴백");
+        } else {
+          console.log("[admate infeed] search: 피드 중간 삽입 " + feedLog);
+        }
+      } else {
+        primaryContents.insertBefore(wrap, primaryContents.firstChild);
+        console.log("[admate infeed] search: 최상단 삽입");
+      }
       return true;
     }
 

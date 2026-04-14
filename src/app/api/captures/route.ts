@@ -83,6 +83,8 @@ export async function POST(request: NextRequest) {
       infeedOpts?: {
         videoUrl?: string;
         searchQuery?: string;
+        searchPlacement?: "top" | "feed";
+        searchFeedInsertAfterIndex?: number;
         description1?: string;
         description2?: string;
         ctaPrimary?: string;

@@ -64,6 +64,8 @@ export interface YouTubeDiagnostics {
   infeedTrendingGridCount?: number;
   /** 스냅샷에 ‘검색하여 시작’류 게스트 빈 홈 문구가 보였는지 */
   infeedGuestEmptyPrompt?: boolean;
+  /** 인피드 검색 삽입 위치(top | feed) */
+  infeedSearchPlacement?: "top" | "feed";
 }
 
 /**
@@ -94,6 +96,10 @@ type InfeedOptsPayload = {
   /** 광고주 YouTube 영상 URL — 소재 이미지가 없을 때 썸네일 자동 추출 */
   videoUrl?: string;
   searchQuery?: string;
+  /** 인피드 검색: `top`(기본) 첫 결과 위 / `feed` 실제 검색 결과 행 사이 */
+  searchPlacement?: "top" | "feed";
+  /** `feed` 일 때: N번째(0부터) 유기 결과 **바로 아래**에 삽입 (기본 1 → 두 번째 결과 아래) */
+  searchFeedInsertAfterIndex?: number;
   description1?: string;
   description2?: string;
   ctaPrimary?: string;
@@ -1167,6 +1173,16 @@ export class YouTubeCapture extends BaseChannel {
     const title = instreamOpts.adTitle?.trim() || "광고 제목";
     const description1 = infeedOpts.description1?.trim() || "";
     const description2 = infeedOpts.description2?.trim() || "";
+    const searchPlacement: "top" | "feed" =
+      adType === "infeed-search" && infeedOpts.searchPlacement === "feed" ? "feed" : "top";
+    const searchFeedInsertAfterIndex =
+      typeof infeedOpts.searchFeedInsertAfterIndex === "number" &&
+      !Number.isNaN(infeedOpts.searchFeedInsertAfterIndex)
+        ? Math.max(0, Math.min(12, Math.floor(infeedOpts.searchFeedInsertAfterIndex)))
+        : 1;
+    if (this.diagnostics && adType === "infeed-search") {
+      this.diagnostics.infeedSearchPlacement = searchPlacement;
+    }
 
     let ctaPrimary = infeedOpts.ctaPrimary?.trim() || "";
     let ctaSecondary = infeedOpts.ctaSecondary?.trim() || "";
@@ -1286,11 +1302,21 @@ export class YouTubeCapture extends BaseChannel {
     }
 
     if (injectSurface === "search") {
-      await page.evaluate<void>(`
-        (() => {
-          window.scrollTo({ top: 0, behavior: 'instant' });
-        })()
-      `);
+      if (searchPlacement === "feed") {
+        await page.evaluate<void>(`
+          (() => {
+            window.scrollTo({ top: 0, behavior: 'instant' });
+            window.scrollBy(0, 520);
+          })()
+        `);
+        await new Promise((r) => setTimeout(r, 2000));
+      } else {
+        await page.evaluate<void>(`
+          (() => {
+            window.scrollTo({ top: 0, behavior: 'instant' });
+          })()
+        `);
+      }
     }
 
     let injected = await page.evaluate(runInfeedInjectInPage, {
@@ -1304,6 +1330,8 @@ export class YouTubeCapture extends BaseChannel {
       sponsorName,
       ctaPrimary,
       ctaSecondary,
+      searchPlacement,
+      searchFeedInsertAfterIndex,
     });
     this.diagnostics.injectionSuccess = injected;
 
@@ -1331,6 +1359,8 @@ export class YouTubeCapture extends BaseChannel {
         sponsorName,
         ctaPrimary,
         ctaSecondary,
+        searchPlacement,
+        searchFeedInsertAfterIndex,
       });
       this.diagnostics.injectionSuccess = injected;
     }
@@ -1340,13 +1370,23 @@ export class YouTubeCapture extends BaseChannel {
     }
 
     await new Promise((r) => setTimeout(r, 1200));
-    await page.evaluate<void>(`
-      (() => {
-        window.scrollTo({ top: 0, behavior: 'instant' });
-        document.documentElement.scrollTop = 0;
-        document.body.scrollTop = 0;
-      })()
-    `);
+    if (adType === "infeed-search" && searchPlacement === "feed") {
+      await page.evaluate<void>(`
+        (() => {
+          const el = document.querySelector('[data-injected="admate-youtube-infeed"]');
+          if (el) el.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'instant' });
+        })()
+      `);
+      await new Promise((r) => setTimeout(r, 700));
+    } else {
+      await page.evaluate<void>(`
+        (() => {
+          window.scrollTo({ top: 0, behavior: 'instant' });
+          document.documentElement.scrollTop = 0;
+          document.body.scrollTop = 0;
+        })()
+      `);
+    }
     await this.applyMastheadLoggedInLook(page, mastheadProfileDataUrl);
     await this.applySignedOutPromptSuppression(page);
 

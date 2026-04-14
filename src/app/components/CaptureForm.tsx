@@ -413,6 +413,10 @@ interface CaptureFormData {
   infeedDescription2: string;
   infeedCtaPrimary: string;
   infeedCtaSecondary: string;
+  /** 인피드 검색: 캡처 시 광고 삽입 위치 */
+  infeedSearchPlacement: "top" | "feed";
+  /** `feed` 일 때: N번째(0부터) 유기 결과 바로 아래 — 숫자 문자열 */
+  infeedSearchFeedInsertAfterIndex: string;
 }
 
 type MediaMenu = "gdn" | "youtube" | "naver" | "kakao";
@@ -505,6 +509,8 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
     infeedDescription2: "",
     infeedCtaPrimary: "",
     infeedCtaSecondary: "",
+    infeedSearchPlacement: "top",
+    infeedSearchFeedInsertAfterIndex: "1",
   });
 
   // 이미지 업로드 관련 상태
@@ -1081,6 +1087,18 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                     ? normalizeHttpUrl(form.infeedVideoUrl.trim())
                     : undefined,
                   searchQuery: form.infeedSearchQuery || undefined,
+                  searchPlacement:
+                    form.infeedSearchPlacement === "feed" ? "feed" : "top",
+                  searchFeedInsertAfterIndex:
+                    form.infeedSearchPlacement === "feed"
+                      ? Math.max(
+                          0,
+                          Math.min(
+                            12,
+                            parseInt(form.infeedSearchFeedInsertAfterIndex || "1", 10) || 1
+                          )
+                        )
+                      : undefined,
                   description1: form.infeedDescription1 || undefined,
                   description2: form.infeedDescription2 || undefined,
                   ctaPrimary: form.infeedCtaPrimary || undefined,
@@ -1133,6 +1151,8 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
         infeedDescription2: "",
         infeedCtaPrimary: "",
         infeedCtaSecondary: "",
+        infeedSearchPlacement: "top",
+        infeedSearchFeedInsertAfterIndex: "1",
       }));
       setUploadedFile(null);
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -1985,6 +2005,63 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                             }))
                           }
                         />
+                      </div>
+                      <div>
+                        <label
+                          className="text-[11px] font-medium mb-1 block"
+                          style={{ color: "var(--color-text-secondary)" }}
+                        >
+                          검색결과 내 광고 위치
+                        </label>
+                        <div className="flex flex-col gap-2">
+                          <label className="flex items-center gap-2 cursor-pointer text-[12px]">
+                            <input
+                              type="radio"
+                              name="infeedSearchPlacement"
+                              checked={form.infeedSearchPlacement === "top"}
+                              onChange={() =>
+                                setForm((p) => ({ ...p, infeedSearchPlacement: "top" }))
+                              }
+                            />
+                            <span>최상단 (첫 검색결과 위)</span>
+                          </label>
+                          <label className="flex items-center gap-2 cursor-pointer text-[12px]">
+                            <input
+                              type="radio"
+                              name="infeedSearchPlacement"
+                              checked={form.infeedSearchPlacement === "feed"}
+                              onChange={() =>
+                                setForm((p) => ({ ...p, infeedSearchPlacement: "feed" }))
+                              }
+                            />
+                            <span>
+                              피드 중간 (다른 검색 결과 사이, 실제 페이지에 가깝게)
+                            </span>
+                          </label>
+                          {form.infeedSearchPlacement === "feed" && (
+                            <div className="pl-6 pt-1">
+                              <label
+                                className="text-[10px] font-medium mb-0.5 block"
+                                style={{ color: "var(--color-text-muted)" }}
+                              >
+                                삽입 기준: 몇 번째 결과(0부터) 바로 아래 (0~12)
+                              </label>
+                              <input
+                                type="number"
+                                min={0}
+                                max={12}
+                                className="form-input max-w-[120px]"
+                                value={form.infeedSearchFeedInsertAfterIndex}
+                                onChange={(e) =>
+                                  setForm((prev) => ({
+                                    ...prev,
+                                    infeedSearchFeedInsertAfterIndex: e.target.value,
+                                  }))
+                                }
+                              />
+                            </div>
+                          )}
+                        </div>
                       </div>
                       <div>
                         <label
