@@ -160,6 +160,18 @@ export function runInfeedInjectInPage(...args: unknown[]): boolean {
     };
 
     if (p.surface === "home") {
+      const synthRoot = document.querySelector("#primary [data-admate-synthetic-feed-root]");
+      if (synthRoot) {
+        synthRoot
+          .querySelectorAll('[data-injected="admate-youtube-infeed"]')
+          .forEach((el) => el.remove());
+        const ad = buildHomeFeedCard();
+        ad.style.maxWidth = "420px";
+        ad.style.marginBottom = "20px";
+        synthRoot.insertBefore(ad, synthRoot.firstChild);
+        console.log("[admate infeed] home: 합성 피드 루트 상단에 광고 삽입");
+        return true;
+      }
       const richItem =
         document.querySelector(
           "#primary ytd-rich-grid-renderer ytd-rich-grid-row ytd-rich-item-renderer"

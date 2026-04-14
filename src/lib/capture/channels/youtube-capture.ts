@@ -76,6 +76,8 @@ export interface YouTubeDiagnostics {
   infeedBootstrapBest?: number;
   /** 인피드 홈: 브라우즈 본문 0건일 때 검색 결과로 세션 워밍 후 브라우즈 재진입 시 true */
   infeedHomeSearchWarmUsed?: boolean;
+  /** 인피드 홈: 유기 피드 대신 oEmbed+썸네일 합성 그리드를 사용함 */
+  infeedHomeSyntheticFeed?: boolean;
 }
 
 /**
@@ -210,6 +212,19 @@ function extractVideoId(url: string): string | null {
 function getThumbnailUrl(videoId: string): string {
   return `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
 }
+
+/** 인피드 홈: 유기 피드가 비었을 때 합성 그리드용 공개 영상 ID */
+const INFEED_HOME_SYNTHETIC_FALLBACK_IDS: string[] = [
+  "67yxoKs30Oo",
+  "jNQXAC9IVRw",
+  "dQw4w9WgXcQ",
+  "9bZkp7q19f0",
+  "kJQP7kiw5Fk",
+  "OPf0YbXqDm0",
+  "RgKAFK5djSk",
+  "CevxZvSJLk8",
+  "YQHsXMglC9A",
+];
 
 export class YouTubeCapture extends BaseChannel {
   private diagnostics: YouTubeDiagnostics | null = null;
@@ -839,6 +854,10 @@ export class YouTubeCapture extends BaseChannel {
         });
         primaryRichGridCount = Math.max(primaryRichGridCount, outside);
       }
+      if (primaryEl) {
+        const synth = primaryEl.querySelectorAll("[data-admate-synthetic-feed-card]").length;
+        primaryRichGridCount = Math.max(primaryRichGridCount, synth);
+      }
 
       const path = location.pathname || "";
       const onTrendingPath = /\/feed\/trending/i.test(path);
@@ -915,6 +934,10 @@ export class YouTubeCapture extends BaseChannel {
         };
         const primary = document.querySelector("#primary");
         let m = countInRoot(primary);
+        if (primary) {
+          const synth = primary.querySelectorAll("[data-admate-synthetic-feed-card]").length;
+          m = Math.max(m, synth);
+        }
         const app = document.querySelector("ytd-app");
         const guide = app?.querySelector("#guide, ytd-mini-guide-renderer, ytd-guide-renderer");
         const contentRoot = app?.querySelector("#content");
@@ -976,6 +999,114 @@ export class YouTubeCapture extends BaseChannel {
       console.warn("[YouTube] 인피드 홈: 검색 경유 워밍 실패", e);
       return 0;
     }
+  }
+
+  private async fetchYoutubeOembedTitle(videoId: string): Promise<string> {
+    if (!/^[a-zA-Z0-9_-]{6,15}$/.test(videoId)) return "";
+    try {
+      const watch = `https://www.youtube.com/watch?v=${videoId}`;
+      const url = `https://www.youtube.com/oembed?url=${encodeURIComponent(watch)}&format=json`;
+      const ac = new AbortController();
+      const t = setTimeout(() => ac.abort(), 5000);
+      const res = await fetch(url, {
+        headers: { Accept: "application/json" },
+        signal: ac.signal,
+      });
+      clearTimeout(t);
+      if (!res.ok) return "";
+      const j = (await res.json()) as { title?: string };
+      return (j.title || "").trim().slice(0, 100);
+    } catch {
+      return "";
+    }
+  }
+
+  private async buildSyntheticInfeedHomeItems(
+    infeedVideoUrl: string | undefined
+  ): Promise<{ id: string; title: string }[]> {
+    const seen = new Set<string>();
+    const ids: string[] = [];
+    const first = infeedVideoUrl?.trim() ? extractVideoId(infeedVideoUrl.trim()) : null;
+    if (first && /^[a-zA-Z0-9_-]{6,15}$/.test(first)) {
+      ids.push(first);
+      seen.add(first);
+    }
+    for (const id of INFEED_HOME_SYNTHETIC_FALLBACK_IDS) {
+      if (seen.has(id)) continue;
+      ids.push(id);
+      seen.add(id);
+      if (ids.length >= 9) break;
+    }
+    const titles = await Promise.all(ids.map((id) => this.fetchYoutubeOembedTitle(id)));
+    return ids.map((id, i) => ({
+      id,
+      title: titles[i] || "동영상",
+    }));
+  }
+
+  /**
+   * 유기 브라우즈 피드가 비었을 때: oEmbed 제목 + i.ytimg.com 썸네일로 리치 그리드와 유사한 3열 카드 주입.
+   * (데이터센터 IP에서 InnerTube 피드가 안 내려올 때 인스트림·스토리보드와 같은 “정적 자산” 계열 폴백)
+   */
+  private async applySyntheticInfeedHomeBrowseGrid(
+    page: IPageHandle,
+    items: { id: string; title: string }[]
+  ): Promise<void> {
+    const itemsJson = JSON.stringify(items);
+    await page.evaluate(
+      ((payload: string) => {
+      const list: { id: string; title: string }[] = JSON.parse(payload);
+      document.querySelectorAll("[data-admate-synthetic-feed-root]").forEach((e) => e.remove());
+      const primary =
+        (document.getElementById("primary") as HTMLElement | null) ||
+        (document.querySelector("ytd-browse #primary") as HTMLElement | null);
+      if (!primary) return;
+      const esc = (s: string) => {
+        const d = document.createElement("div");
+        d.textContent = s;
+        return d.innerHTML;
+      };
+      const root = document.createElement("div");
+      root.setAttribute("data-admate-synthetic-feed-root", "1");
+      root.style.cssText =
+        "box-sizing:border-box;width:100%;max-width:1294px;margin:0 auto;padding:12px 24px 32px 36px;font-family:Roboto,'Noto Sans KR',Arial,sans-serif;";
+      const grid = document.createElement("div");
+      grid.setAttribute("data-admate-synthetic-feed-grid", "1");
+      grid.style.cssText =
+        "display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;width:100%;";
+      for (const it of list) {
+        if (!/^[a-zA-Z0-9_-]{6,15}$/.test(it.id)) continue;
+        const card = document.createElement("div");
+        card.setAttribute("data-admate-synthetic-feed-card", "1");
+        card.style.cssText =
+          "border-radius:12px;overflow:hidden;border:1px solid var(--yt-spec-10-percent-layer,#e5e5e5);background:var(--yt-spec-base-background,#fff);";
+        const safeTitle = esc(it.title);
+        card.innerHTML =
+          '<div style="position:relative;width:100%;aspect-ratio:16/9;background:#000;">' +
+          '<img src="https://i.ytimg.com/vi/' +
+          it.id +
+          '/hqdefault.jpg" alt="" style="width:100%;height:100%;object-fit:cover;display:block;" loading="lazy" />' +
+          "</div>" +
+          '<div style="padding:12px 12px 14px;">' +
+          '<div style="font-size:14px;font-weight:500;line-height:20px;color:var(--yt-spec-text-primary,#0f0f0f);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">' +
+          safeTitle +
+          "</div>" +
+          '<div style="margin-top:6px;font-size:12px;line-height:18px;color:var(--yt-spec-text-secondary,#606060);">YouTube</div>' +
+          "</div>";
+        grid.appendChild(card);
+      }
+      root.appendChild(grid);
+      const chipBar = primary.querySelector(
+        "ytd-feed-filter-chip-bar-renderer, yt-chip-cloud-renderer, ytd-rich-grid-renderer"
+      );
+      if (chipBar && chipBar.parentNode === primary) {
+        chipBar.insertAdjacentElement("afterend", root);
+      } else {
+        primary.appendChild(root);
+      }
+    }) as (...args: unknown[]) => void,
+      itemsJson
+    );
   }
 
   /**
@@ -1644,7 +1775,18 @@ export class YouTubeCapture extends BaseChannel {
 
     let skipHomeAdInjection = false;
     if (adType === "infeed-home" && injectSurface === "home") {
-      const pc = await this.countPrimaryBrowseRichItems(page);
+      let pc = await this.countPrimaryBrowseRichItems(page);
+      if (pc < 1) {
+        console.log(
+          "[YouTube] 인피드 홈: InnerTube 피드 없음 — oEmbed+썸네일 합성 그리드(정적 자산) 주입"
+        );
+        const synthItems = await this.buildSyntheticInfeedHomeItems(infeedOpts.videoUrl?.trim());
+        await this.applySyntheticInfeedHomeBrowseGrid(page, synthItems);
+        if (this.diagnostics) {
+          this.diagnostics.infeedHomeSyntheticFeed = true;
+        }
+        pc = await this.countPrimaryBrowseRichItems(page);
+      }
       skipHomeAdInjection = pc < 1;
       if (this.diagnostics) {
         this.diagnostics.infeedHomeInjectionSkipped = skipHomeAdInjection;
@@ -1652,7 +1794,7 @@ export class YouTubeCapture extends BaseChannel {
       }
       if (skipHomeAdInjection) {
         console.warn(
-          "[YouTube] 인피드 홈: #primary 유기 콘텐츠 없음 — 광고 인젝션 생략(순수 유튜브 본문만 캡처)"
+          "[YouTube] 인피드 홈: 합성 그리드까지 실패 — 광고 인젝션 생략"
         );
       }
     }
@@ -1771,7 +1913,7 @@ export class YouTubeCapture extends BaseChannel {
         `[YouTube] ===== 인피드 캡처 완료 (${injectSurface}) url=${d?.infeedCaptureUrl ?? ""} ` +
           `feedMode=${d?.infeedHomeFeedMode ?? "-"} primary=${d?.infeedPrimaryRichGridCount ?? "-"} ` +
           `bootstrapBest=${d?.infeedBootstrapBest ?? "-"} injectSkipped=${d?.infeedHomeInjectionSkipped === true} ` +
-          `searchWarm=${d?.infeedHomeSearchWarmUsed === true} ` +
+          `synthetic=${d?.infeedHomeSyntheticFeed === true} searchWarm=${d?.infeedHomeSearchWarmUsed === true} ` +
           `trendingBrowse=${d?.infeedTrendingGridCount ?? "-"} guest빈홈=${d?.infeedGuestEmptyPrompt ?? "-"} =====`
       );
     } else {
