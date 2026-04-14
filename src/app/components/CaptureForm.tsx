@@ -927,6 +927,22 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
     "gdn-pc": "PC지면",
     "gdn-mobile": "MO지면",
   };
+  const infeedTypeLabel =
+    form.youtubeAdType === "infeed-home"
+      ? "인피드 · 홈"
+      : form.youtubeAdType === "infeed-search"
+        ? "인피드 · 검색"
+        : form.youtubeAdType === "infeed-watch-next"
+          ? "인피드 · 관련동영상"
+          : "인피드";
+  const infeedSurfaceHint =
+    form.youtubeAdType === "infeed-home"
+      ? "홈 지면은 빈 게스트 피드를 피하기 위해 인기(/feed/trending) 그리드 기준으로 캡처합니다."
+      : form.youtubeAdType === "infeed-search"
+        ? "검색 지면은 검색어 기준 결과 목록에 광고 카드를 삽입합니다."
+        : form.youtubeAdType === "infeed-watch-next"
+          ? "관련동영상 지면은 시청 페이지 우측 추천 영역에 광고 카드를 삽입합니다."
+          : "인피드는 PC 1920×1080 뷰포트에서 열립니다.";
 
   const isGdnMobileSurface =
     form.channel === "gdn" && form.gdnViewportMode === "mobile";
@@ -1350,7 +1366,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                   <option value="pc-non-skip">Pc instream (Non skip)</option>
                   <option value="mo-skip">Mo instream (Skip)</option>
                   <option value="mo-non-skip">Mo instream (Non skip)</option>
-                  <option value="infeed-home">In-feed 홈</option>
+                  <option value="infeed-home">In-feed 홈 (트렌딩)</option>
                   <option value="infeed-search">In-feed 검색</option>
                   <option value="infeed-watch-next">In-feed 관련동영상</option>
                   <option value="yt-other">Display / Overlay 등</option>
@@ -1400,7 +1416,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
               {form.youtubeAdType === "mobile-preroll-ios" &&
                 "모바일 인스트림은 iPhone 15 뷰포트 기준으로 캡처됩니다."}
               {isYoutubeInfeed &&
-                "인피드는 PC 1920×1080 뷰포트에서 열립니다. 홈 지면은 빈 게스트 피드를 피하기 위해 인기(/feed/trending) 그리드에서 캡처합니다."}
+                `인피드는 PC 1920×1080 뷰포트에서 열립니다. ${infeedSurfaceHint}`}
             </p>
 
             {/* 🎬 인스트림 광고 상세 옵션 (프리롤 + 모바일 인스트림 공통) */}
@@ -1942,6 +1958,15 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                   >
                     인피드 광고 정보
                   </p>
+                  <span
+                    className="text-[10px] px-1.5 py-0.5 rounded-full"
+                    style={{
+                      backgroundColor: "var(--color-bg-tertiary)",
+                      color: "var(--color-text-muted)",
+                    }}
+                  >
+                    {infeedTypeLabel}
+                  </span>
                 </div>
                 <p
                   className="text-[11px] mb-3"
@@ -1951,6 +1976,12 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                   하단 소재 이미지 중 <strong>최소 하나</strong>는 입력해야 합니다. 제목·스폰서명·
                   채널 아이콘은 아래에서 지정할 수 있고, CTA는 비우면 지면 유형별 기본값이
                   적용됩니다.
+                </p>
+                <p
+                  className="text-[10px] mb-3"
+                  style={{ color: "var(--color-text-muted)" }}
+                >
+                  지면 안내: {infeedSurfaceHint}
                 </p>
                 <div className="space-y-3">
                   <div>
