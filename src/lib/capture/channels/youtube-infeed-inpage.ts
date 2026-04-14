@@ -94,21 +94,32 @@ export function runInfeedInjectInPage(...args: unknown[]): boolean {
      */
     const btnBase =
       "box-sizing:border-box;margin:0;border:none;cursor:default;font-family:Roboto,'Noto Sans KR',Arial,sans-serif;font-size:14px;line-height:36px;font-weight:500;height:36px;padding:0 16px;border-radius:18px;display:flex;align-items:center;justify-content:center;white-space:nowrap;letter-spacing:0.011px;";
-    const btnRow = (compact: boolean) => {
+    const btnRow = (
+      compact: boolean,
+      opts?: { primaryFitContent?: boolean; marginTop?: string }
+    ) => {
       const gap = "8px";
+      const primaryFit = opts?.primaryFitContent === true;
+      const rowMt =
+        opts?.marginTop !== undefined ? opts.marginTop : compact ? "8px" : "10px";
       const sec = showSecondary
         ? `<button type="button" style="${btnBase}flex:1;min-width:0;background:#f2f2f2;color:#0f0f0f;border:1px solid #e5e5e5;">${esc(
             ctaS
           )}</button>`
         : "";
-      const primW = showSecondary ? "flex:1" : "width:100%";
+      const primW = showSecondary
+        ? "flex:1"
+        : primaryFit
+          ? "width:fit-content;max-width:100%;flex:0 0 auto;"
+          : "width:100%";
+      const primMin = primaryFit ? "" : "min-width:0;";
       const prim =
         ctaP.length > 0
-          ? `<button type="button" style="${btnBase}${primW};min-width:0;background:#0f0f0f;color:#fff;border:1px solid #0f0f0f;">${esc(
+          ? `<button type="button" style="${btnBase}${primW};${primMin}background:#0f0f0f;color:#fff;border:1px solid #0f0f0f;">${esc(
               ctaP
             )}</button>`
           : "";
-      return `<div style="display:flex;flex-direction:row;gap:${gap};margin-top:${compact ? "8px" : "10px"};align-items:center;width:100%;">${sec}${prim}</div>`;
+      return `<div style="display:flex;flex-direction:row;gap:${gap};margin-top:${rowMt};align-items:center;width:100%;justify-content:flex-start;">${sec}${prim}</div>`;
     };
 
     /**
@@ -431,32 +442,35 @@ export function runInfeedInjectInPage(...args: unknown[]): boolean {
 
     wrap.style.width = alignW + "px";
     wrap.innerHTML = `
-      <div style="display:flex;flex-direction:row;gap:10px;align-items:flex-start;width:100%;">
+      <div style="display:flex;flex-direction:row;gap:10px;align-items:stretch;width:100%;">
         <div style="position:relative;flex-shrink:0;width:${compactThumbW}px;height:${compactThumbW}px;border-radius:12px;overflow:hidden;background:#000;">
           <img src="${thumb}" alt="" style="width:100%;height:100%;object-fit:cover;display:block;vertical-align:bottom;" />
-          ${extIcon}
         </div>
-        <div style="flex:1;min-width:0;padding-top:0;">
-          <div style="display:grid;grid-template-columns:minmax(0,1fr) 32px;align-items:start;column-gap:4px;min-height:0;width:100%;">
-            <div style="min-width:0;display:flex;flex-direction:column;gap:0;">
-              <h3 style="margin:0;padding:0;font-size:max(1.6rem,calc(var(--ytd-metadata-line-title-font-size,1.4rem) * 1.12));font-weight:400;line-height:1.32;letter-spacing:0.15px;color:var(--yt-spec-text-primary,#0f0f0f);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">${esc(
-                title
-              )}</h3>
-              ${descBlockWatchNext}
+        <div style="flex:1;min-width:0;min-height:${compactThumbW}px;display:flex;flex-direction:column;padding-top:0;">
+          <div style="flex:1;min-height:0;display:flex;flex-direction:column;">
+            <div style="display:grid;grid-template-columns:minmax(0,1fr) 32px;align-items:start;column-gap:4px;min-height:0;width:100%;">
+              <div style="min-width:0;display:flex;flex-direction:column;gap:0;">
+                <h3 style="margin:0;padding:0;font-size:max(1.6rem,calc(var(--ytd-metadata-line-title-font-size,1.4rem) * 1.12));font-weight:400;line-height:1.32;letter-spacing:0.15px;color:var(--yt-spec-text-primary,#0f0f0f);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">${esc(
+                  title
+                )}</h3>
+                ${descBlockWatchNext}
+              </div>
+              <div style="justify-self:end;align-self:start;z-index:2;transform:translateX(1px);">${menuBtnSearch}</div>
             </div>
-            <div style="justify-self:end;align-self:start;z-index:2;transform:translateX(1px);">${menuBtnSearch}</div>
-          </div>
-          <div style="margin-top:${sponsorWatchMarginTop};display:flex;align-items:center;gap:${avatar ? "8px" : "0"};font-size:1.2rem;">
-            ${
-              avatar
-                ? `<div style="width:24px;height:24px;border-radius:50%;overflow:hidden;flex-shrink:0;background:#eee;">
+            <div style="margin-top:${sponsorWatchMarginTop};display:flex;align-items:center;gap:${avatar ? "8px" : "0"};font-size:1.2rem;">
+              ${
+                avatar
+                  ? `<div style="width:24px;height:24px;border-radius:50%;overflow:hidden;flex-shrink:0;background:#eee;">
               <img src="${avatar}" alt="" style="width:100%;height:100%;object-fit:cover;" />
             </div>`
-                : ""
-            }
-            <div style="min-width:0;line-height:1.65rem;flex:1;">${sponsorHtml}</div>
+                  : ""
+              }
+              <div style="min-width:0;line-height:1.65rem;flex:1;">${sponsorHtml}</div>
+            </div>
           </div>
-          ${btnRow(true)}
+          <div style="margin-top:auto;align-self:stretch;width:100%;padding-top:6px;box-sizing:border-box;">
+            ${btnRow(true, { primaryFitContent: true, marginTop: "0" })}
+          </div>
         </div>
       </div>`;
 
