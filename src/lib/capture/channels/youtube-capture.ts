@@ -1379,9 +1379,7 @@ export class YouTubeCapture extends BaseChannel {
   ): Promise<{ bestCount: number; bestUrl: string }> {
     const candidates: { url: string; label: string }[] = [
       { url: "https://www.youtube.com/feed/trending?app=desktop&hl=ko&gl=KR", label: "trending-ko" },
-      { url: "https://www.youtube.com/feed/trending?app=desktop&hl=en&gl=US", label: "trending-en" },
       { url: "https://www.youtube.com/?app=desktop&hl=ko&gl=KR", label: "home-ko" },
-      { url: "https://www.youtube.com/?app=desktop&hl=en&gl=US", label: "home-en" },
     ];
     let bestCount = 0;
     let bestUrl = candidates[0]!.url;
@@ -1389,24 +1387,12 @@ export class YouTubeCapture extends BaseChannel {
       console.log(`[YouTube] 인피드 홈: 유기 본문 로드 시도 [${label}]`);
       await this.gotoYoutubeInfeedBrowseFeed(page, url);
       await this.reapplyPostNavigationChrome(page, mastheadProfileDataUrl);
-      const n = await this.primeYoutubeBrowsePrimaryGrid(page, 3, 11000);
+      const n = await this.primeYoutubeBrowsePrimaryGrid(page, 3, 5000);
       if (n > bestCount) {
         bestCount = n;
         bestUrl = url;
       }
       if (n >= 8) break;
-    }
-    if (bestCount === 0) {
-      if (this.diagnostics) this.diagnostics.infeedHomeSearchWarmUsed = true;
-      const warmed = await this.warmBrowseViaSearchResults(
-        page,
-        mastheadProfileDataUrl,
-        candidates[0]!.url
-      );
-      if (warmed > bestCount) {
-        bestCount = warmed;
-        bestUrl = candidates[0]!.url;
-      }
     }
     if (bestCount > 0) {
       console.log(`[YouTube] 인피드 홈: 본문 최대 ${bestCount} — 해당 URL로 마무리 이동`);
@@ -1509,7 +1495,7 @@ export class YouTubeCapture extends BaseChannel {
     feedMode: "trending" | "home";
   }> {
     const minPrimaryCards = 3;
-    const timeoutMs = 38000;
+    const timeoutMs = 12000;
     const deadline = Date.now() + timeoutMs;
     let injectSurface: InfeedSurface = "home";
     let reloadCount = 0;
@@ -1546,6 +1532,19 @@ export class YouTubeCapture extends BaseChannel {
     );
     if (this.diagnostics) {
       this.diagnostics.infeedBootstrapBest = boot.bestCount;
+    }
+    if (boot.bestCount < 1) {
+      const snap = await this.readYoutubeRichGridSnapshot(page);
+      const globalRich = snap.richItems + snap.shelfItems;
+      console.warn(
+        `[YouTube] 인피드 홈: 부트스트랩에서 유기 본문 0건 — 합성 피드+광고 상단 고정 경로로 즉시 전환합니다.`
+      );
+      return {
+        injectSurface,
+        richCount: snap.primaryRichGridCount || globalRich,
+        pageSubtype: snap.pageSubtype,
+        feedMode: "trending",
+      };
     }
 
     let feedMode: "trending" | "home" = isTrendingUrl(page.url())
