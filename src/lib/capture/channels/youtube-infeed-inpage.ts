@@ -133,18 +133,18 @@ export function runInfeedInjectInPage(...args: unknown[]): boolean {
       const wrap = document.createElement("div");
       wrap.setAttribute("data-injected", "admate-youtube-infeed");
       wrap.style.cssText =
-        "width:100%;box-sizing:border-box;font-family:Roboto,'Noto Sans KR',Arial,sans-serif;border-radius:12px;overflow:hidden;background:var(--yt-spec-base-background,#fff);border:1px solid var(--yt-spec-10-percent-layer,#e5e5e5);";
+        "width:100%;box-sizing:border-box;font-family:Roboto,'Noto Sans KR',Arial,sans-serif;border:none;background:transparent;";
       const avatarCol =
         avatar &&
         `<div style="width:36px;height:36px;border-radius:50%;overflow:hidden;flex-shrink:0;background:#eee;">
               <img src="${avatar}" alt="" style="width:100%;height:100%;object-fit:cover;" />
             </div>`;
       wrap.innerHTML = `
-        <div style="position:relative;width:100%;aspect-ratio:16/9;background:#000;">
+        <div style="position:relative;width:100%;aspect-ratio:16/9;background:#000;border-radius:12px;overflow:hidden;">
           <img src="${thumb}" alt="" style="width:100%;height:100%;object-fit:cover;display:block;" />
           ${extIcon}
         </div>
-        <div style="padding:12px 12px 14px;">
+        <div style="padding:10px 0 0 0;">
           <div style="display:flex;gap:${avatar ? "12px" : "0"};align-items:flex-start;">
             ${avatarCol || ""}
             <div style="flex:1;min-width:0;">
@@ -154,7 +154,6 @@ export function runInfeedInjectInPage(...args: unknown[]): boolean {
               <div style="margin-top:6px;font-size:1.2rem;display:flex;align-items:center;flex-wrap:wrap;">${sponsorHtml}</div>
             </div>
           </div>
-          ${btnRow(false)}
         </div>`;
       return wrap;
     };
@@ -211,29 +210,19 @@ export function runInfeedInjectInPage(...args: unknown[]): boolean {
         (cloned.querySelector("#content") as HTMLElement | null);
 
       if (detailsHost) {
-        detailsHost
-          .querySelectorAll('[data-admate-home-cta="1"]')
-          .forEach((el) => el.remove());
-        const ctaWrap = document.createElement("div");
-        ctaWrap.setAttribute("data-admate-home-cta", "1");
-        ctaWrap.style.cssText = "display:flex;gap:8px;margin-top:8px;align-items:center;";
-        if (showSecondary) {
-          const secondaryBtn = document.createElement("button");
-          secondaryBtn.type = "button";
-          secondaryBtn.textContent = ctaS;
-          secondaryBtn.style.cssText =
-            "border:1px solid #e5e5e5;background:#f2f2f2;color:#0f0f0f;height:32px;padding:0 12px;border-radius:16px;font:500 12px Roboto,'Noto Sans KR',Arial,sans-serif;";
-          ctaWrap.appendChild(secondaryBtn);
-        }
-        if (ctaP.length > 0) {
-          const primaryBtn = document.createElement("button");
-          primaryBtn.type = "button";
-          primaryBtn.textContent = ctaP;
-          primaryBtn.style.cssText =
-            "border:1px solid #0f0f0f;background:#0f0f0f;color:#fff;height:32px;padding:0 12px;border-radius:16px;font:500 12px Roboto,'Noto Sans KR',Arial,sans-serif;";
-          ctaWrap.appendChild(primaryBtn);
-        }
-        if (ctaWrap.childElementCount > 0) detailsHost.appendChild(ctaWrap);
+        // 홈 인피드 카드에서는 CTA 버튼을 노출하지 않습니다.
+        detailsHost.querySelectorAll("button, #buttons, ytd-button-renderer, ytd-toggle-button-renderer").forEach((el) => {
+          const t = ((el as HTMLElement).textContent || "").trim();
+          if (
+            t.includes("시청") ||
+            t.includes("시작하기") ||
+            t.includes("사이트 방문") ||
+            t.includes("Watch") ||
+            t.includes("Visit")
+          ) {
+            (el as HTMLElement).style.display = "none";
+          }
+        });
       }
 
       return cloned;
@@ -250,8 +239,7 @@ export function runInfeedInjectInPage(...args: unknown[]): boolean {
         if (grid) {
           const cell = document.createElement("div");
           cell.setAttribute("data-injected", "admate-youtube-infeed");
-          cell.style.cssText =
-            "border-radius:12px;overflow:hidden;border:1px solid var(--yt-spec-10-percent-layer,#e5e5e5);background:var(--yt-spec-base-background,#fff);";
+          cell.style.cssText = "border:none;background:transparent;";
           ad.style.border = "none";
           ad.style.borderRadius = "0";
           ad.style.maxWidth = "none";

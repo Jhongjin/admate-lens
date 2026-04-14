@@ -1368,7 +1368,11 @@ export class YouTubeCapture extends BaseChannel {
       const shortsTitle = document.createElement("div");
       shortsTitle.style.cssText =
         "display:flex;align-items:center;gap:8px;margin-bottom:10px;font:700 16px Roboto,'Noto Sans KR',Arial,sans-serif;color:var(--yt-spec-text-primary,#0f0f0f);";
-      shortsTitle.innerHTML = '<span style="color:#ff0033;font-size:15px;">▸</span><span>Shorts</span>';
+      shortsTitle.innerHTML =
+        '<span aria-hidden="true" style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;">' +
+        '<svg viewBox="0 0 24 24" width="16" height="16" xmlns="http://www.w3.org/2000/svg">' +
+        '<path fill="#ff0033" d="M9.2 2.2c.8-.5 1.8.1 1.8 1.1v3.1l3.5-2c1-.6 2.3.1 2.3 1.3v3.7c0 .5-.3 1-.8 1.3l-2.8 1.6 2.8 1.6c.5.3.8.8.8 1.3v3.7c0 1.2-1.3 1.9-2.3 1.3l-3.5-2v3.1c0 1-1 1.6-1.8 1.1l-4.8-2.8c-.8-.5-.8-1.7 0-2.2l3.4-2-3.4-2c-.8-.5-.8-1.7 0-2.2l4.8-2.8Z"/>' +
+        "</svg></span><span>Shorts</span>";
       const shortsRow = document.createElement("div");
       shortsRow.style.cssText =
         "display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:12px;width:100%;";
