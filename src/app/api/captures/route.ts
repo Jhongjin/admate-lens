@@ -89,6 +89,8 @@ export async function POST(request: NextRequest) {
         description2?: string;
         ctaPrimary?: string;
         ctaSecondary?: string;
+        /** 관련동영상: 메인 플레이어 덮개용 퍼블리셔 영상 시점(초) */
+        watchNextPlayerFrameOffsetSec?: number;
       };
       instreamOpts?: {
         videoUrl?: string;

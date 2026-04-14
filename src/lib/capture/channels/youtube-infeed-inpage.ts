@@ -450,7 +450,7 @@ export function runInfeedInjectInPage(...args: unknown[]): boolean {
           <div style="flex:1;min-height:0;display:flex;flex-direction:column;">
             <div style="display:grid;grid-template-columns:minmax(0,1fr) 32px;align-items:start;column-gap:4px;min-height:0;width:100%;">
               <div style="min-width:0;display:flex;flex-direction:column;gap:0;">
-                <h3 style="margin:0;padding:0;font-size:max(1.6rem,calc(var(--ytd-metadata-line-title-font-size,1.4rem) * 1.12));font-weight:400;line-height:1.32;letter-spacing:0.15px;color:var(--yt-spec-text-primary,#0f0f0f);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">${esc(
+                <h3 style="margin:0;padding:0;font-family:Roboto,'Noto Sans KR',Arial,sans-serif;font-size:14px;font-weight:500;line-height:20px;letter-spacing:0.25px;color:rgb(15,15,15);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">${esc(
                   title
                 )}</h3>
                 ${descBlockWatchNext}

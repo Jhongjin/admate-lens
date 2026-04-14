@@ -104,6 +104,8 @@ type InfeedOptsPayload = {
   description2?: string;
   ctaPrimary?: string;
   ctaSecondary?: string;
+  /** 관련동영상: 메인 플레이어 덮개에 쓸 퍼블리셔 영상 시점(초). 스토리보드/VPS 성공 시 정적 썸네일 대신 해당 프레임 */
+  watchNextPlayerFrameOffsetSec?: number;
 };
 
 type InstreamOptsPayload = {
@@ -1147,7 +1149,7 @@ export class YouTubeCapture extends BaseChannel {
       }
     }
 
-    /** 관련동영상: 메인 플레이어를 퍼블리셔 영상 썸네일로 덮을 때 사용(봇 벽·Shadow 내부 문구와 무관하게 캡처용) */
+    /** 관련동영상: 메인 플레이어 덮개 — 정적 썸네일 후 스토리보드·VPS 등으로 중간 프레임 시도 */
     let publisherThumbDataUrl = "";
     if (adType === "infeed-watch-next") {
       const pubUrl = (infeedWatchNextNavUrl || request.publisherUrl || "").trim();
@@ -1159,6 +1161,24 @@ export class YouTubeCapture extends BaseChannel {
         }
         if (pubThumb.ok) {
           publisherThumbDataUrl = pubThumb.dataUrl;
+        }
+      }
+      if (pubUrl && extractVideoId(pubUrl)) {
+        const offRaw = infeedOpts.watchNextPlayerFrameOffsetSec;
+        const frameSec =
+          typeof offRaw === "number" && !Number.isNaN(offRaw)
+            ? Math.max(0, Math.min(180, Math.floor(offRaw)))
+            : 4;
+        try {
+          const live = await this.captureTimedFrameFromInstreamVideo(page, pubUrl, frameSec);
+          if (live.frameDataUrl) {
+            publisherThumbDataUrl = live.frameDataUrl;
+            console.log(
+              `[YouTube] 인피드 관련동영상: 퍼블리셔 영상 ${frameSec}s 프레임으로 플레이어 덮개(정적 썸네일 대체)`
+            );
+          }
+        } catch (e) {
+          console.warn("[YouTube] 인피드 관련동영상: 영상 프레임 추출 실패 — 정적 썸네일 유지", e);
         }
       }
     }
@@ -1265,6 +1285,7 @@ export class YouTubeCapture extends BaseChannel {
       await this.pauseVideo(page, { preserveTimeline: true });
       await new Promise((r) => setTimeout(r, 1000));
       await this.suppressWatchPageInjectionBlockers(page);
+      await this.applyWatchPrimaryPlayerRadiusCss(page);
     }
 
     let injectSurface: InfeedSurface = surface;
@@ -1397,6 +1418,7 @@ export class YouTubeCapture extends BaseChannel {
         await this.pauseVideo(page, { preserveTimeline: true });
         await new Promise((r) => setTimeout(r, 600));
         await this.suppressWatchPageInjectionBlockers(page);
+        await this.applyWatchPrimaryPlayerRadiusCss(page);
       }
     }
 
@@ -2761,6 +2783,23 @@ export class YouTubeCapture extends BaseChannel {
     `);
   }
 
+  /** 시청 페이지 메인 플레이어 컨테이너 모서리 라운딩(콘텐츠 영역) */
+  private async applyWatchPrimaryPlayerRadiusCss(page: IPageHandle): Promise<void> {
+    await page.evaluate<void>(`
+      (() => {
+        var s = document.getElementById('admate-primary-player-radius');
+        if (!s) {
+          s = document.createElement('style');
+          s.id = 'admate-primary-player-radius';
+          document.head.appendChild(s);
+        }
+        s.textContent =
+          '#primary #player,#player-full-bleed-container #player-container,#movie_player,ytd-watch-flexy #primary-inner #player{' +
+          'border-radius:12px!important;overflow:hidden!important;}';
+      })()
+    `);
+  }
+
   /**
    * 인스트림(/watch) 봇 폴백과 동일한 한 사이클: 봇 DOM 제거 → 썸네일 덮음 → 잔여 봇 요소 제거
    * (pauseVideo·suppressWatchPageInjectionBlockers 는 호출부에서 인스트림과 같은 순서로 이어서 호출)
@@ -2874,6 +2913,7 @@ export class YouTubeCapture extends BaseChannel {
           'max-height:none',
           'box-sizing:border-box',
           'overflow:hidden',
+          'border-radius:12px',
           'display:flex',
           'align-items:center',
           'justify-content:center',
