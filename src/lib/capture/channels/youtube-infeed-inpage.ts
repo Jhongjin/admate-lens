@@ -8,7 +8,9 @@ export type InfeedSurface = "home" | "search" | "watch-next";
 export interface InfeedInjectPagePayload {
   surface: InfeedSurface;
   thumbDataUrl: string;
+  /** 채널 아이콘 URL 또는 채널 URL로 확보한 경우에만 채움; 없으면 스폰서 줄·홈 카드의 원형 아바타 숨김 */
   avatarDataUrl: string;
+  showChannelAvatar: boolean;
   title: string;
   description1: string;
   description2: string;
@@ -30,7 +32,7 @@ export function runInfeedInjectInPage(...args: unknown[]): boolean {
     document.querySelectorAll('[data-injected="admate-youtube-infeed"]').forEach((el) => el.remove());
 
     const thumb = p.thumbDataUrl;
-    const avatar = p.avatarDataUrl || thumb;
+    const avatar = p.showChannelAvatar && p.avatarDataUrl ? p.avatarDataUrl : "";
     const title = p.title || "광고 제목";
     const d1 = p.description1 || "";
     const d2 = p.description2 || "";
@@ -84,16 +86,19 @@ export function runInfeedInjectInPage(...args: unknown[]): boolean {
       wrap.setAttribute("data-injected", "admate-youtube-infeed");
       wrap.style.cssText =
         "width:100%;box-sizing:border-box;font-family:Roboto,'Noto Sans KR',Arial,sans-serif;border-radius:12px;overflow:hidden;background:var(--yt-spec-base-background,#fff);border:1px solid var(--yt-spec-10-percent-layer,#e5e5e5);";
+      const avatarCol =
+        avatar &&
+        `<div style="width:36px;height:36px;border-radius:50%;overflow:hidden;flex-shrink:0;background:#eee;">
+              <img src="${avatar}" alt="" style="width:100%;height:100%;object-fit:cover;" />
+            </div>`;
       wrap.innerHTML = `
         <div style="position:relative;width:100%;aspect-ratio:16/9;background:#000;">
           <img src="${thumb}" alt="" style="width:100%;height:100%;object-fit:cover;display:block;" />
           ${extIcon}
         </div>
         <div style="padding:12px 12px 14px;">
-          <div style="display:flex;gap:12px;align-items:flex-start;">
-            <div style="width:36px;height:36px;border-radius:50%;overflow:hidden;flex-shrink:0;background:#eee;">
-              <img src="${avatar}" alt="" style="width:100%;height:100%;object-fit:cover;" />
-            </div>
+          <div style="display:flex;gap:${avatar ? "12px" : "0"};align-items:flex-start;">
+            ${avatarCol || ""}
             <div style="flex:1;min-width:0;">
               <div style="font-size:1.4rem;font-weight:500;line-height:2rem;color:var(--yt-spec-text-primary,#0f0f0f);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">${esc(
                 title
@@ -221,7 +226,7 @@ export function runInfeedInjectInPage(...args: unknown[]): boolean {
           <div style="flex:1 1 auto;min-width:0;padding-top:0;width:100%;max-width:none;">
             <div style="display:grid;grid-template-columns:minmax(0,1fr) 32px;align-items:start;column-gap:8px;min-height:50px;width:100%;">
               <div style="min-width:0;display:flex;flex-direction:column;gap:0;">
-                <h3 style="margin:0;padding:0;font-size:2.4rem;font-weight:400;line-height:2.9rem;color:var(--yt-spec-text-primary,#0f0f0f);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;max-width:100%;">${esc(
+                <h3 style="margin:0;padding:0;font-size:var(--ytd-metadata-line-title-font-size,1.4rem);font-weight:var(--ytd-metadata-line-title-font-weight,400);line-height:var(--ytd-metadata-line-title-line-height,2rem);letter-spacing:var(--ytd-metadata-line-title-letter-spacing,0.25px);color:var(--yt-spec-text-primary,#0f0f0f);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;max-width:100%;">${esc(
                   title
                 )}</h3>
                 ${
@@ -234,11 +239,15 @@ export function runInfeedInjectInPage(...args: unknown[]): boolean {
               </div>
               <div style="justify-self:end;align-self:start;z-index:6;transform:translateX(2px);">${menuBtnSearch}</div>
             </div>
-            <div style="margin-top:5px;display:flex;align-items:center;gap:8px;font-size:1.2rem;">
-              <div style="width:24px;height:24px;border-radius:50%;overflow:hidden;flex-shrink:0;background:#eee;">
+            <div style="margin-top:5px;display:flex;align-items:center;gap:${avatar ? "8px" : "0"};font-size:1.2rem;">
+              ${
+                avatar
+                  ? `<div style="width:24px;height:24px;border-radius:50%;overflow:hidden;flex-shrink:0;background:#eee;">
                 <img src="${avatar}" alt="" style="width:100%;height:100%;object-fit:cover;" />
-              </div>
-              <div style="min-width:0;line-height:1.8rem;">${sponsorHtml}</div>
+              </div>`
+                  : ""
+              }
+              <div style="min-width:0;line-height:1.8rem;flex:1;">${sponsorHtml}</div>
             </div>
             ${
               d2

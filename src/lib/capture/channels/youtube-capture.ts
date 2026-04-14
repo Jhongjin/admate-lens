@@ -1128,15 +1128,24 @@ export class YouTubeCapture extends BaseChannel {
       );
     }
 
-    let avatarDataUrl = creativeDataUrl;
+    /** 인피드 스폰서 줄·홈 카드 원형 아이콘은 썸네일로 대체하지 않음 — 아이콘 URL 또는 채널 URL로 확보된 경우만 표시 */
+    let avatarDataUrl = "";
+    let showChannelAvatar = false;
     if (instreamOpts.avatarImageUrl?.trim()) {
       const av = await imageUrlToDataUrl(instreamOpts.avatarImageUrl.trim());
-      if (av.ok) avatarDataUrl = av.dataUrl;
-    } else if (instreamOpts.companionChannelUrl?.trim()) {
+      if (av.ok) {
+        avatarDataUrl = av.dataUrl;
+        showChannelAvatar = true;
+      }
+    }
+    if (!showChannelAvatar && instreamOpts.companionChannelUrl?.trim()) {
       const logoUrl = await fetchYoutubeChannelLogoUrl(instreamOpts.companionChannelUrl.trim());
       if (logoUrl) {
         const av = await imageUrlToDataUrl(logoUrl);
-        if (av.ok) avatarDataUrl = av.dataUrl;
+        if (av.ok) {
+          avatarDataUrl = av.dataUrl;
+          showChannelAvatar = true;
+        }
       }
     }
 
@@ -1283,6 +1292,7 @@ export class YouTubeCapture extends BaseChannel {
       surface: injectSurface,
       thumbDataUrl: creativeDataUrl,
       avatarDataUrl,
+      showChannelAvatar,
       title,
       description1,
       description2,
@@ -1309,6 +1319,7 @@ export class YouTubeCapture extends BaseChannel {
         surface: injectSurface,
         thumbDataUrl: creativeDataUrl,
         avatarDataUrl,
+        showChannelAvatar,
         title,
         description1,
         description2,
