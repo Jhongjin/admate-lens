@@ -1369,9 +1369,10 @@ export class YouTubeCapture extends BaseChannel {
       shortsTitle.style.cssText =
         "display:flex;align-items:center;gap:8px;margin-bottom:10px;font:700 16px Roboto,'Noto Sans KR',Arial,sans-serif;color:var(--yt-spec-text-primary,#0f0f0f);";
       shortsTitle.innerHTML =
-        '<span aria-hidden="true" style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;">' +
-        '<svg viewBox="0 0 24 24" width="16" height="16" xmlns="http://www.w3.org/2000/svg">' +
-        '<path fill="#ff0033" d="M9.2 2.2c.8-.5 1.8.1 1.8 1.1v3.1l3.5-2c1-.6 2.3.1 2.3 1.3v3.7c0 .5-.3 1-.8 1.3l-2.8 1.6 2.8 1.6c.5.3.8.8.8 1.3v3.7c0 1.2-1.3 1.9-2.3 1.3l-3.5-2v3.1c0 1-1 1.6-1.8 1.1l-4.8-2.8c-.8-.5-.8-1.7 0-2.2l3.4-2-3.4-2c-.8-.5-.8-1.7 0-2.2l4.8-2.8Z"/>' +
+        '<span aria-hidden="true" style="display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;">' +
+        '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" focusable="false" aria-hidden="true" style="display:block;width:24px;height:24px;">' +
+        '<path d="m19.45,3.88c1.12,1.82.48,4.15-1.42,5.22l-1.32.74.94.41c1.36.58,2.27,1.85,2.35,3.27.08,1.43-.68,2.77-1.97,3.49l-8,4.47c-1.91,1.06-4.35.46-5.48-1.35-1.12-1.82-.48-4.15,1.42-5.22l1.33-.74-.94-.41c-1.36-.58-2.27-1.85-2.35-3.27-.08-1.43.68-2.77,1.97-3.49l8-4.47c1.91-1.06,4.35-.46,5.48,1.35Z" fill="#f03"></path>' +
+        '<path d="m10,15l5-3-5-3v6Z" fill="#fff"></path>' +
         "</svg></span><span>Shorts</span>";
       const shortsRow = document.createElement("div");
       shortsRow.style.cssText =
@@ -1396,20 +1397,31 @@ export class YouTubeCapture extends BaseChannel {
               safeViews +
               "</div>"
             : "";
+        const avatarBg = ["#8e24aa", "#1e88e5", "#43a047", "#fb8c00"][
+          Math.abs((it.id || "").split("").reduce((acc, ch) => acc + ch.charCodeAt(0), 0)) % 4
+        ];
+        const avatarChar = esc((it.channel || "Y").trim().charAt(0).toUpperCase() || "Y");
         card.innerHTML =
-          '<div style="position:relative;width:100%;aspect-ratio:16/9;background:#000;">' +
+          '<div style="position:relative;width:100%;aspect-ratio:16/9;background:#000;border-radius:12px;overflow:hidden;">' +
           '<img src="https://i.ytimg.com/vi/' +
           it.id +
           '/hqdefault.jpg" alt="" style="width:100%;height:100%;object-fit:cover;display:block;" loading="lazy" />' +
           "</div>" +
-          '<div style="padding:12px 12px 14px;">' +
+          '<div style="padding:10px 0 0 0;display:flex;gap:10px;align-items:flex-start;">' +
+          '<div style="width:24px;height:24px;border-radius:50%;background:' +
+          avatarBg +
+          ';color:#fff;display:flex;align-items:center;justify-content:center;font:700 11px Roboto,Arial,sans-serif;flex-shrink:0;">' +
+          avatarChar +
+          "</div>" +
+          '<div style="min-width:0;flex:1;">' +
           '<div style="font-size:14px;font-weight:500;line-height:20px;color:var(--yt-spec-text-primary,#0f0f0f);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">' +
           safeTitle +
           "</div>" +
-          '<div style="margin-top:6px;font-size:12px;line-height:18px;color:var(--yt-spec-text-secondary,#606060);">' +
+          '<div style="margin-top:4px;font-size:12px;line-height:17px;color:var(--yt-spec-text-secondary,#606060);">' +
           safeCh +
           "</div>" +
           metaSecond +
+          "</div>" +
           "</div>";
         return card;
       };
