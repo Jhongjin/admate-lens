@@ -160,7 +160,9 @@ export function runInfeedInjectInPage(...args: unknown[]): boolean {
     };
 
     if (p.surface === "home") {
-      const richItem = document.querySelector("ytd-rich-grid-renderer ytd-rich-item-renderer");
+      const richItem =
+        document.querySelector("#primary ytd-rich-grid-renderer ytd-rich-item-renderer") ||
+        document.querySelector("ytd-rich-grid-renderer ytd-rich-item-renderer");
       if (richItem) {
         const host = (richItem.querySelector("#dismissable") as HTMLElement) || (richItem as HTMLElement);
         host.innerHTML = "";
@@ -169,7 +171,9 @@ export function runInfeedInjectInPage(...args: unknown[]): boolean {
         return true;
       }
 
-      const gridContents = document.querySelector("ytd-rich-grid-renderer #contents") as HTMLElement | null;
+      const gridContents =
+        (document.querySelector("#primary ytd-rich-grid-renderer #contents") as HTMLElement | null) ||
+        (document.querySelector("ytd-rich-grid-renderer #contents") as HTMLElement | null);
       if (gridContents) {
         const row = document.createElement("div");
         row.style.cssText =
