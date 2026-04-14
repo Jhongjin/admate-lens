@@ -1318,7 +1318,7 @@ export class YouTubeCapture extends BaseChannel {
       const root = document.createElement("div");
       root.setAttribute("data-admate-synthetic-feed-root", "1");
       root.style.cssText =
-        "box-sizing:border-box;width:100%;max-width:1288px;margin:0 auto;padding:4px 16px 32px 16px;font-family:Roboto,'Noto Sans KR',Arial,sans-serif;";
+        "box-sizing:border-box;width:100%;max-width:none;margin:0;padding:4px 24px 32px 24px;font-family:Roboto,'Noto Sans KR',Arial,sans-serif;";
       const chipRow = document.createElement("div");
       chipRow.setAttribute("data-admate-synthetic-chip-row", "1");
       chipRow.style.cssText =
@@ -1432,14 +1432,15 @@ export class YouTubeCapture extends BaseChannel {
       for (const it of list) {
         if (!/^[a-zA-Z0-9_-]{6,15}$/.test(it.id)) continue;
         const idx = grid.childElementCount + shortsRow.childElementCount + postShortsGrid.childElementCount;
-        if (idx < 4) {
+        // 첫 롱폼은 3개만 배치 (광고 1개가 앞에 삽입되어 총 4개가 1행)
+        if (idx < 3) {
           grid.appendChild(makeWideCard(it));
-        } else if (idx < 10) {
+        } else if (idx < 9) {
           shortsRow.appendChild(makeShortCard(it));
-        } else if (idx < 14) {
+        } else if (idx < 13) {
           postShortsGrid.appendChild(makeWideCard(it));
         }
-        if (idx >= 13) break;
+        if (idx >= 12) break;
       }
       root.appendChild(chipRow);
       root.appendChild(grid);
