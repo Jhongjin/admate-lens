@@ -70,6 +70,10 @@ export interface YouTubeDiagnostics {
   infeedGuestEmptyPrompt?: boolean;
   /** 인피드 검색 삽입 위치(top | feed) */
   infeedSearchPlacement?: "top" | "feed";
+  /** 인피드 홈: 유기 본문이 없어 광고 카드 인젝션을 건너뜀 */
+  infeedHomeInjectionSkipped?: boolean;
+  /** 인피드 홈: URL 부트스트랩 순회 중 관측한 #primary 신호 최대값 */
+  infeedBootstrapBest?: number;
 }
 
 /**
@@ -814,7 +818,10 @@ export class YouTubeCapture extends BaseChannel {
         const pc = primaryEl.querySelectorAll(
           "ytd-rich-shelf-renderer ytd-rich-item-renderer, ytd-rich-section-renderer ytd-rich-item-renderer"
         ).length;
-        primaryRichGridCount = Math.max(pa, pb, pc);
+        const pv = primaryEl.querySelectorAll("ytd-video-renderer").length;
+        const pg = primaryEl.querySelectorAll("ytd-grid-video-renderer").length;
+        const pr = primaryEl.querySelectorAll("ytd-rich-item-renderer").length;
+        primaryRichGridCount = Math.max(pa, pb, pc, pv, pg, pr);
       }
 
       const path = location.pathname || "";
@@ -855,9 +862,9 @@ export class YouTubeCapture extends BaseChannel {
       console.log("[YouTube] 인피드 홈: /watch 선로드로 세션 워밍업 (빈 primary 완화)");
       await page.goto(
         "https://www.youtube.com/watch?v=jNQXAC9IVRw&autoplay=0&hl=ko&gl=KR",
-        { waitUntil: "domcontentloaded", timeout: 45000 }
+        { waitUntil: "domcontentloaded", timeout: 22000 }
       );
-      await new Promise((r) => setTimeout(r, 3000));
+      await new Promise((r) => setTimeout(r, 1500));
     } catch (e) {
       console.warn("[YouTube] 인피드 홈: /watch 워밍업 스킵", e);
     }
@@ -872,6 +879,7 @@ export class YouTubeCapture extends BaseChannel {
     await new Promise((r) => setTimeout(r, 4500));
   }
 
+  /** 브라우즈 피드 본문: 리치 그리드·리스트형 video-renderer 등 신호 중 최대값 */
   private async countPrimaryBrowseRichItems(page: IPageHandle): Promise<number> {
     return page.evaluate<number>(`
       (() => {
@@ -884,9 +892,48 @@ export class YouTubeCapture extends BaseChannel {
         const c = p.querySelectorAll(
           "ytd-rich-shelf-renderer ytd-rich-item-renderer, ytd-rich-section-renderer ytd-rich-item-renderer"
         ).length;
-        return Math.max(a, b, c);
+        const v = p.querySelectorAll("ytd-video-renderer").length;
+        const g = p.querySelectorAll("ytd-grid-video-renderer").length;
+        const r = p.querySelectorAll("ytd-rich-item-renderer").length;
+        return Math.max(a, b, c, v, g, r);
       })()
     `);
+  }
+
+  /**
+   * 인피드 홈: 광고보다 먼저 **유튜브 본문**이 붙도록 트렌딩/홈·로케일 후보를 순회한다.
+   * (데이터센터 IP에서 한 경로만 비는 경우가 있어 다각 시도)
+   */
+  private async bootstrapInfeedHomeBrowseMainContent(
+    page: IPageHandle,
+    mastheadProfileDataUrl: string
+  ): Promise<{ bestCount: number; bestUrl: string }> {
+    const candidates: { url: string; label: string }[] = [
+      { url: "https://www.youtube.com/feed/trending?app=desktop&hl=ko&gl=KR", label: "trending-ko" },
+      { url: "https://www.youtube.com/feed/trending?app=desktop&hl=en&gl=US", label: "trending-en" },
+      { url: "https://www.youtube.com/?app=desktop&hl=ko&gl=KR", label: "home-ko" },
+      { url: "https://www.youtube.com/?app=desktop&hl=en&gl=US", label: "home-en" },
+    ];
+    let bestCount = 0;
+    let bestUrl = candidates[0]!.url;
+    for (const { url, label } of candidates) {
+      console.log(`[YouTube] 인피드 홈: 유기 본문 로드 시도 [${label}]`);
+      await this.gotoYoutubeInfeedBrowseFeed(page, url);
+      await this.reapplyPostNavigationChrome(page, mastheadProfileDataUrl);
+      const n = await this.primeYoutubeBrowsePrimaryGrid(page, 3, 11000);
+      if (n > bestCount) {
+        bestCount = n;
+        bestUrl = url;
+      }
+      if (n >= 8) break;
+    }
+    if (bestCount > 0) {
+      console.log(`[YouTube] 인피드 홈: 본문 최대 ${bestCount} — 해당 URL로 마무리 이동`);
+      await this.gotoYoutubeInfeedBrowseFeed(page, bestUrl);
+      await this.reapplyPostNavigationChrome(page, mastheadProfileDataUrl);
+      await this.primeYoutubeBrowsePrimaryGrid(page, 3, 8000);
+    }
+    return { bestCount, bestUrl };
   }
 
   /** 스크롤로 리치 그리드 lazy mount를 유도한 뒤 주 컬럼 카드 수를 올린다. */
@@ -978,7 +1025,7 @@ export class YouTubeCapture extends BaseChannel {
     pageSubtype: string | null;
     feedMode: "trending" | "home";
   }> {
-    const minPrimaryCards = 4;
+    const minPrimaryCards = 3;
     const timeoutMs = 38000;
     const deadline = Date.now() + timeoutMs;
     let injectSurface: InfeedSurface = "home";
@@ -986,10 +1033,6 @@ export class YouTubeCapture extends BaseChannel {
     let localeFlipCount = 0;
     let lastPrimaryTotal = -1;
     let stagnantIters = 0;
-    let feedMode: "trending" | "home" = "trending";
-    let homeFallbackUsed = false;
-
-    await this.primeYoutubeBrowsePrimaryGrid(page, minPrimaryCards, 16000);
 
     const isTrendingUrl = (u: string) => /\/feed\/trending/i.test(u);
     const isHomeFeedUrl = (u: string) => {
@@ -1013,6 +1056,20 @@ export class YouTubeCapture extends BaseChannel {
       urlMatchesMode(url, mode) &&
       snap.primaryRichGridCount >= minPrimaryCards &&
       !snap.guestEmptySearchPrompt;
+
+    const boot = await this.bootstrapInfeedHomeBrowseMainContent(page, mastheadProfileDataUrl);
+    console.log(
+      `[YouTube] 인피드 홈: 유기 본문 부트스트랩 best=${boot.bestCount} (기준 URL=${boot.bestUrl})`
+    );
+    if (this.diagnostics) {
+      this.diagnostics.infeedBootstrapBest = boot.bestCount;
+    }
+
+    let feedMode: "trending" | "home" = isTrendingUrl(page.url())
+      ? "trending"
+      : isHomeFeedUrl(page.url())
+        ? "home"
+        : "home";
 
     while (Date.now() < deadline) {
       const snap = await this.readYoutubeRichGridSnapshot(page);
@@ -1085,22 +1142,6 @@ export class YouTubeCapture extends BaseChannel {
           page,
           `https://www.youtube.com/?app=desktop&hl=en&gl=US&persist_app=1&cb=${Date.now()}`
         );
-        await this.reapplyPostNavigationChrome(page, mastheadProfileDataUrl);
-        continue;
-      } else if (
-        feedMode === "trending" &&
-        !homeFallbackUsed &&
-        stagnantIters >= 10 &&
-        snap.primaryRichGridCount < minPrimaryCards
-      ) {
-        homeFallbackUsed = true;
-        feedMode = "home";
-        stagnantIters = 0;
-        lastPrimaryTotal = -1;
-        console.warn(
-          "[YouTube] 인피드 홈: 트렌딩 주 컬럼 그리드 부족 — 실제 홈 피드(/)로 전환하여 재시도합니다."
-        );
-        await this.gotoYoutubeInfeedBrowseFeed(page, "https://www.youtube.com/?app=desktop&hl=ko&gl=KR");
         await this.reapplyPostNavigationChrome(page, mastheadProfileDataUrl);
         continue;
       }
@@ -1509,36 +1550,23 @@ export class YouTubeCapture extends BaseChannel {
       }
     }
 
-    let injected = await page.evaluate(runInfeedInjectInPage, {
-      surface: injectSurface,
-      thumbDataUrl: creativeDataUrl,
-      avatarDataUrl,
-      showChannelAvatar,
-      title,
-      description1,
-      description2,
-      sponsorName,
-      ctaPrimary,
-      ctaSecondary,
-      searchPlacement,
-      searchFeedInsertAfterIndex,
-    });
-    this.diagnostics.injectionSuccess = injected;
+    let skipHomeAdInjection = false;
+    if (adType === "infeed-home" && injectSurface === "home") {
+      const pc = await this.countPrimaryBrowseRichItems(page);
+      skipHomeAdInjection = pc < 1;
+      if (this.diagnostics) {
+        this.diagnostics.infeedHomeInjectionSkipped = skipHomeAdInjection;
+        this.diagnostics.infeedPrimaryRichGridCount = pc;
+      }
+      if (skipHomeAdInjection) {
+        console.warn(
+          "[YouTube] 인피드 홈: #primary 유기 콘텐츠 없음 — 광고 인젝션 생략(순수 유튜브 본문만 캡처)"
+        );
+      }
+    }
 
-    if (!injected && injectSurface === "home") {
-      console.warn(
-        "[YouTube] 홈(/) 인젝션 실패 — 인기 탭으로 이동 후 그리드 첫 칸에 재시도합니다."
-      );
-      await this.gotoYoutubeInfeedBrowseFeed(
-        page,
-        "https://www.youtube.com/feed/trending?app=desktop&hl=ko&gl=KR"
-      );
-      await this.injectKoreanFonts(page);
-      await this.dismissYouTubeConsent(page);
-      await new Promise((r) => setTimeout(r, 2000));
-      await this.applyMastheadLoggedInLook(page, mastheadProfileDataUrl);
-      await this.applySignedOutPromptSuppression(page);
-      await this.primeYoutubeBrowsePrimaryGrid(page, 4, 12000);
+    let injected = false;
+    if (!skipHomeAdInjection) {
       injected = await page.evaluate(runInfeedInjectInPage, {
         surface: injectSurface,
         thumbDataUrl: creativeDataUrl,
@@ -1553,10 +1581,51 @@ export class YouTubeCapture extends BaseChannel {
         searchPlacement,
         searchFeedInsertAfterIndex,
       });
+    }
+    this.diagnostics.injectionSuccess = injected;
+
+    if (!injected && injectSurface === "home" && !skipHomeAdInjection) {
+      console.warn(
+        "[YouTube] 홈(/) 인젝션 실패 — 인기 탭으로 이동 후 그리드 첫 칸에 재시도합니다."
+      );
+      await this.gotoYoutubeInfeedBrowseFeed(
+        page,
+        "https://www.youtube.com/feed/trending?app=desktop&hl=ko&gl=KR"
+      );
+      await this.injectKoreanFonts(page);
+      await this.dismissYouTubeConsent(page);
+      await new Promise((r) => setTimeout(r, 2000));
+      await this.applyMastheadLoggedInLook(page, mastheadProfileDataUrl);
+      await this.applySignedOutPromptSuppression(page);
+      await this.primeYoutubeBrowsePrimaryGrid(page, 3, 12000);
+      const pcRetry = await this.countPrimaryBrowseRichItems(page);
+      if (adType === "infeed-home" && pcRetry < 1) {
+        console.warn("[YouTube] 인피드 홈: 재시도 후에도 #primary 유기 콘텐츠 없음 — 인젝션 생략");
+        if (this.diagnostics) {
+          this.diagnostics.infeedHomeInjectionSkipped = true;
+          this.diagnostics.infeedPrimaryRichGridCount = pcRetry;
+        }
+        injected = false;
+      } else {
+        injected = await page.evaluate(runInfeedInjectInPage, {
+          surface: injectSurface,
+          thumbDataUrl: creativeDataUrl,
+          avatarDataUrl,
+          showChannelAvatar,
+          title,
+          description1,
+          description2,
+          sponsorName,
+          ctaPrimary,
+          ctaSecondary,
+          searchPlacement,
+          searchFeedInsertAfterIndex,
+        });
+      }
       this.diagnostics.injectionSuccess = injected;
     }
 
-    if (!injected) {
+    if (!injected && !skipHomeAdInjection) {
       console.warn("[YouTube] 인피드 인젝션 실패 — 빈 피드·레이아웃 변경 가능");
     }
 
@@ -1609,6 +1678,7 @@ export class YouTubeCapture extends BaseChannel {
       console.log(
         `[YouTube] ===== 인피드 캡처 완료 (${injectSurface}) url=${d?.infeedCaptureUrl ?? ""} ` +
           `feedMode=${d?.infeedHomeFeedMode ?? "-"} primary=${d?.infeedPrimaryRichGridCount ?? "-"} ` +
+          `bootstrapBest=${d?.infeedBootstrapBest ?? "-"} injectSkipped=${d?.infeedHomeInjectionSkipped === true} ` +
           `trendingBrowse=${d?.infeedTrendingGridCount ?? "-"} guest빈홈=${d?.infeedGuestEmptyPrompt ?? "-"} =====`
       );
     } else {
