@@ -1318,11 +1318,11 @@ export class YouTubeCapture extends BaseChannel {
       const root = document.createElement("div");
       root.setAttribute("data-admate-synthetic-feed-root", "1");
       root.style.cssText =
-        "box-sizing:border-box;width:100%;max-width:none;margin:0;padding:4px 24px 32px 24px;font-family:Roboto,'Noto Sans KR',Arial,sans-serif;";
+        "box-sizing:border-box;width:100%;max-width:none;margin:0;padding:0 24px 32px 24px;font-family:Roboto,'Noto Sans KR',Arial,sans-serif;";
       const chipRow = document.createElement("div");
       chipRow.setAttribute("data-admate-synthetic-chip-row", "1");
       chipRow.style.cssText =
-        "display:flex;align-items:center;gap:8px;overflow-x:auto;white-space:nowrap;padding:0 0 8px 0;margin-bottom:4px;";
+        "display:flex;align-items:center;gap:8px;overflow-x:auto;white-space:nowrap;padding:0 0 8px 0;margin:-2px 0 4px 0;";
       const chipPool = [
         "전체",
         "라이브",
@@ -1368,7 +1368,7 @@ export class YouTubeCapture extends BaseChannel {
       const shortsTitle = document.createElement("div");
       shortsTitle.style.cssText =
         "display:flex;align-items:center;gap:8px;margin-bottom:10px;font:700 16px Roboto,'Noto Sans KR',Arial,sans-serif;color:var(--yt-spec-text-primary,#0f0f0f);";
-      shortsTitle.innerHTML = '<span style="font-size:15px;">⚡</span><span>Shorts</span>';
+      shortsTitle.innerHTML = '<span style="color:#ff0033;font-size:15px;">▸</span><span>Shorts</span>';
       const shortsRow = document.createElement("div");
       shortsRow.style.cssText =
         "display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:12px;width:100%;";
@@ -1382,7 +1382,7 @@ export class YouTubeCapture extends BaseChannel {
         const card = document.createElement("div");
         card.setAttribute("data-admate-synthetic-feed-card", "1");
         card.style.cssText =
-          "border-radius:12px;overflow:hidden;border:1px solid var(--yt-spec-10-percent-layer,#e5e5e5);background:var(--yt-spec-base-background,#fff);";
+          "border-radius:12px;overflow:hidden;border:none;background:transparent;";
         const safeTitle = esc(it.title);
         const safeCh = esc(it.channel || "YouTube");
         const safeViews = it.viewText ? esc(it.viewText) : "";
