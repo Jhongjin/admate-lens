@@ -260,7 +260,7 @@ export function runInfeedInjectInPage(...args: unknown[]): boolean {
       wrap.setAttribute("data-admate-search-placement", placement);
       wrap.style.cssText =
         placement === "feed"
-          ? "display:block;margin:0 0 16px 0;padding:0;box-sizing:border-box;width:100%;font-family:Roboto,'Noto Sans KR',Arial,sans-serif;"
+          ? "display:block;margin:16px 0 16px 0;padding:0;box-sizing:border-box;width:100%;font-family:Roboto,'Noto Sans KR',Arial,sans-serif;"
           : "display:block;margin:0 0 16px 0;padding:0 16px;box-sizing:border-box;font-family:Roboto,'Noto Sans KR',Arial,sans-serif;";
       const searchBtns = showSearchCtaRow
         ? `<div style="display:flex;gap:8px;align-items:center;width:100%;max-width:420px;margin-top:12px;">
