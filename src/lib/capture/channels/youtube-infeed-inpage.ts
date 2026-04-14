@@ -161,6 +161,9 @@ export function runInfeedInjectInPage(...args: unknown[]): boolean {
 
     if (p.surface === "home") {
       const richItem =
+        document.querySelector(
+          "#primary ytd-rich-grid-renderer ytd-rich-grid-row ytd-rich-item-renderer"
+        ) ||
         document.querySelector("#primary ytd-rich-grid-renderer ytd-rich-item-renderer") ||
         document.querySelector("ytd-rich-grid-renderer ytd-rich-item-renderer");
       if (richItem) {

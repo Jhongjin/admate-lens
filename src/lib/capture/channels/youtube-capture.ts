@@ -807,11 +807,14 @@ export class YouTubeCapture extends BaseChannel {
       const primaryEl = document.querySelector("#primary");
       let primaryRichGridCount = 0;
       if (primaryEl) {
-        primaryRichGridCount = primaryEl.querySelectorAll(
-          "ytd-rich-grid-renderer ytd-rich-item-renderer, " +
-            "ytd-rich-shelf-renderer ytd-rich-item-renderer, " +
-            "ytd-rich-section-renderer ytd-rich-item-renderer"
+        const pa = primaryEl.querySelectorAll("ytd-rich-grid-renderer ytd-rich-item-renderer").length;
+        const pb = primaryEl.querySelectorAll(
+          "ytd-rich-grid-renderer ytd-rich-grid-row ytd-rich-item-renderer"
         ).length;
+        const pc = primaryEl.querySelectorAll(
+          "ytd-rich-shelf-renderer ytd-rich-item-renderer, ytd-rich-section-renderer ytd-rich-item-renderer"
+        ).length;
+        primaryRichGridCount = Math.max(pa, pb, pc);
       }
 
       const path = location.pathname || "";
@@ -844,6 +847,71 @@ export class YouTubeCapture extends BaseChannel {
         guestEmptySearchPrompt,
       };
     });
+  }
+
+  /** 인피드 홈: 관련동영상과 유사하게 짧은 /watch 로 세션을 깨운 뒤 브라우즈 피드로 넘어간다. */
+  private async warmupYoutubeSessionBeforeBrowseFeed(page: IPageHandle): Promise<void> {
+    try {
+      console.log("[YouTube] 인피드 홈: /watch 선로드로 세션 워밍업 (빈 primary 완화)");
+      await page.goto(
+        "https://www.youtube.com/watch?v=jNQXAC9IVRw&autoplay=0&hl=ko&gl=KR",
+        { waitUntil: "domcontentloaded", timeout: 45000 }
+      );
+      await new Promise((r) => setTimeout(r, 3000));
+    } catch (e) {
+      console.warn("[YouTube] 인피드 홈: /watch 워밍업 스킵", e);
+    }
+  }
+
+  /**
+   * 트렌딩·홈(/) 브라우즈 URL 전용 이동.
+   * `networkidle2`는 YouTube에서 지연·조기 종료가 잦아, domcontentloaded + 고정 대기가 그리드에 유리한 경우가 많다.
+   */
+  private async gotoYoutubeInfeedBrowseFeed(page: IPageHandle, url: string): Promise<void> {
+    await page.goto(url, { waitUntil: "domcontentloaded", timeout: 50000 });
+    await new Promise((r) => setTimeout(r, 4500));
+  }
+
+  private async countPrimaryBrowseRichItems(page: IPageHandle): Promise<number> {
+    return page.evaluate<number>(`
+      (() => {
+        const p = document.querySelector("#primary");
+        if (!p) return 0;
+        const a = p.querySelectorAll("ytd-rich-grid-renderer ytd-rich-item-renderer").length;
+        const b = p.querySelectorAll(
+          "ytd-rich-grid-renderer ytd-rich-grid-row ytd-rich-item-renderer"
+        ).length;
+        const c = p.querySelectorAll(
+          "ytd-rich-shelf-renderer ytd-rich-item-renderer, ytd-rich-section-renderer ytd-rich-item-renderer"
+        ).length;
+        return Math.max(a, b, c);
+      })()
+    `);
+  }
+
+  /** 스크롤로 리치 그리드 lazy mount를 유도한 뒤 주 컬럼 카드 수를 올린다. */
+  private async primeYoutubeBrowsePrimaryGrid(
+    page: IPageHandle,
+    min: number,
+    timeoutMs: number
+  ): Promise<number> {
+    const deadline = Date.now() + timeoutMs;
+    let last = 0;
+    while (Date.now() < deadline) {
+      last = await this.countPrimaryBrowseRichItems(page);
+      if (last >= min) {
+        await page.evaluate<void>(
+          `(() => { window.scrollTo({ top: 0, behavior: "instant" }); })()`
+        );
+        return last;
+      }
+      await page.evaluate<void>(`(() => { window.scrollBy(0, 700); })()`);
+      await new Promise((r) => setTimeout(r, 550));
+    }
+    await page.evaluate<void>(
+      `(() => { window.scrollTo({ top: 0, behavior: "instant" }); })()`
+    );
+    return last;
   }
 
   private async reapplyPostNavigationChrome(
@@ -921,6 +989,8 @@ export class YouTubeCapture extends BaseChannel {
     let feedMode: "trending" | "home" = "trending";
     let homeFallbackUsed = false;
 
+    await this.primeYoutubeBrowsePrimaryGrid(page, minPrimaryCards, 16000);
+
     const isTrendingUrl = (u: string) => /\/feed\/trending/i.test(u);
     const isHomeFeedUrl = (u: string) => {
       try {
@@ -975,10 +1045,7 @@ export class YouTubeCapture extends BaseChannel {
         console.warn(
           `[YouTube] 인피드 홈: URL이 ${feedMode} 지면과 불일치 (${url}) — 재이동합니다.`
         );
-        await page.goto(dest, {
-          waitUntil: "networkidle2",
-          timeout: 45000,
-        });
+        await this.gotoYoutubeInfeedBrowseFeed(page, dest);
         await this.reapplyPostNavigationChrome(page, mastheadProfileDataUrl);
         stagnantIters = 0;
         continue;
@@ -995,9 +1062,9 @@ export class YouTubeCapture extends BaseChannel {
         console.warn(
           "[YouTube] 인피드 홈: URL은 trending인데 게스트 빈 홈 UI — 로케일 전환(en/US) 후 재시도합니다."
         );
-        await page.goto(
-          `https://www.youtube.com/feed/trending?app=desktop&hl=en&gl=US&persist_app=1&cb=${Date.now()}`,
-          { waitUntil: "networkidle2", timeout: 45000 }
+        await this.gotoYoutubeInfeedBrowseFeed(
+          page,
+          `https://www.youtube.com/feed/trending?app=desktop&hl=en&gl=US&persist_app=1&cb=${Date.now()}`
         );
         await this.reapplyPostNavigationChrome(page, mastheadProfileDataUrl);
         continue;
@@ -1014,9 +1081,9 @@ export class YouTubeCapture extends BaseChannel {
         console.warn(
           "[YouTube] 인피드 홈: 홈(/)에서 게스트 빈 홈 UI — 로케일 전환(en/US) 후 재시도합니다."
         );
-        await page.goto(
-          `https://www.youtube.com/?app=desktop&hl=en&gl=US&persist_app=1&cb=${Date.now()}`,
-          { waitUntil: "networkidle2", timeout: 45000 }
+        await this.gotoYoutubeInfeedBrowseFeed(
+          page,
+          `https://www.youtube.com/?app=desktop&hl=en&gl=US&persist_app=1&cb=${Date.now()}`
         );
         await this.reapplyPostNavigationChrome(page, mastheadProfileDataUrl);
         continue;
@@ -1033,10 +1100,7 @@ export class YouTubeCapture extends BaseChannel {
         console.warn(
           "[YouTube] 인피드 홈: 트렌딩 주 컬럼 그리드 부족 — 실제 홈 피드(/)로 전환하여 재시도합니다."
         );
-        await page.goto("https://www.youtube.com/?app=desktop&hl=ko&gl=KR", {
-          waitUntil: "networkidle2",
-          timeout: 45000,
-        });
+        await this.gotoYoutubeInfeedBrowseFeed(page, "https://www.youtube.com/?app=desktop&hl=ko&gl=KR");
         await this.reapplyPostNavigationChrome(page, mastheadProfileDataUrl);
         continue;
       }
@@ -1052,11 +1116,12 @@ export class YouTubeCapture extends BaseChannel {
         stagnantIters = 0;
         console.warn("[YouTube] 인피드 홈: 그리드 정체 — 전체 리로드 후 재시도합니다.");
         await Promise.all([
-          page.waitForNavigation({ waitUntil: "networkidle2", timeout: 45000 }),
+          page.waitForNavigation({ waitUntil: "domcontentloaded", timeout: 50000 }),
           page.evaluate<void>(`
             (() => { window.location.reload(); })()
           `),
         ]);
+        await new Promise((r) => setTimeout(r, 3500));
         await this.reapplyPostNavigationChrome(page, mastheadProfileDataUrl);
       }
 
@@ -1289,6 +1354,9 @@ export class YouTubeCapture extends BaseChannel {
     }
 
     await this.applyYouTubeConsentCookies(page);
+    if (adType === "infeed-home") {
+      await this.warmupYoutubeSessionBeforeBrowseFeed(page);
+    }
     if (adType === "infeed-watch-next" && infeedWatchNextNavUrl) {
       const embedFirst = this.convertToEmbedUrl(infeedWatchNextNavUrl);
       if (embedFirst) {
@@ -1298,6 +1366,8 @@ export class YouTubeCapture extends BaseChannel {
       }
       await page.goto(infeedWatchNextNavUrl, { waitUntil: "networkidle2", timeout: 45000 });
       targetUrl = infeedWatchNextNavUrl;
+    } else if (adType === "infeed-home") {
+      await this.gotoYoutubeInfeedBrowseFeed(page, targetUrl);
     } else {
       await page.goto(targetUrl, { waitUntil: "networkidle2", timeout: 45000 });
     }
@@ -1307,10 +1377,10 @@ export class YouTubeCapture extends BaseChannel {
         console.warn(
           `[YouTube] 인피드 홈: 첫 이동 후 URL이 트렌딩이 아님 (${opened}) — /feed/trending 으로 재이동합니다.`
         );
-        await page.goto("https://www.youtube.com/feed/trending?app=desktop&hl=ko&gl=KR", {
-          waitUntil: "networkidle2",
-          timeout: 45000,
-        });
+        await this.gotoYoutubeInfeedBrowseFeed(
+          page,
+          "https://www.youtube.com/feed/trending?app=desktop&hl=ko&gl=KR"
+        );
       }
     }
     await this.injectKoreanFonts(page);
@@ -1348,7 +1418,11 @@ export class YouTubeCapture extends BaseChannel {
           document.documentElement.style.overflow = '';
         })()
       `);
-      await page.goto(targetUrl, { waitUntil: "networkidle2", timeout: 45000 });
+      if (adType === "infeed-home") {
+        await this.gotoYoutubeInfeedBrowseFeed(page, targetUrl);
+      } else {
+        await page.goto(targetUrl, { waitUntil: "networkidle2", timeout: 45000 });
+      }
       await new Promise((r) => setTimeout(r, 2000));
       await this.applyMastheadLoggedInLook(page, mastheadProfileDataUrl);
       await this.applySignedOutPromptSuppression(page);
@@ -1358,10 +1432,10 @@ export class YouTubeCapture extends BaseChannel {
           console.warn(
             `[YouTube] 인피드 홈: 동의 처리 후 URL이 트렌딩이 아님 (${opened}) — /feed/trending 으로 재이동합니다.`
           );
-          await page.goto("https://www.youtube.com/feed/trending?app=desktop&hl=ko&gl=KR", {
-            waitUntil: "networkidle2",
-            timeout: 45000,
-          });
+          await this.gotoYoutubeInfeedBrowseFeed(
+            page,
+            "https://www.youtube.com/feed/trending?app=desktop&hl=ko&gl=KR"
+          );
         }
       }
     }
@@ -1455,15 +1529,16 @@ export class YouTubeCapture extends BaseChannel {
       console.warn(
         "[YouTube] 홈(/) 인젝션 실패 — 인기 탭으로 이동 후 그리드 첫 칸에 재시도합니다."
       );
-      await page.goto("https://www.youtube.com/feed/trending?app=desktop&hl=ko&gl=KR", {
-        waitUntil: "networkidle2",
-        timeout: 45000,
-      });
+      await this.gotoYoutubeInfeedBrowseFeed(
+        page,
+        "https://www.youtube.com/feed/trending?app=desktop&hl=ko&gl=KR"
+      );
       await this.injectKoreanFonts(page);
       await this.dismissYouTubeConsent(page);
       await new Promise((r) => setTimeout(r, 2000));
       await this.applyMastheadLoggedInLook(page, mastheadProfileDataUrl);
       await this.applySignedOutPromptSuppression(page);
+      await this.primeYoutubeBrowsePrimaryGrid(page, 4, 12000);
       injected = await page.evaluate(runInfeedInjectInPage, {
         surface: injectSurface,
         thumbDataUrl: creativeDataUrl,
