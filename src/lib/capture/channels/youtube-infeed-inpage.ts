@@ -222,7 +222,7 @@ export function runInfeedInjectInPage(...args: unknown[]): boolean {
         }
       </div>`
         : "";
-      const sponsorSearchMarginTop = !d1 && !showSearchCtaRow ? "0px" : "4px";
+      const sponsorSearchMarginTop = !d1 && !showSearchCtaRow ? "0px" : "2px";
       const firstShortWidth = (() => {
         const shorts = document.querySelector(
           "ytd-rich-shelf-renderer ytd-reel-item-renderer, ytd-reel-shelf-renderer ytd-reel-item-renderer"
@@ -237,9 +237,9 @@ export function runInfeedInjectInPage(...args: unknown[]): boolean {
             ${extIcon}
           </div>
           <div style="flex:1 1 auto;min-width:0;padding-top:0;width:100%;max-width:none;">
-            <div style="display:grid;grid-template-columns:minmax(0,1fr) 32px;align-items:start;column-gap:8px;min-height:50px;width:100%;">
+            <div style="display:grid;grid-template-columns:minmax(0,1fr) 32px;align-items:start;column-gap:8px;min-height:0;width:100%;">
               <div style="min-width:0;display:flex;flex-direction:column;gap:0;">
-                <h3 style="margin:0;padding:0;font-size:max(1.8rem,calc(var(--ytd-metadata-line-title-font-size,1.4rem) * 1.22));font-weight:400;line-height:2.65rem;letter-spacing:0.2px;color:var(--yt-spec-text-primary,#0f0f0f);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;max-width:100%;">${esc(
+                <h3 style="margin:0;padding:0;font-size:max(1.8rem,calc(var(--ytd-metadata-line-title-font-size,1.4rem) * 1.22));font-weight:400;line-height:1.32;letter-spacing:0.2px;color:var(--yt-spec-text-primary,#0f0f0f);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;max-width:100%;">${esc(
                   title
                 )}</h3>
                 ${
