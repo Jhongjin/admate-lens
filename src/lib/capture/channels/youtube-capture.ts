@@ -1304,6 +1304,8 @@ export class YouTubeCapture extends BaseChannel {
    * 1) `YOUTUBE_DATA_API_KEY` 인기 차트, 2) Invidious 트렌딩,
    * 3) YouTube 웹 HTML 스크랩, 4) oEmbed 고정 ID.
    * 캡처마다 순서는 기본적으로 셔플됨(`YOUTUBE_INFEED_SYNTHETIC_SHUFFLE` 로 끔).
+   * `infeedVideoUrl`: 특정 영상을 목록 맨 앞에 고정할 때만 전달. 인피드 홈+광고 카드와 **같은** URL이면
+   *   광고 바로 옆 유기 칸이 동일 영상이 되므로 호출부에서 `undefined` 로 두는 것이 일반적임.
    */
   private async resolveSyntheticInfeedHomeItems(infeedVideoUrl: string | undefined): Promise<{
     items: SyntheticInfeedHomeItem[];
@@ -2259,7 +2261,9 @@ export class YouTubeCapture extends BaseChannel {
     if (adType === "infeed-home" && injectSurface === "home") {
       let pc = await this.countPrimaryBrowseRichItems(page);
       if (pc < 1) {
-        const synth = await this.resolveSyntheticInfeedHomeItems(infeedOpts.videoUrl?.trim());
+        // 광고 소재 `videoUrl`은 이미 광고 카드 썸네일·메타에 사용됨. 합성 피드에까지 맨 앞에 pin 하면
+        // 첫 유기 칸이 동일 videoId가 되어 "광고 다음에 똑같은 영상"처럼 보이므로 pin 하지 않음.
+        const synth = await this.resolveSyntheticInfeedHomeItems(undefined);
         console.log(
           `[YouTube] 인피드 홈: InnerTube 피드 없음 — 합성 그리드 주입 (source=${synth.source}, cards=${synth.items.length})`
         );
