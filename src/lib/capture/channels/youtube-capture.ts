@@ -2286,9 +2286,9 @@ export class YouTubeCapture extends BaseChannel {
         app.setAttribute("mini-guide-visible", "true");
         app.removeAttribute("guide-persistent-and-visible");
         app.removeAttribute("guide-persistent-and-visible-in-section-list");
-        const guide = app.querySelector("#guide") as HTMLElement | null;
+        const guide = app.querySelector("#guide");
         if (guide) guide.style.setProperty("display", "none", "important");
-        const miniGuide = app.querySelector("ytd-mini-guide-renderer") as HTMLElement | null;
+        const miniGuide = app.querySelector("ytd-mini-guide-renderer");
         if (miniGuide) {
           miniGuide.style.removeProperty("display");
           miniGuide.style.setProperty("display", "block", "important");
