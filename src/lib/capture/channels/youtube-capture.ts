@@ -78,7 +78,7 @@ export interface YouTubeDiagnostics {
   infeedHomeSearchWarmUsed?: boolean;
   /** 인피드 홈: 유기 피드 대신 oEmbed+썸네일 합성 그리드를 사용함 */
   infeedHomeSyntheticFeed?: boolean;
-  /** 합성 피드 메타 출처: `youtube-data-api` | `invidious` | `youtube-web-scrape` | `oembed-fallback` */
+  /** 합성 피드 메타 출처: `youtube-data-api` | `youtube-data-api+search` | `youtube-data-api-search` | `invidious` | `youtube-web-scrape` | `oembed-fallback` */
   infeedHomeSyntheticSource?: string;
 }
 
@@ -263,6 +263,26 @@ function shuffleArrayCopy<T>(items: readonly T[]): T[] {
     a[j] = t;
   }
   return a;
+}
+
+/** 동일 videoId는 앞 배열(인기 차트 등) 메타를 유지 */
+function mergeSyntheticByIdPreferFirst(
+  primary: SyntheticInfeedHomeItem[],
+  secondary: SyntheticInfeedHomeItem[]
+): SyntheticInfeedHomeItem[] {
+  const map = new Map<string, SyntheticInfeedHomeItem>();
+  for (const r of primary) map.set(r.id, r);
+  for (const r of secondary) {
+    if (!map.has(r.id)) map.set(r.id, r);
+  }
+  return [...map.values()];
+}
+
+/** `search.list` 보강·차트 폴백 (`YOUTUBE_INFEED_SYNTHETIC_SEARCH_ENRICH=0` 로 끔, search 할당량 절약) */
+function isSyntheticSearchEnrichEnabled(): boolean {
+  const v = (process.env.YOUTUBE_INFEED_SYNTHETIC_SEARCH_ENRICH ?? "").trim().toLowerCase();
+  if (v === "0" || v === "false" || v === "off" || v === "no") return false;
+  return true;
 }
 
 const INVIDIOUS_TRENDING_HOSTS: string[] = [
@@ -1146,6 +1166,120 @@ export class YouTubeCapture extends BaseChannel {
     }
   }
 
+  /**
+   * Data API `search.list` — 인기 차트와 다른 롱폼 후보(뉴스·예능 등)를 섞을 때 사용.
+   * (할당량: search.list 1회 ≈ videos.list 대비 높음 — `YOUTUBE_INFEED_SYNTHETIC_SEARCH_ENRICH` 로 끌 수 있음)
+   */
+  private async fetchKrVideosFromYoutubeSearchApi(
+    region: string,
+    query: string,
+    maxResults: number
+  ): Promise<SyntheticInfeedHomeItem[]> {
+    const key = process.env.YOUTUBE_DATA_API_KEY?.trim();
+    if (!key || !query.trim()) return [];
+    const regionCode = region.slice(0, 2).toUpperCase() || "KR";
+    const relLang = regionCode === "KR" ? "ko" : regionCode === "JP" ? "ja" : "en";
+    try {
+      const u = new URL("https://www.googleapis.com/youtube/v3/search");
+      u.searchParams.set("part", "snippet");
+      u.searchParams.set("type", "video");
+      u.searchParams.set("maxResults", String(Math.min(25, Math.max(1, maxResults))));
+      u.searchParams.set("q", query.trim().slice(0, 80));
+      u.searchParams.set("regionCode", regionCode);
+      u.searchParams.set("relevanceLanguage", relLang);
+      u.searchParams.set("key", key);
+      const ac = new AbortController();
+      const t = setTimeout(() => ac.abort(), 10_000);
+      const res = await fetch(u.toString(), {
+        headers: { Accept: "application/json" },
+        signal: ac.signal,
+      });
+      clearTimeout(t);
+      const rawText = await res.text();
+      let j: {
+        items?: Array<{
+          id?: { kind?: string; videoId?: string };
+          snippet?: { title?: string; channelTitle?: string };
+        }>;
+        error?: { message?: string };
+      };
+      try {
+        j = JSON.parse(rawText) as typeof j;
+      } catch {
+        console.warn(`[YouTube] 합성 그리드: search.list JSON 파싱 실패 HTTP ${res.status}`);
+        return [];
+      }
+      if (!res.ok) {
+        console.warn(
+          `[YouTube] 합성 그리드: search.list 실패 HTTP ${res.status} — ${j.error?.message || rawText.slice(0, 160)}`
+        );
+        return [];
+      }
+      const out: SyntheticInfeedHomeItem[] = [];
+      for (const it of j.items || []) {
+        const vid = it.id?.videoId;
+        if (!vid || !/^[a-zA-Z0-9_-]{6,15}$/.test(vid)) continue;
+        if (it.id?.kind && it.id.kind !== "youtube#video") continue;
+        out.push({
+          id: vid,
+          title: (it.snippet?.title || "동영상").slice(0, 120),
+          channel: (it.snippet?.channelTitle || "").slice(0, 100),
+          viewText: "",
+        });
+        if (out.length >= maxResults) break;
+      }
+      if (out.length > 0) {
+        console.log(
+          `[YouTube] 합성 그리드: search.list ${out.length}건 (region=${regionCode}, q=${query.trim().slice(0, 40)})`
+        );
+      }
+      return out;
+    } catch (e) {
+      console.warn(`[YouTube] 합성 그리드: search.list 예외 (region=${regionCode})`, e);
+      return [];
+    }
+  }
+
+  /** 여러 검색어로 최소 `minUnique` 개까지 모음 (중복 제거) */
+  private async collectSyntheticItemsFromSearchQueries(
+    region: string,
+    minUnique: number,
+    cap: number
+  ): Promise<SyntheticInfeedHomeItem[]> {
+    const rc = region.slice(0, 2).toUpperCase() || "KR";
+    const queries =
+      rc === "KR"
+        ? [
+            "KBS 뉴스",
+            "예능 하이라이트",
+            "한국 음악",
+            "스포츠 하이라이트",
+            "MBC 예능",
+            "요리 레시피",
+            "드라마 하이라이트",
+            "SBS 뉴스",
+          ]
+        : [
+            "trending news",
+            "official music video",
+            "sports highlights",
+            "movie trailer",
+          ];
+    const seen = new Set<string>();
+    const out: SyntheticInfeedHomeItem[] = [];
+    for (const q of shuffleArrayCopy(queries)) {
+      const chunk = await this.fetchKrVideosFromYoutubeSearchApi(region, q, 15);
+      for (const r of chunk) {
+        if (seen.has(r.id)) continue;
+        seen.add(r.id);
+        out.push(r);
+        if (out.length >= cap) return out;
+      }
+      if (out.length >= minUnique) break;
+    }
+    return out;
+  }
+
   private async fetchTrendingFromInvidious(
     region: string,
     max: number
@@ -1301,7 +1435,7 @@ export class YouTubeCapture extends BaseChannel {
 
   /**
    * 유기 피드가 비었을 때 합성 그리드용 카드 메타.
-   * 1) `YOUTUBE_DATA_API_KEY` 인기 차트, 2) Invidious 트렌딩,
+   * 1) `YOUTUBE_DATA_API_KEY` 인기 차트(+선택 `search.list` KR 보강), 2) Invidious 트렌딩,
    * 3) YouTube 웹 HTML 스크랩, 4) oEmbed 고정 ID.
    * 캡처마다 순서는 기본적으로 셔플됨(`YOUTUBE_INFEED_SYNTHETIC_SHUFFLE` 로 끔).
    * `infeedVideoUrl`: 특정 영상을 목록 맨 앞에 고정할 때만 전달. 인피드 홈+광고 카드와 **같은** URL이면
@@ -1356,10 +1490,49 @@ export class YouTubeCapture extends BaseChannel {
         `[YouTube] 합성 그리드: YOUTUBE_DATA_API_KEY 사용 — videos.list(chart=mostPopular) 우선 (region=${region.slice(0, 2).toUpperCase() || "KR"})`
       );
     }
-    const apiRows = await this.fetchMostPopularFromYoutubeDataApi(region, max);
+    let apiRows = await this.fetchMostPopularFromYoutubeDataApi(region, max);
+    let dataApiSource: "youtube-data-api" | "youtube-data-api+search" | "youtube-data-api-search" =
+      "youtube-data-api";
+
     if (apiRows.length >= 4) {
-      return withPinnedFirst(apiRows, "youtube-data-api");
+      if (
+        hasDataApiKey &&
+        isSyntheticSearchEnrichEnabled() &&
+        region.slice(0, 2).toUpperCase() === "KR"
+      ) {
+        const enrichQueries = [
+          "예능 하이라이트",
+          "KBS 뉴스",
+          "스포츠 하이라이트",
+          "음악방송",
+          "요리 레시피",
+        ];
+        const eq = enrichQueries[Math.floor(Math.random() * enrichQueries.length)]!;
+        const extra = await this.fetchKrVideosFromYoutubeSearchApi(region, eq, 12);
+        if (extra.length > 0) {
+          const merged = mergeSyntheticByIdPreferFirst(apiRows, extra);
+          if (merged.length > apiRows.length) {
+            apiRows = merged;
+            dataApiSource = "youtube-data-api+search";
+            console.log(
+              `[YouTube] 합성 그리드: 인기 차트+search.list 병합 → ${apiRows.length}건 풀 (보강 질의=${eq})`
+            );
+          }
+        }
+      }
+      return withPinnedFirst(apiRows, dataApiSource);
     }
+
+    if (hasDataApiKey && isSyntheticSearchEnrichEnabled()) {
+      const searchOnly = await this.collectSyntheticItemsFromSearchQueries(region, 4, 40);
+      if (searchOnly.length >= 4) {
+        console.log(
+          `[YouTube] 합성 그리드: chart 미달(${apiRows.length}건) — search.list만 ${searchOnly.length}건으로 대체 시도`
+        );
+        return withPinnedFirst(searchOnly, "youtube-data-api-search");
+      }
+    }
+
     if (hasDataApiKey) {
       console.warn(
         `[YouTube] 합성 그리드: Data API 유효 카드 ${apiRows.length}건(4건 미만) — Invidious·스크랩·oEmbed 순으로 폴백합니다.`
