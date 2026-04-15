@@ -278,6 +278,44 @@ function mergeSyntheticByIdPreferFirst(
   return [...map.values()];
 }
 
+function dedupeSyntheticByIdPreserveOrder(items: readonly SyntheticInfeedHomeItem[]): SyntheticInfeedHomeItem[] {
+  const seen = new Set<string>();
+  const out: SyntheticInfeedHomeItem[] = [];
+  for (const r of items) {
+    if (!r.id || seen.has(r.id)) continue;
+    seen.add(r.id);
+    out.push(r);
+  }
+  return out;
+}
+
+/** 풀이 클 때 캡처마다 다른 부분집합을 쓰기 위한 연속 구간 무작위 추출 */
+function takeRandomContiguousWindow<T>(arr: readonly T[], windowSize: number): T[] {
+  if (arr.length <= windowSize) return [...arr];
+  const w = Math.min(windowSize, arr.length);
+  const start = Math.floor(Math.random() * (arr.length - w + 1));
+  return arr.slice(start, start + w);
+}
+
+/** YouTube Data API `contentDetails.duration` (ISO 8601, 예: PT1M33S) */
+function parseYoutubeIsoDurationSeconds(iso: string | undefined): number | null {
+  if (!iso || typeof iso !== "string") return null;
+  const m = iso.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
+  if (!m) return null;
+  const h = parseInt(m[1] || "0", 10) || 0;
+  const min = parseInt(m[2] || "0", 10) || 0;
+  const s = parseInt(m[3] || "0", 10) || 0;
+  const total = h * 3600 + min * 60 + s;
+  return total > 0 ? total : null;
+}
+
+/** 합성 홈: 롱폼 상단·쇼츠·롱폼 하단 (서버에서 역할 분리 후 주입) */
+type SyntheticInfeedHomeGridPayload = {
+  longTop: SyntheticInfeedHomeItem[];
+  shortsMid: SyntheticInfeedHomeItem[];
+  longBottom: SyntheticInfeedHomeItem[];
+};
+
 /** `search.list` 보강·차트 폴백 (`YOUTUBE_INFEED_SYNTHETIC_SEARCH_ENRICH=0` 로 끔, search 할당량 절약) */
 function isSyntheticSearchEnrichEnabled(): boolean {
   const v = (process.env.YOUTUBE_INFEED_SYNTHETIC_SEARCH_ENRICH ?? "").trim().toLowerCase();
@@ -1280,6 +1318,132 @@ export class YouTubeCapture extends BaseChannel {
     return out;
   }
 
+  /** `videos.list` contentDetails — 합성 홈에서 롱폼/쇼츠 구분용 */
+  private async fetchVideoContentDetailsDurations(videoIds: string[]): Promise<Map<string, number>> {
+    const out = new Map<string, number>();
+    const key = process.env.YOUTUBE_DATA_API_KEY?.trim();
+    if (!key || videoIds.length === 0) return out;
+    const valid = [...new Set(videoIds.filter((id) => /^[a-zA-Z0-9_-]{6,15}$/.test(id)))];
+    for (let i = 0; i < valid.length; i += 50) {
+      const chunk = valid.slice(i, i + 50);
+      try {
+        const u = new URL("https://www.googleapis.com/youtube/v3/videos");
+        u.searchParams.set("part", "contentDetails");
+        u.searchParams.set("id", chunk.join(","));
+        u.searchParams.set("key", key);
+        const ac = new AbortController();
+        const t = setTimeout(() => ac.abort(), 10_000);
+        const res = await fetch(u.toString(), {
+          headers: { Accept: "application/json" },
+          signal: ac.signal,
+        });
+        clearTimeout(t);
+        const rawText = await res.text();
+        let j: {
+          items?: Array<{ id?: string; contentDetails?: { duration?: string } }>;
+        };
+        try {
+          j = JSON.parse(rawText) as typeof j;
+        } catch {
+          continue;
+        }
+        if (!res.ok) continue;
+        for (const it of j.items || []) {
+          const id = it.id;
+          const sec = parseYoutubeIsoDurationSeconds(it.contentDetails?.duration);
+          if (id && sec != null) out.set(id, sec);
+        }
+      } catch {
+        continue;
+      }
+    }
+    return out;
+  }
+
+  /**
+   * 합성 풀을 롱폼(16:9)·쇼츠(9:16)로 나눈 뒤 무작위 샘플링.
+   * — 제목 `#shorts`·재생길이(키 있을 때)·쇼츠 검색 보강으로 슬롯 혼선 완화
+   * — 풀이 크면 연속 구간+셔플로 캡처마다 다른 ID 조합
+   */
+  private async partitionAndSampleSyntheticHomeGrid(
+    poolIn: SyntheticInfeedHomeItem[],
+    region: string
+  ): Promise<SyntheticInfeedHomeGridPayload> {
+    const poolCapWindow = 52;
+    let pool = dedupeSyntheticByIdPreserveOrder(poolIn);
+    if (pool.length > poolCapWindow) {
+      pool = takeRandomContiguousWindow(pool, poolCapWindow);
+    }
+    pool = shuffleArrayCopy(pool);
+
+    const hasKey = Boolean(process.env.YOUTUBE_DATA_API_KEY?.trim());
+    const rc = region.slice(0, 2).toUpperCase() || "KR";
+    const ids = pool.map((p) => p.id);
+    const durations = hasKey ? await this.fetchVideoContentDetailsDurations(ids) : new Map<string, number>();
+
+    const isLikelyShort = (it: SyntheticInfeedHomeItem): boolean => {
+      if (/#shorts\b/i.test(it.title)) return true;
+      if (/\b쇼츠\b/i.test(it.title) && !/(풀|full|롱폼|full\s*ep)/i.test(it.title)) return true;
+      const d = durations.get(it.id);
+      if (d != null && d > 0 && d <= 120) return true;
+      if (d != null && d > 120 && d <= 180 && /쇼츠|shorts|#short/i.test(it.title)) return true;
+      return false;
+    };
+
+    let shortsPool = pool.filter(isLikelyShort);
+    let longPool = pool.filter((it) => !isLikelyShort(it));
+
+    if (shortsPool.length < 6 && hasKey) {
+      const extra = await this.fetchKrVideosFromYoutubeSearchApi(region, "#shorts", 24);
+      for (const x of extra) {
+        if (!shortsPool.some((s) => s.id === x.id)) shortsPool.push(x);
+      }
+    }
+    if (longPool.length < 7 && hasKey) {
+      const q =
+        rc === "KR"
+          ? ["예능 풀영상", "KBS 뉴스", "다큐멘터리", "스포츠 중계"][Math.floor(Math.random() * 4)]!
+          : "documentary";
+      const extra = await this.fetchKrVideosFromYoutubeSearchApi(region, q, 24);
+      for (const x of extra) {
+        if (isLikelyShort(x)) continue;
+        if (!longPool.some((s) => s.id === x.id)) longPool.push(x);
+      }
+    }
+
+    const shortsMid = shuffleArrayCopy(shortsPool).slice(0, 6);
+    const longShuf = shuffleArrayCopy(longPool);
+    let longTop = longShuf.slice(0, 3);
+    let longBottom = longShuf.slice(3, 7);
+
+    if (longTop.length < 3 || longBottom.length < 4) {
+      const fillLongPreferNonShort = () => {
+        let used = new Set<string>([...shortsMid, ...longTop, ...longBottom].map((x) => x.id));
+        let filler = shuffleArrayCopy(pool.filter((p) => !used.has(p.id) && !isLikelyShort(p)));
+        for (const x of filler) {
+          used.add(x.id);
+          if (longTop.length < 3) longTop.push(x);
+          else if (longBottom.length < 4) longBottom.push(x);
+          if (longTop.length >= 3 && longBottom.length >= 4) return;
+        }
+        used = new Set<string>([...shortsMid, ...longTop, ...longBottom].map((x) => x.id));
+        filler = shuffleArrayCopy(pool.filter((p) => !used.has(p.id)));
+        for (const x of filler) {
+          used.add(x.id);
+          if (longTop.length < 3) longTop.push(x);
+          else if (longBottom.length < 4) longBottom.push(x);
+          if (longTop.length >= 3 && longBottom.length >= 4) return;
+        }
+      };
+      fillLongPreferNonShort();
+    }
+
+    console.log(
+      `[YouTube] 합성 레이아웃: 롱 ${longTop.length}+${longBottom.length} / 쇼츠 ${shortsMid.length} (풀 롱${longPool.length}·숏${shortsPool.length}·원본${poolIn.length})`
+    );
+    return { longTop, shortsMid, longBottom };
+  }
+
   private async fetchTrendingFromInvidious(
     region: string,
     max: number
@@ -1415,16 +1579,13 @@ export class YouTubeCapture extends BaseChannel {
         const ids = isLikelyKr
           ? rawIds.slice(0, max)
           : shuffleArrayCopy(rawIds).slice(0, max);
-        const rows: SyntheticInfeedHomeItem[] = [];
-        for (const id of ids) {
-          const meta = await this.fetchYoutubeOembedMeta(id);
-          rows.push({
-            id,
-            title: meta.title || "동영상",
-            channel: meta.author || "",
-            viewText: "",
-          });
-        }
+        const metas = await Promise.all(ids.map((id) => this.fetchYoutubeOembedMeta(id)));
+        const rows: SyntheticInfeedHomeItem[] = ids.map((id, i) => ({
+          id,
+          title: metas[i]?.title || "동영상",
+          channel: metas[i]?.author || "",
+          viewText: "",
+        }));
         if (rows.length >= 4) return rows;
       } catch {
         continue;
@@ -1445,7 +1606,8 @@ export class YouTubeCapture extends BaseChannel {
     items: SyntheticInfeedHomeItem[];
     source: string;
   }> {
-    const max = 12;
+    /** 레이아웃 분리·무작위 창에 쓸 후보 풀 크기 (실제 그리드는 3+6+4=13슬롯) */
+    const poolCap = 44;
     const region = (process.env.YOUTUBE_TRENDING_REGION || "KR").trim().slice(0, 2) || "KR";
     const pinned = infeedVideoUrl?.trim()
       ? extractVideoId(infeedVideoUrl.trim())
@@ -1454,7 +1616,8 @@ export class YouTubeCapture extends BaseChannel {
 
     const withPinnedFirst = async (
       rows: SyntheticInfeedHomeItem[],
-      source: string
+      source: string,
+      limit: number
     ): Promise<{ items: SyntheticInfeedHomeItem[]; source: string }> => {
       const ordered = isSyntheticInfeedShuffleEnabled() ? shuffleArrayCopy(rows) : [...rows];
       const seen = new Set<string>();
@@ -1479,9 +1642,9 @@ export class YouTubeCapture extends BaseChannel {
         if (seen.has(r.id)) continue;
         out.push(r);
         seen.add(r.id);
-        if (out.length >= max) break;
+        if (out.length >= limit) break;
       }
-      return { items: out.slice(0, max), source };
+      return { items: out.slice(0, limit), source };
     };
 
     const hasDataApiKey = Boolean(process.env.YOUTUBE_DATA_API_KEY?.trim());
@@ -1490,7 +1653,7 @@ export class YouTubeCapture extends BaseChannel {
         `[YouTube] 합성 그리드: YOUTUBE_DATA_API_KEY 사용 — videos.list(chart=mostPopular) 우선 (region=${region.slice(0, 2).toUpperCase() || "KR"})`
       );
     }
-    let apiRows = await this.fetchMostPopularFromYoutubeDataApi(region, max);
+    let apiRows = await this.fetchMostPopularFromYoutubeDataApi(region, poolCap);
     let dataApiSource: "youtube-data-api" | "youtube-data-api+search" | "youtube-data-api-search" =
       "youtube-data-api";
 
@@ -1520,16 +1683,16 @@ export class YouTubeCapture extends BaseChannel {
           }
         }
       }
-      return withPinnedFirst(apiRows, dataApiSource);
+      return withPinnedFirst(apiRows, dataApiSource, poolCap);
     }
 
     if (hasDataApiKey && isSyntheticSearchEnrichEnabled()) {
-      const searchOnly = await this.collectSyntheticItemsFromSearchQueries(region, 4, 40);
+      const searchOnly = await this.collectSyntheticItemsFromSearchQueries(region, 4, poolCap);
       if (searchOnly.length >= 4) {
         console.log(
           `[YouTube] 합성 그리드: chart 미달(${apiRows.length}건) — search.list만 ${searchOnly.length}건으로 대체 시도`
         );
-        return withPinnedFirst(searchOnly, "youtube-data-api-search");
+        return withPinnedFirst(searchOnly, "youtube-data-api-search", poolCap);
       }
     }
 
@@ -1539,14 +1702,14 @@ export class YouTubeCapture extends BaseChannel {
       );
     }
 
-    const invRows = await this.fetchTrendingFromInvidious(region, max);
+    const invRows = await this.fetchTrendingFromInvidious(region, poolCap);
     if (invRows.length >= 4) {
-      return withPinnedFirst(invRows, "invidious");
+      return withPinnedFirst(invRows, "invidious", poolCap);
     }
 
-    const webRows = await this.fetchTrendingFromYoutubeWebScrape(region, max);
+    const webRows = await this.fetchTrendingFromYoutubeWebScrape(region, poolCap);
     if (webRows.length >= 4) {
-      return withPinnedFirst(webRows, "youtube-web-scrape");
+      return withPinnedFirst(webRows, "youtube-web-scrape", poolCap);
     }
 
     const seen = new Set<string>();
@@ -1559,7 +1722,7 @@ export class YouTubeCapture extends BaseChannel {
       if (seen.has(id)) continue;
       ids.push(id);
       seen.add(id);
-      if (ids.length >= 9) break;
+      if (ids.length >= 16) break;
     }
     const metas = await Promise.all(ids.map((id) => this.fetchYoutubeOembedMeta(id)));
     let items: SyntheticInfeedHomeItem[] = ids.map((id, i) => ({
@@ -1582,7 +1745,7 @@ export class YouTubeCapture extends BaseChannel {
         items = shuffleArrayCopy(items);
       }
     }
-    return { items: items.slice(0, max), source: "oembed-fallback" };
+    return { items: items.slice(0, Math.min(poolCap, items.length)), source: "oembed-fallback" };
   }
 
   /**
@@ -1591,12 +1754,19 @@ export class YouTubeCapture extends BaseChannel {
    */
   private async applySyntheticInfeedHomeBrowseGrid(
     page: IPageHandle,
-    items: SyntheticInfeedHomeItem[]
+    layout: SyntheticInfeedHomeGridPayload
   ): Promise<void> {
-    const itemsJson = JSON.stringify(items);
+    const itemsJson = JSON.stringify(layout);
     await page.evaluate(
       ((payload: string) => {
-      const list: SyntheticInfeedHomeItem[] = JSON.parse(payload);
+      const layout = JSON.parse(payload) as {
+        longTop: SyntheticInfeedHomeItem[];
+        shortsMid: SyntheticInfeedHomeItem[];
+        longBottom: SyntheticInfeedHomeItem[];
+      };
+      const longTop = layout.longTop || [];
+      const shortsMid = layout.shortsMid || [];
+      const longBottom = layout.longBottom || [];
       document.querySelectorAll("[data-admate-synthetic-feed-root]").forEach((e) => e.remove());
       const primary =
         (document.getElementById("primary") as HTMLElement | null) ||
@@ -1737,19 +1907,17 @@ export class YouTubeCapture extends BaseChannel {
           "</div>";
         return card;
       };
-      for (const it of list) {
-        if (!/^[a-zA-Z0-9_-]{6,15}$/.test(it.id)) continue;
-        const idx = grid.childElementCount + shortsRow.childElementCount + postShortsGrid.childElementCount;
-        // 첫 롱폼은 3개만 배치 (광고 1개가 앞에 삽입되어 총 4개가 1행)
-        if (idx < 3) {
-          grid.appendChild(makeWideCard(it));
-        } else if (idx < 9) {
-          shortsRow.appendChild(makeShortCard(it));
-        } else if (idx < 13) {
-          postShortsGrid.appendChild(makeWideCard(it));
-        }
-        if (idx >= 12) break;
-      }
+      const pushWide = (it: SyntheticInfeedHomeItem, row: HTMLElement) => {
+        if (!/^[a-zA-Z0-9_-]{6,15}$/.test(it.id)) return;
+        row.appendChild(makeWideCard(it));
+      };
+      const pushShort = (it: SyntheticInfeedHomeItem) => {
+        if (!/^[a-zA-Z0-9_-]{6,15}$/.test(it.id)) return;
+        shortsRow.appendChild(makeShortCard(it));
+      };
+      longTop.forEach((it) => pushWide(it, grid));
+      shortsMid.forEach((it) => pushShort(it));
+      longBottom.forEach((it) => pushWide(it, postShortsGrid));
       root.appendChild(chipRow);
       root.appendChild(grid);
       if (shortsRow.childElementCount > 0) root.appendChild(shortsSection);
@@ -2437,10 +2605,13 @@ export class YouTubeCapture extends BaseChannel {
         // 광고 소재 `videoUrl`은 이미 광고 카드 썸네일·메타에 사용됨. 합성 피드에까지 맨 앞에 pin 하면
         // 첫 유기 칸이 동일 videoId가 되어 "광고 다음에 똑같은 영상"처럼 보이므로 pin 하지 않음.
         const synth = await this.resolveSyntheticInfeedHomeItems(undefined);
+        const trendRegion =
+          (process.env.YOUTUBE_TRENDING_REGION || "KR").trim().slice(0, 2) || "KR";
+        const gridLayout = await this.partitionAndSampleSyntheticHomeGrid(synth.items, trendRegion);
         console.log(
-          `[YouTube] 인피드 홈: InnerTube 피드 없음 — 합성 그리드 주입 (source=${synth.source}, cards=${synth.items.length})`
+          `[YouTube] 인피드 홈: InnerTube 피드 없음 — 합성 그리드 주입 (source=${synth.source}, pool=${synth.items.length})`
         );
-        await this.applySyntheticInfeedHomeBrowseGrid(page, synth.items);
+        await this.applySyntheticInfeedHomeBrowseGrid(page, gridLayout);
         if (this.diagnostics) {
           this.diagnostics.infeedHomeSyntheticFeed = true;
           this.diagnostics.infeedHomeSyntheticSource = synth.source;
