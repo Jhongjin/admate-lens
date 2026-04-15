@@ -85,8 +85,8 @@ export function runInfeedInjectInPage(...args: unknown[]): boolean {
           })()
         : "";
 
-    const menuBtn = `<button type="button" aria-label="메뉴" style="flex-shrink:0;background:none;border:none;padding:4px;cursor:default;color:var(--yt-spec-text-primary,#0f0f0f);border-radius:50%;width:40px;height:40px;display:flex;align-items:center;justify-content:center;margin:-4px -4px 0 0;"><svg height="24" viewBox="0 0 24 24" width="24"><path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z" fill="currentColor"/></svg></button>`;
-    const menuBtnSearch = `<button type="button" aria-label="메뉴" style="flex-shrink:0;background:rgba(255,255,255,0.96);border:none;padding:2px;cursor:default;color:var(--yt-spec-text-primary,#0f0f0f);border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 1px rgba(0,0,0,0.06);"><svg height="24" viewBox="0 0 24 24" width="24"><path d="M6 10a2 2 0 100 4 2 2 0 000-4Zm6 0a2 2 0 100 4 2 2 0 000-4Zm6 0a2 2 0 100 4 2 2 0 000-4Z" fill="currentColor"/></svg></button>`;
+    const menuBtn = `<button type="button" aria-label="작업 더보기" style="flex-shrink:0;background:none;border:none;padding:4px;cursor:default;color:var(--yt-spec-text-primary,#0f0f0f);border-radius:50%;width:40px;height:40px;display:flex;align-items:center;justify-content:center;margin:-4px -4px 0 0;"><svg height="24" viewBox="0 0 24 24" width="24"><path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z" fill="currentColor"/></svg></button>`;
+    const menuBtnSearch = `<button type="button" aria-label="작업 더보기" style="flex-shrink:0;background:rgba(255,255,255,0.96);border:none;padding:2px;cursor:default;color:var(--yt-spec-text-primary,#0f0f0f);border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 1px rgba(0,0,0,0.06);"><svg height="24" viewBox="0 0 24 24" width="24"><path d="M6 10a2 2 0 100 4 2 2 0 000-4Zm6 0a2 2 0 100 4 2 2 0 000-4Zm6 0a2 2 0 100 4 2 2 0 000-4Z" fill="currentColor"/></svg></button>`;
 
     /**
      * 데스크톱 웹 인피드 광고 CTA — yt-spec-button-shape-next--size-m 근접
@@ -127,7 +127,12 @@ export function runInfeedInjectInPage(...args: unknown[]): boolean {
      * (rgba(0,0,0,0.3) + 흰 아이콘, yt-spec-button-shape-next--size-m 높이에 맞춘 원형)
      */
     const extIcon =
-      '<span style="position:absolute;bottom:10px;right:10px;width:42px;height:42px;border-radius:999px;background:rgba(18,18,18,0.76);backdrop-filter:saturate(120%) blur(1px);display:flex;align-items:center;justify-content:center;box-sizing:border-box;color:#fff;border:1px solid rgba(255,255,255,0.16);"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M7 17L17 7M17 7H10M17 7V14" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"/></svg></span>';
+      '<span style="position:absolute;bottom:10px;right:10px;width:42px;height:42px;border-radius:999px;background:rgba(18,18,18,0.72);display:flex;align-items:center;justify-content:center;box-sizing:border-box;color:#fff;border:1px solid rgba(255,255,255,0.14);"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M10 7L15.5 12L10 17" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"/></svg></span>';
+    const thumbMenuBtn =
+      '<button type="button" aria-label="작업 더보기" style="position:absolute;right:4px;bottom:4px;padding:4px;border:none;background:rgba(0,0,0,0.55);cursor:default;border-radius:4px;color:#fff;line-height:0;">' +
+      '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" focusable="false" aria-hidden="true" style="display:block;opacity:0.95;">' +
+      '<path d="M12 8.5a1.5 1.5 0 110-3 1.5 1.5 0 010 3zm0 5a1.5 1.5 0 110-3 1.5 1.5 0 010 3zm0 5a1.5 1.5 0 110-3 1.5 1.5 0 010 3z" fill="currentColor"/></svg>' +
+      "</button>";
 
     const buildHomeFeedCard = (): HTMLElement => {
       const wrap = document.createElement("div");
@@ -143,15 +148,19 @@ export function runInfeedInjectInPage(...args: unknown[]): boolean {
         <div style="position:relative;width:100%;aspect-ratio:16/9;background:#000;border-radius:12px;overflow:hidden;">
           <img src="${thumb}" alt="" style="width:100%;height:100%;object-fit:cover;display:block;" />
           ${extIcon}
+          ${thumbMenuBtn}
         </div>
         <div style="padding:10px 0 0 0;">
           <div style="display:flex;gap:${avatar ? "12px" : "0"};align-items:flex-start;">
             ${avatarCol || ""}
-            <div style="flex:1;min-width:0;">
-              <div style="font-size:1.4rem;font-weight:500;line-height:2rem;color:var(--yt-spec-text-primary,#0f0f0f);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">${esc(
-                title
-              )}</div>
-              <div style="margin-top:6px;font-size:1.2rem;display:flex;align-items:center;flex-wrap:wrap;">${sponsorHtml}</div>
+            <div style="flex:1;min-width:0;display:flex;align-items:flex-start;gap:2px;">
+              <div style="min-width:0;flex:1;">
+                <div style="font-size:1.4rem;font-weight:500;line-height:2rem;color:var(--yt-spec-text-primary,#0f0f0f);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">${esc(
+                  title
+                )}</div>
+                <div style="margin-top:6px;font-size:1.2rem;display:flex;align-items:center;flex-wrap:wrap;">${sponsorHtml}</div>
+              </div>
+              ${menuBtn}
             </div>
           </div>
         </div>`;

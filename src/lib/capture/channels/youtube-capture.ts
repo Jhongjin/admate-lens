@@ -257,6 +257,13 @@ function isSyntheticInfeedShuffleEnabled(): boolean {
   return true;
 }
 
+/** 데스크톱 캡처 DPR(기본 2). 품질 저하 시 2~3 권장 */
+function getDesktopCaptureDpr(): number {
+  const raw = Number(process.env.YOUTUBE_CAPTURE_DEVICE_SCALE_FACTOR ?? "2");
+  if (!Number.isFinite(raw)) return 2;
+  return Math.max(1, Math.min(3, Math.round(raw)));
+}
+
 function shuffleArrayCopy<T>(items: readonly T[]): T[] {
   const a = [...items];
   for (let i = a.length - 1; i > 0; i--) {
@@ -367,7 +374,7 @@ export class YouTubeCapture extends BaseChannel {
       console.log(`[YouTube] 📱 초기 모바일 뷰포트/UA 적용: ${isAOS ? "AOS (Pixel 8)" : "iOS (iPhone 15)"} ${mobileVp.width}×${mobileVp.height}`);
     } else {
       // 데스크톱 시청 레이아웃 고정
-      await page.setViewport({ width: 1920, height: 1080, deviceScaleFactor: 1 });
+      await page.setViewport({ width: 1920, height: 1080, deviceScaleFactor: getDesktopCaptureDpr() });
     }
 
 
@@ -1554,6 +1561,7 @@ export class YouTubeCapture extends BaseChannel {
           order: (["date", "relevance", "viewCount"] as const)[randomInt(0, 3)]!,
         });
         for (const x of shuffleArrayCopy(batch)) {
+          if (!isLikelyShort(x)) continue;
           if (seenShortIds.has(x.id)) continue;
           seenShortIds.add(x.id);
           if (shortsMid.some((s) => s.id === x.id)) continue;
@@ -1581,6 +1589,7 @@ export class YouTubeCapture extends BaseChannel {
       );
       sqIdx++;
       for (const x of shuffleArrayCopy(more)) {
+        if (!isLikelyShort(x)) continue;
         if (shortsMid.some((s) => s.id === x.id)) continue;
         shortsMid.push(x);
         if (shortsMid.length >= 6) break;
@@ -2075,6 +2084,14 @@ export class YouTubeCapture extends BaseChannel {
         '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" focusable="false" aria-hidden="true" style="display:block;opacity:0.95;">' +
         '<path d="M12 8.5a1.5 1.5 0 110-3 1.5 1.5 0 010 3zm0 5a1.5 1.5 0 110-3 1.5 1.5 0 010 3zm0 5a1.5 1.5 0 110-3 1.5 1.5 0 010 3z" fill="currentColor"/></svg>' +
         "</button>";
+      const wideThumbSrc = (id: string): string =>
+        "https://i.ytimg.com/vi_webp/" + id + "/hq720.webp";
+      const wideThumbFallback = (id: string): string =>
+        "https://i.ytimg.com/vi/" + id + "/hqdefault.jpg";
+      const shortThumbSrc = (id: string): string =>
+        "https://i.ytimg.com/vi/" + id + "/oardefault.jpg";
+      const shortThumbFallback = (id: string): string =>
+        "https://i.ytimg.com/vi/" + id + "/hqdefault.jpg";
       const makeWideCard = (it: SyntheticInfeedHomeItem): HTMLElement => {
         const card = document.createElement("div");
         card.setAttribute("data-admate-synthetic-feed-card", "1");
@@ -2111,9 +2128,11 @@ export class YouTubeCapture extends BaseChannel {
             "</div>";
         card.innerHTML =
           '<div style="position:relative;width:100%;aspect-ratio:16/9;background:#000;border-radius:12px;overflow:hidden;">' +
-          '<img src="https://i.ytimg.com/vi/' +
-          it.id +
-          '/hqdefault.jpg" alt="" style="width:100%;height:100%;object-fit:cover;display:block;" loading="lazy" />' +
+          '<img src="' +
+          wideThumbSrc(it.id) +
+          '" alt="" style="width:100%;height:100%;object-fit:cover;display:block;" loading="lazy" onerror="this.onerror=null;this.src=\'' +
+          wideThumbFallback(it.id) +
+          '\';" />' +
           thumbMenuBtn +
           "</div>" +
           '<div style="padding:10px 0 0 0;display:flex;gap:12px;align-items:flex-start;">' +
@@ -2140,10 +2159,12 @@ export class YouTubeCapture extends BaseChannel {
         const safeTitle = esc(it.title);
         const safeViews = it.viewText ? esc(it.viewText) : "조회수 1.2만회";
         card.innerHTML =
-          '<div style="position:relative;width:100%;height:clamp(188px,22vw,300px);border-radius:12px;overflow:hidden;background:#000;">' +
-          '<img src="https://i.ytimg.com/vi/' +
-          it.id +
-          '/hqdefault.jpg" alt="" style="width:100%;height:100%;object-fit:cover;object-position:center;display:block;" loading="lazy" />' +
+          '<div style="position:relative;width:100%;aspect-ratio:9 / 16;max-height:300px;border-radius:12px;overflow:hidden;background:#000;">' +
+          '<img src="' +
+          shortThumbSrc(it.id) +
+          '" alt="" style="width:100%;height:100%;object-fit:cover;object-position:center;display:block;" loading="lazy" onerror="this.onerror=null;this.src=\'' +
+          shortThumbFallback(it.id) +
+          '\';" />' +
           thumbMenuBtn +
           "</div>" +
           '<div style="margin-top:8px;display:flex;gap:4px;align-items:flex-start;">' +
@@ -2514,7 +2535,7 @@ export class YouTubeCapture extends BaseChannel {
     const surface = infeedSurfaceFromAdType(adType)!;
     console.log(`[YouTube] ===== 인피드 캡처 시작 (${surface}) =====`);
 
-    await page.setViewport({ width: 1920, height: 1080, deviceScaleFactor: 1 });
+    await page.setViewport({ width: 1920, height: 1080, deviceScaleFactor: getDesktopCaptureDpr() });
 
     this.diagnostics = {
       adType,
