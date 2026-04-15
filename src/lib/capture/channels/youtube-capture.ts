@@ -2076,7 +2076,7 @@ export class YouTubeCapture extends BaseChannel {
         '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" focusable="false" aria-hidden="true" style="display:block;">' +
         '<path d="M5.5 12a2 2 0 114 0 2 2 0 01-4 0Zm4.5 0a2 2 0 114 0 2 2 0 01-4 0Zm4.5 0a2 2 0 114 0 2 2 0 01-4 0Z" fill="currentColor"/></svg>' +
         "</button>";
-      const shortsColCount = Math.max(Math.min(shortsMid.length || 0, 5), 1);
+      const shortsColCount = 5;
       const shortsRow = document.createElement("div");
       shortsRow.style.cssText =
         "display:grid;grid-template-columns:repeat(" +

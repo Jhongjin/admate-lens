@@ -128,7 +128,7 @@ export function runInfeedInjectInPage(...args: unknown[]): boolean {
      * (rgba(0,0,0,0.3) + 흰 아이콘, yt-spec-button-shape-next--size-m 높이에 맞춘 원형)
      */
     const extIcon =
-      '<span style="position:absolute;bottom:10px;right:10px;width:42px;height:42px;border-radius:999px;background:rgba(18,18,18,0.72);display:flex;align-items:center;justify-content:center;box-sizing:border-box;color:#fff;border:1px solid rgba(255,255,255,0.14);"><svg width="20" height="20" viewBox="0 0 24 24" focusable="false" aria-hidden="true" style="display:block;width:100%;height:100%;pointer-events:none;fill:currentColor;"><path d="M19 5H8a1 1 0 000 2h7.586L5.293 17.293a1 1 0 101.414 1.414L17 8.414V16a1 1 0 002 0V5Z"></path></svg></span>';
+      '<span style="position:absolute;bottom:10px;right:10px;width:40px;height:40px;border-radius:999px;background:rgba(18,18,18,0.72);display:flex;align-items:center;justify-content:center;box-sizing:border-box;color:#fff;border:1px solid rgba(255,255,255,0.14);"><svg width="18" height="18" viewBox="0 0 24 24" focusable="false" aria-hidden="true" style="display:block;pointer-events:none;fill:currentColor;"><path d="M19 5H8a1 1 0 000 2h7.586L5.293 17.293a1 1 0 101.414 1.414L17 8.414V16a1 1 0 002 0V5Z"></path></svg></span>';
     const thumbMenuBtn = "";
 
     const buildHomeFeedCard = (): HTMLElement => {
