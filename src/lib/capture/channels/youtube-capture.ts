@@ -1521,7 +1521,7 @@ export class YouTubeCapture extends BaseChannel {
     let shortsPool = pool.filter(isLikelyShort);
     let longPool = pool.filter((it) => !isLikelyShort(it));
 
-    if (shortsPool.length < 6 && searchOk) {
+    if (shortsPool.length < 5 && searchOk) {
       const extra = await this.fetchKrVideosFromYoutubeSearchApi(region, "#shorts", 24);
       for (const x of extra) {
         if (!shortsPool.some((s) => s.id === x.id)) shortsPool.push(x);
@@ -1555,7 +1555,7 @@ export class YouTubeCapture extends BaseChannel {
       ]);
       const seenShortIds = new Set<string>();
       for (const q of shortSearchQueries) {
-        if (shortsMid.length >= 6) break;
+        if (shortsMid.length >= 5) break;
         const batch = await this.fetchKrVideosFromYoutubeSearchApi(region, q, 25, {
           publishedAfter: new Date(Date.now() - randomInt(2, 168) * 3600 * 1000).toISOString(),
           order: (["date", "relevance", "viewCount"] as const)[randomInt(0, 3)]!,
@@ -1566,18 +1566,18 @@ export class YouTubeCapture extends BaseChannel {
           seenShortIds.add(x.id);
           if (shortsMid.some((s) => s.id === x.id)) continue;
           shortsMid.push(x);
-          if (shortsMid.length >= 6) break;
+          if (shortsMid.length >= 5) break;
         }
       }
     }
     for (const x of shuffleArrayCopy(shortsPool)) {
-      if (shortsMid.length >= 6) break;
+      if (shortsMid.length >= 5) break;
       if (shortsMid.some((s) => s.id === x.id)) continue;
       shortsMid.push(x);
     }
     const shortQueriesFallback = ["쇼츠", "Shorts", "릴스"];
     let sqIdx = 0;
-    while (shortsMid.length < 6 && searchOk && sqIdx < shortQueriesFallback.length) {
+    while (shortsMid.length < 5 && searchOk && sqIdx < shortQueriesFallback.length) {
       const more = await this.fetchKrVideosFromYoutubeSearchApi(
         region,
         shortQueriesFallback[sqIdx]!,
@@ -1592,19 +1592,19 @@ export class YouTubeCapture extends BaseChannel {
         if (!isLikelyShort(x)) continue;
         if (shortsMid.some((s) => s.id === x.id)) continue;
         shortsMid.push(x);
-        if (shortsMid.length >= 6) break;
+        if (shortsMid.length >= 5) break;
       }
     }
-    while (shortsMid.length < 6) {
+    while (shortsMid.length < 5) {
       const extra = shuffleArrayCopy(
         pool.filter((p) => isLikelyShort(p) && !shortsMid.some((s) => s.id === p.id))
       );
       if (extra.length === 0) break;
       shortsMid.push(extra[0]!);
     }
-    if (!searchOk && shortsPool.length >= 6) {
-      const off = randomInt(shortsPool.length - 6 + 1);
-      shortsMid = shortsPool.slice(off, off + 6);
+    if (!searchOk && shortsPool.length >= 5) {
+      const off = randomInt(shortsPool.length - 5 + 1);
+      shortsMid = shortsPool.slice(off, off + 5);
     }
 
     if (searchOk) {
@@ -1657,9 +1657,9 @@ export class YouTubeCapture extends BaseChannel {
       fillLongPreferNonShort();
     }
 
-    if (shortsMid.length < 6) {
+    if (shortsMid.length < 5) {
       console.warn(
-        `[YouTube] 합성 레이아웃: 쇼츠 ${shortsMid.length}/6칸만 확보 — API·풀 후보 부족 시 그리드에 빈 칸이 생길 수 있음`
+        `[YouTube] 합성 레이아웃: 쇼츠 ${shortsMid.length}/5칸만 확보 — API·풀 후보 부족 시 그리드에 빈 칸이 생길 수 있음`
       );
     }
     console.log(
@@ -2010,11 +2010,11 @@ export class YouTubeCapture extends BaseChannel {
       const root = document.createElement("div");
       root.setAttribute("data-admate-synthetic-feed-root", "1");
       root.style.cssText =
-        "box-sizing:border-box;width:100%;max-width:none;margin:0;padding:10px 16px 32px 16px;font-family:Roboto,'Noto Sans KR',Arial,sans-serif;";
+        "box-sizing:border-box;width:100%;max-width:none;margin:0;padding:16px 16px 32px 16px;font-family:Roboto,'Noto Sans KR',Arial,sans-serif;";
       const chipRow = document.createElement("div");
       chipRow.setAttribute("data-admate-synthetic-chip-row", "1");
       chipRow.style.cssText =
-        "display:flex;align-items:center;gap:8px;overflow-x:auto;white-space:nowrap;padding:0 0 10px 0;margin:2px 0 8px 0;";
+        "display:flex;align-items:center;gap:8px;overflow-x:auto;white-space:nowrap;padding:0 0 10px 0;margin:6px 0 8px 0;";
       const chipPool = [
         "전체",
         "라이브",
@@ -2052,7 +2052,7 @@ export class YouTubeCapture extends BaseChannel {
       // 인피드 광고 삽입 위치는 첫 롱폼 그리드 기준으로 유지
       grid.setAttribute("data-admate-synthetic-feed-grid", "1");
       grid.style.cssText =
-        "display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px 12px;width:100%;";
+        "display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px 12px;width:100%;";
       const shortsSection = document.createElement("div");
       shortsSection.setAttribute("data-admate-synthetic-shorts-row", "1");
       shortsSection.style.cssText =
@@ -2069,14 +2069,14 @@ export class YouTubeCapture extends BaseChannel {
         "</svg></span><span>Shorts</span></span>" +
         '<button type="button" aria-label="작업 더보기" tabindex="-1" style="border:none;background:transparent;cursor:default;padding:4px;border-radius:50%;color:var(--yt-spec-text-secondary,#606060);line-height:0;">' +
         '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" focusable="false" aria-hidden="true" style="display:block;">' +
-        '<path d="M12 8.5a1.5 1.5 0 110-3 1.5 1.5 0 010 3zm0 5a1.5 1.5 0 110-3 1.5 1.5 0 010 3zm0 5a1.5 1.5 0 110-3 1.5 1.5 0 010 3z" fill="currentColor"/></svg>' +
+        '<path d="M6 12a1.5 1.5 0 113 0 1.5 1.5 0 01-3 0Zm4.5 0a1.5 1.5 0 113 0 1.5 1.5 0 01-3 0Zm4.5 0a1.5 1.5 0 113 0 1.5 1.5 0 01-3 0Z" fill="currentColor"/></svg>' +
         "</button>";
       const metaMenuBtn =
         '<button type="button" aria-label="작업 더보기" tabindex="-1" style="flex-shrink:0;align-self:flex-start;margin:-6px -4px 0 0;padding:8px 4px;border:none;background:transparent;cursor:default;border-radius:50%;color:var(--yt-spec-text-secondary,#606060);line-height:0;">' +
         '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" focusable="false" aria-hidden="true" style="display:block;">' +
         '<path d="M6 12a1.5 1.5 0 113 0 1.5 1.5 0 01-3 0Zm4.5 0a1.5 1.5 0 113 0 1.5 1.5 0 01-3 0Zm4.5 0a1.5 1.5 0 113 0 1.5 1.5 0 01-3 0Z" fill="currentColor"/></svg>' +
         "</button>";
-      const shortsColCount = Math.max(shortsMid.length || 0, 1);
+      const shortsColCount = Math.max(Math.min(shortsMid.length || 0, 5), 1);
       const shortsRow = document.createElement("div");
       shortsRow.style.cssText =
         "display:grid;grid-template-columns:repeat(" +
@@ -2162,7 +2162,7 @@ export class YouTubeCapture extends BaseChannel {
         const safeTitle = esc(it.title);
         const safeViews = it.viewText ? esc(it.viewText) : "조회수 1.2만회";
         card.innerHTML =
-          '<div style="position:relative;width:100%;aspect-ratio:9 / 16;max-height:300px;border-radius:12px;overflow:hidden;background:#000;">' +
+          '<div style="position:relative;width:100%;aspect-ratio:9 / 16;border-radius:12px;overflow:hidden;background:#000;">' +
           '<img src="' +
           shortThumbSrc(it.id) +
           '" alt="" style="width:100%;height:100%;object-fit:cover;object-position:center;display:block;" loading="lazy" onerror="this.onerror=null;this.src=\'' +
@@ -2190,19 +2190,18 @@ export class YouTubeCapture extends BaseChannel {
       };
       const shortFallbackIds = ["L_jWHffIx5E", "2Vv-BfVoq4g", "fLexgOxsZu0", "JGwWNGJdvx8", "YQHsXMglC9A", "RgKAFK5djSk"];
       let fallbackIdx = 0;
-      while (shortsMid.length < 6 && fallbackIdx < shortFallbackIds.length) {
+      while (shortsMid.length < 5 && fallbackIdx < shortFallbackIds.length) {
         const id = shortFallbackIds[fallbackIdx];
         fallbackIdx++;
         if (!id || shortsMid.some((s) => s.id === id)) continue;
         shortsMid.push({ id, title: "Shorts 추천 영상", channel: "YouTube", viewText: "조회수 1.2만회" });
       }
-      longTop.forEach((it) => pushWide(it, grid));
+      longTop.slice(0, 2).forEach((it) => pushWide(it, grid));
       shortsMid.forEach((it) => pushShort(it));
-      longBottom.forEach((it) => pushWide(it, postShortsGrid));
+      // 뷰포트 정합: 세 번째 롱폼 행은 노출하지 않음
       root.appendChild(chipRow);
       root.appendChild(grid);
       if (shortsRow.childElementCount > 0) root.appendChild(shortsSection);
-      if (postShortsGrid.childElementCount > 0) root.appendChild(postShortsGrid);
       const chipBar = primary.querySelector(
         "ytd-feed-filter-chip-bar-renderer, yt-chip-cloud-renderer, ytd-rich-grid-renderer"
       );
@@ -3002,6 +3001,26 @@ export class YouTubeCapture extends BaseChannel {
     }
     await this.applyMastheadLoggedInLook(page, mastheadProfileDataUrl);
     await this.applySignedOutPromptSuppression(page);
+    if (adType === "infeed-home") {
+      await page.evaluate<void>(`
+        (() => {
+          const app = document.querySelector("ytd-app");
+          if (!app) return;
+          app.setAttribute("mini-guide-visible", "true");
+          app.removeAttribute("guide-persistent-and-visible");
+          app.removeAttribute("guide-persistent-and-visible-in-section-list");
+          const guide = app.querySelector("#guide");
+          if (guide) guide.style.setProperty("display", "none", "important");
+          const miniGuide = app.querySelector("ytd-mini-guide-renderer");
+          if (miniGuide) {
+            miniGuide.style.removeProperty("display");
+            miniGuide.style.setProperty("display", "block", "important");
+            miniGuide.style.setProperty("visibility", "visible", "important");
+            miniGuide.style.setProperty("opacity", "1", "important");
+          }
+        })()
+      `);
+    }
 
     this.diagnostics.infeedCaptureUrl = page.url();
 
