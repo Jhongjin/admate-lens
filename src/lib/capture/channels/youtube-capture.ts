@@ -2069,12 +2069,12 @@ export class YouTubeCapture extends BaseChannel {
         "</svg></span><span>Shorts</span></span>" +
         '<button type="button" aria-label="작업 더보기" tabindex="-1" style="border:none;background:transparent;cursor:default;padding:4px;border-radius:50%;color:var(--yt-spec-text-secondary,#606060);line-height:0;">' +
         '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" focusable="false" aria-hidden="true" style="display:block;">' +
-        '<path d="M6 12a1.5 1.5 0 113 0 1.5 1.5 0 01-3 0Zm4.5 0a1.5 1.5 0 113 0 1.5 1.5 0 01-3 0Zm4.5 0a1.5 1.5 0 113 0 1.5 1.5 0 01-3 0Z" fill="currentColor"/></svg>' +
+        '<path d="M5.5 12a2 2 0 114 0 2 2 0 01-4 0Zm4.5 0a2 2 0 114 0 2 2 0 01-4 0Zm4.5 0a2 2 0 114 0 2 2 0 01-4 0Z" fill="currentColor"/></svg>' +
         "</button>";
       const metaMenuBtn =
         '<button type="button" aria-label="작업 더보기" tabindex="-1" style="flex-shrink:0;align-self:flex-start;margin:-6px -4px 0 0;padding:8px 4px;border:none;background:transparent;cursor:default;border-radius:50%;color:var(--yt-spec-text-secondary,#606060);line-height:0;">' +
         '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" focusable="false" aria-hidden="true" style="display:block;">' +
-        '<path d="M6 12a1.5 1.5 0 113 0 1.5 1.5 0 01-3 0Zm4.5 0a1.5 1.5 0 113 0 1.5 1.5 0 01-3 0Zm4.5 0a1.5 1.5 0 113 0 1.5 1.5 0 01-3 0Z" fill="currentColor"/></svg>' +
+        '<path d="M5.5 12a2 2 0 114 0 2 2 0 01-4 0Zm4.5 0a2 2 0 114 0 2 2 0 01-4 0Zm4.5 0a2 2 0 114 0 2 2 0 01-4 0Z" fill="currentColor"/></svg>' +
         "</button>";
       const shortsColCount = Math.max(Math.min(shortsMid.length || 0, 5), 1);
       const shortsRow = document.createElement("div");

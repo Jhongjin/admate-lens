@@ -86,7 +86,7 @@ export function runInfeedInjectInPage(...args: unknown[]): boolean {
         : "";
 
     const menuBtn =
-      '<button type="button" aria-label="작업 더보기" style="flex-shrink:0;background:none;border:none;padding:4px;cursor:default;color:var(--yt-spec-text-primary,#0f0f0f);border-radius:50%;width:40px;height:40px;display:flex;align-items:center;justify-content:center;margin:-4px -4px 0 0;"><svg width="20" height="20" viewBox="0 0 24 24" focusable="false" aria-hidden="true" style="display:block;"><path d="M6 12a1.5 1.5 0 113 0 1.5 1.5 0 01-3 0Zm4.5 0a1.5 1.5 0 113 0 1.5 1.5 0 01-3 0Zm4.5 0a1.5 1.5 0 113 0 1.5 1.5 0 01-3 0Z" fill="currentColor"/></svg></button>';
+      '<button type="button" aria-label="작업 더보기" style="flex-shrink:0;background:none;border:none;padding:4px;cursor:default;color:var(--yt-spec-text-primary,#0f0f0f);border-radius:50%;width:40px;height:40px;display:flex;align-items:center;justify-content:center;margin:-4px -4px 0 0;"><svg width="20" height="20" viewBox="0 0 24 24" focusable="false" aria-hidden="true" style="display:block;"><path d="M5.5 12a2 2 0 114 0 2 2 0 01-4 0Zm4.5 0a2 2 0 114 0 2 2 0 01-4 0Zm4.5 0a2 2 0 114 0 2 2 0 01-4 0Z" fill="currentColor"/></svg></button>';
     const menuBtnSearch = "";
 
     /**
@@ -128,7 +128,7 @@ export function runInfeedInjectInPage(...args: unknown[]): boolean {
      * (rgba(0,0,0,0.3) + 흰 아이콘, yt-spec-button-shape-next--size-m 높이에 맞춘 원형)
      */
     const extIcon =
-      '<span style="position:absolute;bottom:10px;right:10px;width:42px;height:42px;border-radius:999px;background:rgba(18,18,18,0.72);display:flex;align-items:center;justify-content:center;box-sizing:border-box;color:#fff;border:1px solid rgba(255,255,255,0.14);"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M8 16L16 8M11 8H16V13" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>';
+      '<span style="position:absolute;bottom:10px;right:10px;width:42px;height:42px;border-radius:999px;background:rgba(18,18,18,0.72);display:flex;align-items:center;justify-content:center;box-sizing:border-box;color:#fff;border:1px solid rgba(255,255,255,0.14);"><svg width="20" height="20" viewBox="0 0 24 24" focusable="false" aria-hidden="true" style="display:block;width:100%;height:100%;pointer-events:none;fill:currentColor;"><path d="M19 5H8a1 1 0 000 2h7.586L5.293 17.293a1 1 0 101.414 1.414L17 8.414V16a1 1 0 002 0V5Z"></path></svg></span>';
     const thumbMenuBtn = "";
 
     const buildHomeFeedCard = (): HTMLElement => {
