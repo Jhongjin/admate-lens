@@ -2162,20 +2162,20 @@ export class YouTubeCapture extends BaseChannel {
         const safeTitle = esc(it.title);
         const safeViews = it.viewText ? esc(it.viewText) : "조회수 1.2만회";
         card.innerHTML =
-          '<div style="position:relative;width:100%;height:clamp(168px,16.4vw,220px);border-radius:12px;overflow:hidden;background:#000;">' +
+          '<div style="position:relative;width:100%;aspect-ratio:9/16;border-radius:12px;overflow:hidden;background:#000;">' +
           '<img src="' +
           shortThumbSrc(it.id) +
           '" alt="" style="width:100%;height:100%;object-fit:cover;object-position:center;display:block;" loading="lazy" onerror="this.onerror=null;this.src=\'' +
           shortThumbFallback(it.id) +
           '\';" />' +
           "</div>" +
-          '<div style="margin-top:8px;display:flex;gap:4px;align-items:flex-start;min-height:36px;">' +
-          '<div style="min-width:0;flex:1;font-size:13px;font-weight:500;line-height:18px;color:var(--yt-spec-text-primary,#0f0f0f);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:36px;">' +
+          '<div style="margin-top:8px;display:flex;gap:4px;align-items:flex-start;">' +
+          '<div style="min-width:0;flex:1;font-size:13px;font-weight:500;line-height:18px;color:var(--yt-spec-text-primary,#0f0f0f);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">' +
           safeTitle +
           "</div>" +
           metaMenuBtn +
           "</div>" +
-          '<div style="margin-top:4px;font-size:11px;line-height:16px;color:var(--yt-spec-text-secondary,#606060);">' +
+          '<div style="margin-top:2px;font-size:11px;line-height:16px;color:var(--yt-spec-text-secondary,#606060);">' +
           safeViews +
           "</div>";
         return card;
