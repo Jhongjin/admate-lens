@@ -1211,29 +1211,52 @@ export class YouTubeCapture extends BaseChannel {
   ): Promise<SyntheticInfeedHomeItem[]> {
     const rg = region.slice(0, 2).toLowerCase() || "kr";
     const gl = rg.toUpperCase();
-    const searchPool = [
+    /** 영어·글로벌 쇼츠가 잘 섞이는 키워드는 KR 스크랩 후보에서 제외 */
+    const searchPoolKr = [
       "인기 동영상",
+      "한국 인기",
+      "실시간 인기",
+      "예능 하이라이트",
+      "음악방송",
+      "스포츠 하이라이트",
+      "뉴스 클립",
+      "드라마",
+      "예능",
+      "KBS",
+      "SBS 뉴스",
+      "요리",
       "브이로그",
       "게임 실황",
-      "뉴스",
-      "음악",
-      "요리",
-      "ASMR",
-      "스포츠 하이라이트",
-      "movie trailer",
-      "music video",
-      "live",
+      "한국 예능",
+      "인기 음악",
     ];
-    const q1 = searchPool[Math.floor(Math.random() * searchPool.length)] || "music";
-    const q2 = searchPool[Math.floor(Math.random() * searchPool.length)] || "news";
-    const candidates = shuffleArrayCopy([
+    const pickKr = () =>
+      searchPoolKr[Math.floor(Math.random() * searchPoolKr.length)] || "인기 동영상";
+    const q1 = pickKr();
+    let q2 = pickKr();
+    for (let i = 0; i < 10 && q2 === q1; i++) q2 = pickKr();
+
+    const isLikelyKr = gl === "KR";
+    const year = new Date().getFullYear();
+
+    /**
+     * URL 순서를 섞지 않음: 트렌딩·홈·한국어 검색을 먼저 시도해야 gl=KR 피드가 우선됨.
+     * (셔플 시 `hl=en&gl=US`가 먼저 성공하면 로그만 KR이어도 영상 메타가 해외로 쏠림)
+     */
+    const candidates: string[] = [
       `https://www.youtube.com/feed/trending?app=desktop&persist_app=1&hl=${rg}&gl=${gl}`,
       `https://www.youtube.com/?app=desktop&persist_app=1&hl=${rg}&gl=${gl}`,
+      `https://www.youtube.com/results?search_query=${encodeURIComponent("인기 동영상")}&app=desktop&hl=${rg}&gl=${gl}`,
       `https://www.youtube.com/results?search_query=${encodeURIComponent(q1)}&app=desktop&hl=${rg}&gl=${gl}`,
       `https://www.youtube.com/results?search_query=${encodeURIComponent(q2)}&app=desktop&hl=${rg}&gl=${gl}`,
-      `https://www.youtube.com/results?search_query=%EC%9D%B8%EA%B8%B0%20%EB%8F%99%EC%98%81%EC%83%81&app=desktop&hl=${rg}&gl=${gl}`,
-      `https://www.youtube.com/results?search_query=trending&app=desktop&hl=en&gl=US`,
-    ]);
+      `https://www.youtube.com/results?search_query=${encodeURIComponent(`인기 동영상 ${year}`)}&app=desktop&hl=${rg}&gl=${gl}`,
+    ];
+    if (!isLikelyKr) {
+      candidates.push(
+        `https://www.youtube.com/results?search_query=trending&app=desktop&hl=en&gl=US`,
+        `https://www.youtube.com/feed/trending?app=desktop&persist_app=1&hl=en&gl=US`
+      );
+    }
 
     for (const url of candidates) {
       try {
@@ -1254,7 +1277,10 @@ export class YouTubeCapture extends BaseChannel {
         if (!html || html.length < 1000) continue;
         const rawIds = this.extractVideoIdsFromYoutubeHtml(html, Math.max(max * 5, 36));
         if (rawIds.length < 4) continue;
-        const ids = shuffleArrayCopy(rawIds).slice(0, max);
+        // KR: HTML에 등장한 순서가 트렌딩/검색 상단과 더 잘 맞음. 무작위 셔플은 해외·쇼츠 혼입을 키움.
+        const ids = isLikelyKr
+          ? rawIds.slice(0, max)
+          : shuffleArrayCopy(rawIds).slice(0, max);
         const rows: SyntheticInfeedHomeItem[] = [];
         for (const id of ids) {
           const meta = await this.fetchYoutubeOembedMeta(id);
