@@ -127,7 +127,7 @@ export function runInfeedInjectInPage(...args: unknown[]): boolean {
      * (rgba(0,0,0,0.3) + 흰 아이콘, yt-spec-button-shape-next--size-m 높이에 맞춘 원형)
      */
     const extIcon =
-      '<span style="position:absolute;bottom:10px;right:10px;width:42px;height:42px;border-radius:999px;background:rgba(18,18,18,0.72);display:flex;align-items:center;justify-content:center;box-sizing:border-box;color:#fff;border:1px solid rgba(255,255,255,0.14);"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M10 7L15.5 12L10 17" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"/></svg></span>';
+      '<span style="position:absolute;bottom:10px;right:10px;width:42px;height:42px;border-radius:999px;background:rgba(18,18,18,0.72);display:flex;align-items:center;justify-content:center;box-sizing:border-box;color:#fff;border:1px solid rgba(255,255,255,0.14);"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M8 16L16 8M11 8H16V13" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>';
     const thumbMenuBtn =
       '<button type="button" aria-label="작업 더보기" style="position:absolute;right:4px;bottom:4px;padding:4px;border:none;background:rgba(0,0,0,0.55);cursor:default;border-radius:4px;color:#fff;line-height:0;">' +
       '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" focusable="false" aria-hidden="true" style="display:block;opacity:0.95;">' +
