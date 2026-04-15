@@ -2010,11 +2010,11 @@ export class YouTubeCapture extends BaseChannel {
       const root = document.createElement("div");
       root.setAttribute("data-admate-synthetic-feed-root", "1");
       root.style.cssText =
-        "box-sizing:border-box;width:100%;max-width:none;margin:0;padding:0 16px 32px 16px;font-family:Roboto,'Noto Sans KR',Arial,sans-serif;";
+        "box-sizing:border-box;width:100%;max-width:none;margin:0;padding:10px 16px 32px 16px;font-family:Roboto,'Noto Sans KR',Arial,sans-serif;";
       const chipRow = document.createElement("div");
       chipRow.setAttribute("data-admate-synthetic-chip-row", "1");
       chipRow.style.cssText =
-        "display:flex;align-items:center;gap:8px;overflow-x:auto;white-space:nowrap;padding:2px 0 8px 0;margin:0 0 6px 0;";
+        "display:flex;align-items:center;gap:8px;overflow-x:auto;white-space:nowrap;padding:0 0 10px 0;margin:2px 0 8px 0;";
       const chipPool = [
         "전체",
         "라이브",
@@ -2074,12 +2074,7 @@ export class YouTubeCapture extends BaseChannel {
       const metaMenuBtn =
         '<button type="button" aria-label="작업 더보기" tabindex="-1" style="flex-shrink:0;align-self:flex-start;margin:-6px -4px 0 0;padding:8px 4px;border:none;background:transparent;cursor:default;border-radius:50%;color:var(--yt-spec-text-secondary,#606060);line-height:0;">' +
         '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" focusable="false" aria-hidden="true" style="display:block;">' +
-        '<path d="M12 8.5a1.5 1.5 0 110-3 1.5 1.5 0 010 3zm0 5a1.5 1.5 0 110-3 1.5 1.5 0 010 3zm0 5a1.5 1.5 0 110-3 1.5 1.5 0 010 3z" fill="currentColor"/></svg>' +
-        "</button>";
-      const shortThumbMenuBtn =
-        '<button type="button" aria-label="작업 더보기" tabindex="-1" style="position:absolute;right:4px;bottom:4px;padding:4px;border:none;background:rgba(0,0,0,0.55);cursor:default;border-radius:4px;color:#fff;line-height:0;">' +
-        '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" focusable="false" aria-hidden="true" style="display:block;opacity:0.95;">' +
-        '<path d="M12 8.5a1.5 1.5 0 110-3 1.5 1.5 0 010 3zm0 5a1.5 1.5 0 110-3 1.5 1.5 0 010 3zm0 5a1.5 1.5 0 110-3 1.5 1.5 0 010 3z" fill="currentColor"/></svg>' +
+        '<path d="M6 12a1.5 1.5 0 113 0 1.5 1.5 0 01-3 0Zm4.5 0a1.5 1.5 0 113 0 1.5 1.5 0 01-3 0Zm4.5 0a1.5 1.5 0 113 0 1.5 1.5 0 01-3 0Z" fill="currentColor"/></svg>' +
         "</button>";
       const shortsColCount = Math.max(shortsMid.length || 0, 1);
       const shortsRow = document.createElement("div");
@@ -2092,7 +2087,7 @@ export class YouTubeCapture extends BaseChannel {
       const postShortsGrid = document.createElement("div");
       postShortsGrid.setAttribute("data-admate-synthetic-post-shorts-grid", "1");
       postShortsGrid.style.cssText =
-        "display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px 12px;width:100%;";
+        "display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px 12px;width:100%;max-height:190px;overflow:hidden;";
       const wideThumbSrc = (id: string): string =>
         "https://i.ytimg.com/vi_webp/" + id + "/hq720.webp";
       const wideThumbFallback = (id: string): string =>
@@ -2173,10 +2168,12 @@ export class YouTubeCapture extends BaseChannel {
           '" alt="" style="width:100%;height:100%;object-fit:cover;object-position:center;display:block;" loading="lazy" onerror="this.onerror=null;this.src=\'' +
           shortThumbFallback(it.id) +
           '\';" />' +
-          shortThumbMenuBtn +
           "</div>" +
-          '<div style="margin-top:8px;font-size:13px;font-weight:500;line-height:18px;color:var(--yt-spec-text-primary,#0f0f0f);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">' +
+          '<div style="margin-top:8px;display:flex;gap:4px;align-items:flex-start;">' +
+          '<div style="min-width:0;flex:1;font-size:13px;font-weight:500;line-height:18px;color:var(--yt-spec-text-primary,#0f0f0f);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">' +
           safeTitle +
+          "</div>" +
+          metaMenuBtn +
           "</div>" +
           '<div style="margin-top:4px;font-size:11px;line-height:16px;color:var(--yt-spec-text-secondary,#606060);">' +
           safeViews +
