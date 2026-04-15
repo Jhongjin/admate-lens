@@ -233,6 +233,8 @@ type SyntheticInfeedHomeItem = {
   channel: string;
   /** 예: `조회수 123만회` — 없으면 빈 문자열 */
   viewText: string;
+  /** Data API `channels.list` 로 채움 — 있으면 롱폼 카드에 원형 채널 로고 표시 */
+  channelThumbUrl?: string;
 };
 
 function formatKrViewCount(raw: string | number): string {
@@ -1360,6 +1362,117 @@ export class YouTubeCapture extends BaseChannel {
     return out;
   }
 
+  private async fetchVideoIdToChannelIdMap(videoIds: string[]): Promise<Map<string, string>> {
+    const out = new Map<string, string>();
+    const key = process.env.YOUTUBE_DATA_API_KEY?.trim();
+    if (!key || videoIds.length === 0) return out;
+    const valid = [...new Set(videoIds.filter((id) => /^[a-zA-Z0-9_-]{6,15}$/.test(id)))];
+    for (let i = 0; i < valid.length; i += 50) {
+      const chunk = valid.slice(i, i + 50);
+      try {
+        const u = new URL("https://www.googleapis.com/youtube/v3/videos");
+        u.searchParams.set("part", "snippet");
+        u.searchParams.set("id", chunk.join(","));
+        u.searchParams.set("key", key);
+        const ac = new AbortController();
+        const t = setTimeout(() => ac.abort(), 10_000);
+        const res = await fetch(u.toString(), {
+          headers: { Accept: "application/json" },
+          signal: ac.signal,
+        });
+        clearTimeout(t);
+        const rawText = await res.text();
+        let j: {
+          items?: Array<{ id?: string; snippet?: { channelId?: string } }>;
+        };
+        try {
+          j = JSON.parse(rawText) as typeof j;
+        } catch {
+          continue;
+        }
+        if (!res.ok) continue;
+        for (const it of j.items || []) {
+          const vid = it.id;
+          const cid = it.snippet?.channelId;
+          if (vid && cid && typeof cid === "string" && cid.length >= 10) out.set(vid, cid);
+        }
+      } catch {
+        continue;
+      }
+    }
+    return out;
+  }
+
+  private async fetchChannelIdToDefaultThumbUrl(channelIds: string[]): Promise<Map<string, string>> {
+    const out = new Map<string, string>();
+    const key = process.env.YOUTUBE_DATA_API_KEY?.trim();
+    if (!key || channelIds.length === 0) return out;
+    const uniq = [...new Set(channelIds.filter((c) => typeof c === "string" && c.length >= 10))];
+    for (let i = 0; i < uniq.length; i += 50) {
+      const chunk = uniq.slice(i, i + 50);
+      try {
+        const u = new URL("https://www.googleapis.com/youtube/v3/channels");
+        u.searchParams.set("part", "snippet");
+        u.searchParams.set("id", chunk.join(","));
+        u.searchParams.set("key", key);
+        const ac = new AbortController();
+        const t = setTimeout(() => ac.abort(), 10_000);
+        const res = await fetch(u.toString(), {
+          headers: { Accept: "application/json" },
+          signal: ac.signal,
+        });
+        clearTimeout(t);
+        const rawText = await res.text();
+        let j: {
+          items?: Array<{
+            id?: string;
+            snippet?: { thumbnails?: { medium?: { url?: string }; default?: { url?: string } } };
+          }>;
+        };
+        try {
+          j = JSON.parse(rawText) as typeof j;
+        } catch {
+          continue;
+        }
+        if (!res.ok) continue;
+        for (const it of j.items || []) {
+          const id = it.id;
+          const url =
+            it.snippet?.thumbnails?.medium?.url || it.snippet?.thumbnails?.default?.url || "";
+          if (id && url && /^https:\/\//i.test(url)) out.set(id, url);
+        }
+      } catch {
+        continue;
+      }
+    }
+    return out;
+  }
+
+  /** 첫·하단 롱폼 행 카드에 채널 원형 로고 URL 주입 */
+  private async enrichSyntheticLongformChannelAvatars(
+    items: SyntheticInfeedHomeItem[]
+  ): Promise<void> {
+    const key = process.env.YOUTUBE_DATA_API_KEY?.trim();
+    if (!key || items.length === 0) return;
+    const ids = [...new Set(items.map((x) => x.id).filter((id) => /^[a-zA-Z0-9_-]{6,15}$/.test(id)))];
+    if (ids.length === 0) return;
+    const vidToCh = await this.fetchVideoIdToChannelIdMap(ids);
+    const chIds = [...new Set([...vidToCh.values()])];
+    const chToUrl = await this.fetchChannelIdToDefaultThumbUrl(chIds);
+    let n = 0;
+    for (const it of items) {
+      const ch = vidToCh.get(it.id);
+      const url = ch ? chToUrl.get(ch) : undefined;
+      if (url) {
+        it.channelThumbUrl = url;
+        n++;
+      }
+    }
+    if (n > 0) {
+      console.log(`[YouTube] 합성 롱폼: 채널 로고 URL ${n}/${items.length}건`);
+    }
+  }
+
   /**
    * 합성 풀을 롱폼(16:9)·쇼츠(9:16)로 나눈 뒤 무작위 샘플링.
    * — 제목 `#shorts`·재생길이(키 있을 때)·쇼츠 검색 보강으로 슬롯 혼선 완화
@@ -1411,7 +1524,26 @@ export class YouTubeCapture extends BaseChannel {
       }
     }
 
-    const shortsMid = shuffleArrayCopy(shortsPool).slice(0, 6);
+    let shortsMid = shuffleArrayCopy(shortsPool).slice(0, 6);
+    const shortQueries = ["#shorts", "쇼츠", "Shorts", "유튜브 쇼츠", "shorts korea", "YouTube Shorts"];
+    let sqIdx = 0;
+    while (shortsMid.length < 6 && hasKey && sqIdx < shortQueries.length) {
+      const more = await this.fetchKrVideosFromYoutubeSearchApi(region, shortQueries[sqIdx]!, 22);
+      sqIdx++;
+      for (const x of shuffleArrayCopy(more)) {
+        if (shortsMid.some((s) => s.id === x.id)) continue;
+        shortsMid.push(x);
+        if (shortsMid.length >= 6) break;
+      }
+    }
+    while (shortsMid.length < 6) {
+      const extra = shuffleArrayCopy(
+        pool.filter((p) => isLikelyShort(p) && !shortsMid.some((s) => s.id === p.id))
+      );
+      if (extra.length === 0) break;
+      shortsMid.push(extra[0]!);
+    }
+
     const longShuf = shuffleArrayCopy(longPool);
     let longTop = longShuf.slice(0, 3);
     let longBottom = longShuf.slice(3, 7);
@@ -1438,6 +1570,11 @@ export class YouTubeCapture extends BaseChannel {
       fillLongPreferNonShort();
     }
 
+    if (shortsMid.length < 6) {
+      console.warn(
+        `[YouTube] 합성 레이아웃: 쇼츠 ${shortsMid.length}/6칸만 확보 — API·풀 후보 부족 시 그리드에 빈 칸이 생길 수 있음`
+      );
+    }
     console.log(
       `[YouTube] 합성 레이아웃: 롱 ${longTop.length}+${longBottom.length} / 쇼츠 ${shortsMid.length} (풀 롱${longPool.length}·숏${shortsPool.length}·원본${poolIn.length})`
     );
@@ -1836,9 +1973,12 @@ export class YouTubeCapture extends BaseChannel {
         '<path d="m19.45,3.88c1.12,1.82.48,4.15-1.42,5.22l-1.32.74.94.41c1.36.58,2.27,1.85,2.35,3.27.08,1.43-.68,2.77-1.97,3.49l-8,4.47c-1.91,1.06-4.35.46-5.48-1.35-1.12-1.82-.48-4.15,1.42-5.22l1.33-.74-.94-.41c-1.36-.58-2.27-1.85-2.35-3.27-.08-1.43.68-2.77,1.97-3.49l8-4.47c1.91-1.06,4.35-.46,5.48,1.35Z" fill="#f03"></path>' +
         '<path d="m10,15l5-3-5-3v6Z" fill="#fff"></path>' +
         "</svg></span><span>Shorts</span>";
+      const shortsColCount = Math.max(shortsMid.length || 0, 1);
       const shortsRow = document.createElement("div");
       shortsRow.style.cssText =
-        "display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:12px;width:100%;";
+        "display:grid;grid-template-columns:repeat(" +
+        shortsColCount +
+        ",minmax(0,1fr));gap:12px;width:100%;";
       shortsSection.appendChild(shortsTitle);
       shortsSection.appendChild(shortsRow);
       const postShortsGrid = document.createElement("div");
@@ -1863,18 +2003,30 @@ export class YouTubeCapture extends BaseChannel {
           Math.abs((it.id || "").split("").reduce((acc, ch) => acc + ch.charCodeAt(0), 0)) % 4
         ];
         const avatarChar = esc((it.channel || "Y").trim().charAt(0).toUpperCase() || "Y");
+        const rawChThumb = (it as { channelThumbUrl?: string }).channelThumbUrl;
+        const chThumbOk =
+          typeof rawChThumb === "string" &&
+          rawChThumb.startsWith("https://") &&
+          rawChThumb.length < 512;
+        const chSrc = chThumbOk ? rawChThumb.replace(/"/g, "") : "";
+        const avatarInner = chThumbOk
+          ? '<div style="width:36px;height:36px;border-radius:50%;overflow:hidden;flex-shrink:0;background:#eee;">' +
+            '<img src="' +
+            chSrc +
+            '" alt="" style="width:100%;height:100%;object-fit:cover;display:block;" loading="lazy" referrerpolicy="no-referrer" /></div>'
+          : '<div style="width:36px;height:36px;border-radius:50%;background:' +
+            avatarBg +
+            ';color:#fff;display:flex;align-items:center;justify-content:center;font:700 12px Roboto,Arial,sans-serif;flex-shrink:0;">' +
+            avatarChar +
+            "</div>";
         card.innerHTML =
           '<div style="position:relative;width:100%;aspect-ratio:16/9;background:#000;border-radius:12px;overflow:hidden;">' +
           '<img src="https://i.ytimg.com/vi/' +
           it.id +
           '/hqdefault.jpg" alt="" style="width:100%;height:100%;object-fit:cover;display:block;" loading="lazy" />' +
           "</div>" +
-          '<div style="padding:10px 0 0 0;display:flex;gap:10px;align-items:flex-start;">' +
-          '<div style="width:24px;height:24px;border-radius:50%;background:' +
-          avatarBg +
-          ';color:#fff;display:flex;align-items:center;justify-content:center;font:700 11px Roboto,Arial,sans-serif;flex-shrink:0;">' +
-          avatarChar +
-          "</div>" +
+          '<div style="padding:10px 0 0 0;display:flex;gap:12px;align-items:flex-start;">' +
+          avatarInner +
           '<div style="min-width:0;flex:1;">' +
           '<div style="font-size:14px;font-weight:500;line-height:20px;color:var(--yt-spec-text-primary,#0f0f0f);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">' +
           safeTitle +
@@ -2608,6 +2760,10 @@ export class YouTubeCapture extends BaseChannel {
         const trendRegion =
           (process.env.YOUTUBE_TRENDING_REGION || "KR").trim().slice(0, 2) || "KR";
         const gridLayout = await this.partitionAndSampleSyntheticHomeGrid(synth.items, trendRegion);
+        await this.enrichSyntheticLongformChannelAvatars([
+          ...gridLayout.longTop,
+          ...gridLayout.longBottom,
+        ]);
         console.log(
           `[YouTube] 인피드 홈: InnerTube 피드 없음 — 합성 그리드 주입 (source=${synth.source}, pool=${synth.items.length})`
         );
