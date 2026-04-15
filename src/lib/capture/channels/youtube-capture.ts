@@ -2010,11 +2010,11 @@ export class YouTubeCapture extends BaseChannel {
       const root = document.createElement("div");
       root.setAttribute("data-admate-synthetic-feed-root", "1");
       root.style.cssText =
-        "box-sizing:border-box;width:100%;max-width:none;margin:0;padding:0 8px 32px 8px;font-family:Roboto,'Noto Sans KR',Arial,sans-serif;";
+        "box-sizing:border-box;width:100%;max-width:none;margin:0;padding:0 16px 32px 16px;font-family:Roboto,'Noto Sans KR',Arial,sans-serif;";
       const chipRow = document.createElement("div");
       chipRow.setAttribute("data-admate-synthetic-chip-row", "1");
       chipRow.style.cssText =
-        "display:flex;align-items:center;gap:8px;overflow-x:auto;white-space:nowrap;padding:0 0 8px 0;margin:-10px 0 4px 0;";
+        "display:flex;align-items:center;gap:8px;overflow-x:auto;white-space:nowrap;padding:2px 0 8px 0;margin:0 0 6px 0;";
       const chipPool = [
         "전체",
         "라이브",
@@ -2069,6 +2069,16 @@ export class YouTubeCapture extends BaseChannel {
         "</svg></span><span>Shorts</span></span>" +
         '<button type="button" aria-label="작업 더보기" tabindex="-1" style="border:none;background:transparent;cursor:default;padding:4px;border-radius:50%;color:var(--yt-spec-text-secondary,#606060);line-height:0;">' +
         '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" focusable="false" aria-hidden="true" style="display:block;">' +
+        '<path d="M12 8.5a1.5 1.5 0 110-3 1.5 1.5 0 010 3zm0 5a1.5 1.5 0 110-3 1.5 1.5 0 010 3zm0 5a1.5 1.5 0 110-3 1.5 1.5 0 010 3z" fill="currentColor"/></svg>' +
+        "</button>";
+      const metaMenuBtn =
+        '<button type="button" aria-label="작업 더보기" tabindex="-1" style="flex-shrink:0;align-self:flex-start;margin:-6px -4px 0 0;padding:8px 4px;border:none;background:transparent;cursor:default;border-radius:50%;color:var(--yt-spec-text-secondary,#606060);line-height:0;">' +
+        '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" focusable="false" aria-hidden="true" style="display:block;">' +
+        '<path d="M12 8.5a1.5 1.5 0 110-3 1.5 1.5 0 010 3zm0 5a1.5 1.5 0 110-3 1.5 1.5 0 010 3zm0 5a1.5 1.5 0 110-3 1.5 1.5 0 010 3z" fill="currentColor"/></svg>' +
+        "</button>";
+      const shortThumbMenuBtn =
+        '<button type="button" aria-label="작업 더보기" tabindex="-1" style="position:absolute;right:4px;bottom:4px;padding:4px;border:none;background:rgba(0,0,0,0.55);cursor:default;border-radius:4px;color:#fff;line-height:0;">' +
+        '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" focusable="false" aria-hidden="true" style="display:block;opacity:0.95;">' +
         '<path d="M12 8.5a1.5 1.5 0 110-3 1.5 1.5 0 010 3zm0 5a1.5 1.5 0 110-3 1.5 1.5 0 010 3zm0 5a1.5 1.5 0 110-3 1.5 1.5 0 010 3z" fill="currentColor"/></svg>' +
         "</button>";
       const shortsColCount = Math.max(shortsMid.length || 0, 1);
@@ -2135,6 +2145,7 @@ export class YouTubeCapture extends BaseChannel {
           "</div>" +
           '<div style="padding:10px 0 0 0;display:flex;gap:12px;align-items:flex-start;">' +
           avatarInner +
+          '<div style="min-width:0;flex:1;display:flex;gap:2px;align-items:flex-start;">' +
           '<div style="min-width:0;flex:1;">' +
           '<div style="font-size:14px;font-weight:500;line-height:20px;color:var(--yt-spec-text-primary,#0f0f0f);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">' +
           safeTitle +
@@ -2143,6 +2154,8 @@ export class YouTubeCapture extends BaseChannel {
           safeCh +
           "</div>" +
           metaSecond +
+          "</div>" +
+          metaMenuBtn +
           "</div>" +
           "</div>";
         return card;
@@ -2160,6 +2173,7 @@ export class YouTubeCapture extends BaseChannel {
           '" alt="" style="width:100%;height:100%;object-fit:cover;object-position:center;display:block;" loading="lazy" onerror="this.onerror=null;this.src=\'' +
           shortThumbFallback(it.id) +
           '\';" />' +
+          shortThumbMenuBtn +
           "</div>" +
           '<div style="margin-top:8px;font-size:13px;font-weight:500;line-height:18px;color:var(--yt-spec-text-primary,#0f0f0f);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">' +
           safeTitle +
@@ -2275,28 +2289,6 @@ export class YouTubeCapture extends BaseChannel {
     await new Promise((r) => setTimeout(r, 1500));
     await this.applyMastheadLoggedInLook(page, mastheadProfileDataUrl);
     await this.applySignedOutPromptSuppression(page);
-  }
-
-  /** 인피드 캡처: 좌측 메뉴를 접힌(mini-guide) 상태로 고정 */
-  private async applyYoutubeMiniGuideCollapsed(page: IPageHandle): Promise<void> {
-    await page.evaluate<void>(`
-      (() => {
-        const app = document.querySelector("ytd-app");
-        if (!app) return;
-        app.setAttribute("mini-guide-visible", "true");
-        app.removeAttribute("guide-persistent-and-visible");
-        app.removeAttribute("guide-persistent-and-visible-in-section-list");
-        const guide = app.querySelector("#guide");
-        if (guide) guide.style.setProperty("display", "none", "important");
-        const miniGuide = app.querySelector("ytd-mini-guide-renderer");
-        if (miniGuide) {
-          miniGuide.style.removeProperty("display");
-          miniGuide.style.setProperty("display", "block", "important");
-          miniGuide.style.setProperty("visibility", "visible", "important");
-          miniGuide.style.setProperty("opacity", "1", "important");
-        }
-      })()
-    `);
   }
 
   /** 좌측 가이드/본문의 비로그인 유도 문구를 숨겨 로그인 상태처럼 보이게 보정 */
@@ -2769,9 +2761,6 @@ export class YouTubeCapture extends BaseChannel {
     await new Promise((r) => setTimeout(r, 2500));
     await this.applyMastheadLoggedInLook(page, mastheadProfileDataUrl);
     await this.applySignedOutPromptSuppression(page);
-    if (adType === "infeed-home") {
-      await this.applyYoutubeMiniGuideCollapsed(page);
-    }
 
     const hasConsent = await page.evaluate<boolean>(`
       (() => {
