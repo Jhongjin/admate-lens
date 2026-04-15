@@ -2010,11 +2010,11 @@ export class YouTubeCapture extends BaseChannel {
       const root = document.createElement("div");
       root.setAttribute("data-admate-synthetic-feed-root", "1");
       root.style.cssText =
-        "box-sizing:border-box;width:100%;max-width:none;margin:0;padding:16px 16px 32px 16px;font-family:Roboto,'Noto Sans KR',Arial,sans-serif;";
+        "box-sizing:border-box;width:100%;max-width:none;margin:0;padding:10px 16px 28px 16px;font-family:Roboto,'Noto Sans KR',Arial,sans-serif;";
       const chipRow = document.createElement("div");
       chipRow.setAttribute("data-admate-synthetic-chip-row", "1");
       chipRow.style.cssText =
-        "display:flex;align-items:center;gap:8px;overflow-x:auto;white-space:nowrap;padding:0 0 10px 0;margin:6px 0 8px 0;";
+        "display:flex;align-items:center;gap:8px;overflow-x:auto;white-space:nowrap;padding:0 0 10px 0;margin:2px 0 8px 0;";
       const chipPool = [
         "전체",
         "라이브",
@@ -2056,7 +2056,7 @@ export class YouTubeCapture extends BaseChannel {
       const shortsSection = document.createElement("div");
       shortsSection.setAttribute("data-admate-synthetic-shorts-row", "1");
       shortsSection.style.cssText =
-        "margin:18px 0 14px 0;";
+        "margin:14px 0 12px 0;";
       const shortsTitle = document.createElement("div");
       shortsTitle.style.cssText =
         "display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px;font:700 16px Roboto,'Noto Sans KR',Arial,sans-serif;color:var(--yt-spec-text-primary,#0f0f0f);";
@@ -2072,8 +2072,8 @@ export class YouTubeCapture extends BaseChannel {
         '<path d="M5.5 12a2 2 0 114 0 2 2 0 01-4 0Zm4.5 0a2 2 0 114 0 2 2 0 01-4 0Zm4.5 0a2 2 0 114 0 2 2 0 01-4 0Z" fill="currentColor"/></svg>' +
         "</button>";
       const metaMenuBtn =
-        '<button type="button" aria-label="작업 더보기" tabindex="-1" style="flex-shrink:0;align-self:flex-start;margin:-6px -4px 0 0;padding:8px 4px;border:none;background:transparent;cursor:default;border-radius:50%;color:var(--yt-spec-text-secondary,#606060);line-height:0;">' +
-        '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" focusable="false" aria-hidden="true" style="display:block;">' +
+        '<button type="button" aria-label="작업 더보기" tabindex="-1" style="flex-shrink:0;align-self:flex-start;margin:-4px -3px 0 0;padding:6px 3px;border:none;background:transparent;cursor:default;border-radius:50%;color:var(--yt-spec-text-secondary,#606060);line-height:0;">' +
+        '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" focusable="false" aria-hidden="true" style="display:block;">' +
         '<path d="M5.5 12a2 2 0 114 0 2 2 0 01-4 0Zm4.5 0a2 2 0 114 0 2 2 0 01-4 0Zm4.5 0a2 2 0 114 0 2 2 0 01-4 0Z" fill="currentColor"/></svg>' +
         "</button>";
       const shortsColCount = 5;
@@ -2081,7 +2081,7 @@ export class YouTubeCapture extends BaseChannel {
       shortsRow.style.cssText =
         "display:grid;grid-template-columns:repeat(" +
         shortsColCount +
-        ",minmax(0,1fr));gap:12px;width:100%;";
+        ",minmax(0,1fr));gap:10px;width:100%;";
       shortsSection.appendChild(shortsTitle);
       shortsSection.appendChild(shortsRow);
       const postShortsGrid = document.createElement("div");
@@ -2162,15 +2162,15 @@ export class YouTubeCapture extends BaseChannel {
         const safeTitle = esc(it.title);
         const safeViews = it.viewText ? esc(it.viewText) : "조회수 1.2만회";
         card.innerHTML =
-          '<div style="position:relative;width:100%;height:clamp(180px,18vw,250px);border-radius:12px;overflow:hidden;background:#000;">' +
+          '<div style="position:relative;width:100%;height:clamp(168px,16.4vw,220px);border-radius:12px;overflow:hidden;background:#000;">' +
           '<img src="' +
           shortThumbSrc(it.id) +
           '" alt="" style="width:100%;height:100%;object-fit:cover;object-position:center;display:block;" loading="lazy" onerror="this.onerror=null;this.src=\'' +
           shortThumbFallback(it.id) +
           '\';" />' +
           "</div>" +
-          '<div style="margin-top:8px;display:flex;gap:4px;align-items:flex-start;">' +
-          '<div style="min-width:0;flex:1;font-size:13px;font-weight:500;line-height:18px;color:var(--yt-spec-text-primary,#0f0f0f);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">' +
+          '<div style="margin-top:8px;display:flex;gap:4px;align-items:flex-start;min-height:36px;">' +
+          '<div style="min-width:0;flex:1;font-size:13px;font-weight:500;line-height:18px;color:var(--yt-spec-text-primary,#0f0f0f);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:36px;">' +
           safeTitle +
           "</div>" +
           metaMenuBtn +
