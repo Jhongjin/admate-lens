@@ -2162,7 +2162,7 @@ export class YouTubeCapture extends BaseChannel {
         const safeTitle = esc(it.title);
         const safeViews = it.viewText ? esc(it.viewText) : "조회수 1.2만회";
         card.innerHTML =
-          '<div style="position:relative;width:100%;aspect-ratio:9 / 16;border-radius:12px;overflow:hidden;background:#000;">' +
+          '<div style="position:relative;width:100%;height:clamp(180px,18vw,250px);border-radius:12px;overflow:hidden;background:#000;">' +
           '<img src="' +
           shortThumbSrc(it.id) +
           '" alt="" style="width:100%;height:100%;object-fit:cover;object-position:center;display:block;" loading="lazy" onerror="this.onerror=null;this.src=\'' +
