@@ -247,6 +247,24 @@ function formatKrViewCount(raw: string | number): string {
   return `조회수 ${n}회`;
 }
 
+/** 합성 인피드 홈: 캡처마다 카드 순서를 섞음 (`YOUTUBE_INFEED_SYNTHETIC_SHUFFLE=0|false` 로 끔) */
+function isSyntheticInfeedShuffleEnabled(): boolean {
+  const v = (process.env.YOUTUBE_INFEED_SYNTHETIC_SHUFFLE ?? "").trim().toLowerCase();
+  if (v === "0" || v === "false" || v === "off" || v === "no") return false;
+  return true;
+}
+
+function shuffleArrayCopy<T>(items: readonly T[]): T[] {
+  const a = [...items];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    const t = a[i]!;
+    a[i] = a[j]!;
+    a[j] = t;
+  }
+  return a;
+}
+
 const INVIDIOUS_TRENDING_HOSTS: string[] = [
   "https://inv.tux.pizza",
   "https://vid.puffyan.us",
@@ -1059,12 +1077,14 @@ export class YouTubeCapture extends BaseChannel {
   ): Promise<SyntheticInfeedHomeItem[]> {
     const key = process.env.YOUTUBE_DATA_API_KEY?.trim();
     if (!key) return [];
+    const regionCode = region.slice(0, 2).toUpperCase() || "KR";
     try {
       const u = new URL("https://www.googleapis.com/youtube/v3/videos");
       u.searchParams.set("part", "snippet,statistics");
       u.searchParams.set("chart", "mostPopular");
-      u.searchParams.set("regionCode", region.slice(0, 2).toUpperCase() || "KR");
-      u.searchParams.set("maxResults", String(Math.min(25, max)));
+      u.searchParams.set("regionCode", regionCode);
+      const pool = Math.min(50, Math.max(max, 28));
+      u.searchParams.set("maxResults", String(pool));
       u.searchParams.set("key", key);
       const ac = new AbortController();
       const t = setTimeout(() => ac.abort(), 10_000);
@@ -1073,14 +1093,30 @@ export class YouTubeCapture extends BaseChannel {
         signal: ac.signal,
       });
       clearTimeout(t);
-      if (!res.ok) return [];
-      const j = (await res.json()) as {
+      const rawText = await res.text();
+      let j: {
         items?: Array<{
           id?: string;
           snippet?: { title?: string; channelTitle?: string };
           statistics?: { viewCount?: string };
         }>;
+        error?: { message?: string; code?: number; errors?: Array<{ reason?: string }> };
       };
+      try {
+        j = JSON.parse(rawText) as typeof j;
+      } catch {
+        console.warn(
+          `[YouTube] 합성 그리드: Data API 응답 JSON 파싱 실패 (HTTP ${res.status}, region=${regionCode})`
+        );
+        return [];
+      }
+      if (!res.ok) {
+        const msg = j.error?.message || rawText.slice(0, 200);
+        console.warn(
+          `[YouTube] 합성 그리드: Data API videos.list 실패 HTTP ${res.status} region=${regionCode} — ${msg}`
+        );
+        return [];
+      }
       const out: SyntheticInfeedHomeItem[] = [];
       for (const it of j.items || []) {
         const id = it.id;
@@ -1092,10 +1128,20 @@ export class YouTubeCapture extends BaseChannel {
           channel: (it.snippet?.channelTitle || "").slice(0, 100),
           viewText: vc ? formatKrViewCount(vc) : "",
         });
-        if (out.length >= max) break;
+        if (out.length >= pool) break;
+      }
+      if (out.length === 0 && (j.items === undefined || j.items.length === 0)) {
+        console.warn(
+          `[YouTube] 합성 그리드: Data API 정상 응답이나 items 비어 있음 (region=${regionCode}, pool=${pool}) — 키·API 활성화·할당량 확인`
+        );
+      } else if (out.length > 0) {
+        console.log(
+          `[YouTube] 합성 그리드: Data API 인기 차트 ${out.length}건 (region=${regionCode}, maxResults=${pool})`
+        );
       }
       return out;
-    } catch {
+    } catch (e) {
+      console.warn(`[YouTube] 합성 그리드: Data API 요청 예외 (region=${regionCode})`, e);
       return [];
     }
   }
@@ -1135,7 +1181,7 @@ export class YouTubeCapture extends BaseChannel {
             channel: String(o.author || "").slice(0, 100),
             viewText: Number.isFinite(vc) && vc > 0 ? formatKrViewCount(vc) : "",
           });
-          if (out.length >= max) break;
+          if (out.length >= Math.min(40, Math.max(max, 24))) break;
         }
         if (out.length >= 4) return out;
       } catch {
@@ -1165,12 +1211,29 @@ export class YouTubeCapture extends BaseChannel {
   ): Promise<SyntheticInfeedHomeItem[]> {
     const rg = region.slice(0, 2).toLowerCase() || "kr";
     const gl = rg.toUpperCase();
-    const candidates = [
+    const searchPool = [
+      "인기 동영상",
+      "브이로그",
+      "게임 실황",
+      "뉴스",
+      "음악",
+      "요리",
+      "ASMR",
+      "스포츠 하이라이트",
+      "movie trailer",
+      "music video",
+      "live",
+    ];
+    const q1 = searchPool[Math.floor(Math.random() * searchPool.length)] || "music";
+    const q2 = searchPool[Math.floor(Math.random() * searchPool.length)] || "news";
+    const candidates = shuffleArrayCopy([
       `https://www.youtube.com/feed/trending?app=desktop&persist_app=1&hl=${rg}&gl=${gl}`,
       `https://www.youtube.com/?app=desktop&persist_app=1&hl=${rg}&gl=${gl}`,
+      `https://www.youtube.com/results?search_query=${encodeURIComponent(q1)}&app=desktop&hl=${rg}&gl=${gl}`,
+      `https://www.youtube.com/results?search_query=${encodeURIComponent(q2)}&app=desktop&hl=${rg}&gl=${gl}`,
       `https://www.youtube.com/results?search_query=%EC%9D%B8%EA%B8%B0%20%EB%8F%99%EC%98%81%EC%83%81&app=desktop&hl=${rg}&gl=${gl}`,
       `https://www.youtube.com/results?search_query=trending&app=desktop&hl=en&gl=US`,
-    ];
+    ]);
 
     for (const url of candidates) {
       try {
@@ -1189,10 +1252,11 @@ export class YouTubeCapture extends BaseChannel {
         if (!res.ok) continue;
         const html = await res.text();
         if (!html || html.length < 1000) continue;
-        const ids = this.extractVideoIdsFromYoutubeHtml(html, Math.max(max * 2, 18));
-        if (ids.length < 4) continue;
+        const rawIds = this.extractVideoIdsFromYoutubeHtml(html, Math.max(max * 5, 36));
+        if (rawIds.length < 4) continue;
+        const ids = shuffleArrayCopy(rawIds).slice(0, max);
         const rows: SyntheticInfeedHomeItem[] = [];
-        for (const id of ids.slice(0, max)) {
+        for (const id of ids) {
           const meta = await this.fetchYoutubeOembedMeta(id);
           rows.push({
             id,
@@ -1213,6 +1277,7 @@ export class YouTubeCapture extends BaseChannel {
    * 유기 피드가 비었을 때 합성 그리드용 카드 메타.
    * 1) `YOUTUBE_DATA_API_KEY` 인기 차트, 2) Invidious 트렌딩,
    * 3) YouTube 웹 HTML 스크랩, 4) oEmbed 고정 ID.
+   * 캡처마다 순서는 기본적으로 셔플됨(`YOUTUBE_INFEED_SYNTHETIC_SHUFFLE` 로 끔).
    */
   private async resolveSyntheticInfeedHomeItems(infeedVideoUrl: string | undefined): Promise<{
     items: SyntheticInfeedHomeItem[];
@@ -1229,6 +1294,7 @@ export class YouTubeCapture extends BaseChannel {
       rows: SyntheticInfeedHomeItem[],
       source: string
     ): Promise<{ items: SyntheticInfeedHomeItem[]; source: string }> => {
+      const ordered = isSyntheticInfeedShuffleEnabled() ? shuffleArrayCopy(rows) : [...rows];
       const seen = new Set<string>();
       const out: SyntheticInfeedHomeItem[] = [];
       if (pinnedOk) {
@@ -1247,7 +1313,7 @@ export class YouTubeCapture extends BaseChannel {
           seen.add(pinnedOk);
         }
       }
-      for (const r of rows) {
+      for (const r of ordered) {
         if (seen.has(r.id)) continue;
         out.push(r);
         seen.add(r.id);
@@ -1256,9 +1322,20 @@ export class YouTubeCapture extends BaseChannel {
       return { items: out.slice(0, max), source };
     };
 
+    const hasDataApiKey = Boolean(process.env.YOUTUBE_DATA_API_KEY?.trim());
+    if (hasDataApiKey) {
+      console.log(
+        `[YouTube] 합성 그리드: YOUTUBE_DATA_API_KEY 사용 — videos.list(chart=mostPopular) 우선 (region=${region.slice(0, 2).toUpperCase() || "KR"})`
+      );
+    }
     const apiRows = await this.fetchMostPopularFromYoutubeDataApi(region, max);
     if (apiRows.length >= 4) {
       return withPinnedFirst(apiRows, "youtube-data-api");
+    }
+    if (hasDataApiKey) {
+      console.warn(
+        `[YouTube] 합성 그리드: Data API 유효 카드 ${apiRows.length}건(4건 미만) — Invidious·스크랩·oEmbed 순으로 폴백합니다.`
+      );
     }
 
     const invRows = await this.fetchTrendingFromInvidious(region, max);
@@ -1284,13 +1361,27 @@ export class YouTubeCapture extends BaseChannel {
       if (ids.length >= 9) break;
     }
     const metas = await Promise.all(ids.map((id) => this.fetchYoutubeOembedMeta(id)));
-    const items: SyntheticInfeedHomeItem[] = ids.map((id, i) => ({
+    let items: SyntheticInfeedHomeItem[] = ids.map((id, i) => ({
       id,
       title: metas[i]?.title || "동영상",
       channel: metas[i]?.author || "",
       viewText: "",
     }));
-    return { items, source: "oembed-fallback" };
+    if (isSyntheticInfeedShuffleEnabled()) {
+      if (pinnedOk) {
+        const pinIdx = items.findIndex((x) => x.id === pinnedOk);
+        if (pinIdx >= 0) {
+          const pinnedRow = items[pinIdx]!;
+          const rest = items.filter((_, i) => i !== pinIdx);
+          items = [pinnedRow, ...shuffleArrayCopy(rest)];
+        } else {
+          items = shuffleArrayCopy(items);
+        }
+      } else {
+        items = shuffleArrayCopy(items);
+      }
+    }
+    return { items: items.slice(0, max), source: "oembed-fallback" };
   }
 
   /**
