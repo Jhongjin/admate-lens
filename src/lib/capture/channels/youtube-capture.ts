@@ -2111,7 +2111,7 @@ export class YouTubeCapture extends BaseChannel {
       const wideThumbFallback = (id: string): string =>
         "https://i.ytimg.com/vi/" + id + "/hqdefault.jpg";
       const shortThumbSrc = (id: string): string =>
-        "https://i.ytimg.com/vi/" + id + "/oardefault.jpg";
+        "https://i.ytimg.com/vi_webp/" + id + "/hq720.webp";
       const shortThumbFallback = (id: string): string =>
         "https://i.ytimg.com/vi/" + id + "/hqdefault.jpg";
       const makeWideCard = (it: SyntheticInfeedHomeItem): HTMLElement => {
@@ -2179,7 +2179,7 @@ export class YouTubeCapture extends BaseChannel {
         const safeViews = it.viewText ? esc(it.viewText) : esc(syntheticViewText(it.id));
         card.innerHTML =
           '<div style="width:100%;display:flex;justify-content:center;flex-shrink:0;margin:0;">' +
-          '<div style="position:relative;width:min(100cqi, calc(0.5625 * clamp(260px, 24vw, 320px)));max-width:100%;aspect-ratio:9/16;height:auto;margin:0 auto;border-radius:12px;overflow:hidden;background:#000;flex-shrink:0;">' +
+          '<div style="position:relative;width:100%;max-width:100%;aspect-ratio:9/16;margin:0 auto;border-radius:12px;overflow:hidden;background:#000;flex-shrink:0;">' +
           '<img src="' +
           shortThumbSrc(it.id) +
           '" alt="" style="width:100%;height:100%;object-fit:cover;object-position:center;display:block;" loading="lazy" onerror="this.onerror=null;this.src=\'' +
