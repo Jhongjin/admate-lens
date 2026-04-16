@@ -232,8 +232,8 @@ type SyntheticInfeedHomeItem = {
   id: string;
   title: string;
   channel: string;
-  /** 예: `조회수 123만회` — 없으면 빈 문자열 */
-  viewText: string;
+  /** 예: `조회수 123만회` — 없으면 합성 그리드에서 id 기반 플레이스홀더 */
+  viewText?: string;
   /** Data API `channels.list` 로 채움 — 있으면 롱폼 카드에 원형 채널 로고 표시 */
   channelThumbUrl?: string;
 };
@@ -2007,6 +2007,24 @@ export class YouTubeCapture extends BaseChannel {
         d.textContent = s;
         return d.innerHTML;
       };
+      const syntheticViewText = (id: string): string => {
+        let h = 0;
+        for (let i = 0; i < id.length; i++) {
+          h = (h * 31 + id.charCodeAt(i)) | 0;
+        }
+        const opts = [
+          "조회수 12만회",
+          "조회수 3.1천회",
+          "조회수 28만회",
+          "조회수 901회",
+          "조회수 155만회",
+          "조회수 6.4천회",
+          "조회수 2.1만회",
+          "조회수 44만회",
+        ];
+        const pick = opts[Math.abs(h) % opts.length];
+        return pick || "조회수 1.2만회";
+      };
       const root = document.createElement("div");
       root.setAttribute("data-admate-synthetic-feed-root", "1");
       root.style.cssText =
@@ -2103,9 +2121,11 @@ export class YouTubeCapture extends BaseChannel {
           "border-radius:12px;overflow:hidden;border:none;background:transparent;";
         const safeTitle = esc(it.title);
         const safeCh = esc(it.channel || "YouTube");
-        const safeViews = it.viewText ? esc(it.viewText) : "조회수 1.2만회";
-        const metaSecond =
-          '<div style="margin-top:4px;font-size:12px;line-height:18px;color:var(--yt-spec-text-secondary,#606060);">' +
+        const safeViews = it.viewText ? esc(it.viewText) : esc(syntheticViewText(it.id));
+        const metaLine =
+          '<div style="margin-top:4px;font-size:12px;line-height:17px;color:var(--yt-spec-text-secondary,#606060);">' +
+          safeCh +
+          " · " +
           safeViews +
           "</div>";
         const avatarBg = ["#8e24aa", "#1e88e5", "#43a047", "#fb8c00"][
@@ -2143,10 +2163,7 @@ export class YouTubeCapture extends BaseChannel {
           '<div style="font-size:14px;font-weight:500;line-height:20px;color:var(--yt-spec-text-primary,#0f0f0f);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">' +
           safeTitle +
           "</div>" +
-          '<div style="margin-top:4px;font-size:12px;line-height:17px;color:var(--yt-spec-text-secondary,#606060);">' +
-          safeCh +
-          "</div>" +
-          metaSecond +
+          metaLine +
           "</div>" +
           metaMenuBtn +
           "</div>" +
@@ -2157,19 +2174,19 @@ export class YouTubeCapture extends BaseChannel {
         const card = document.createElement("div");
         card.setAttribute("data-admate-synthetic-short-card", "1");
         card.style.cssText =
-          "display:flex;flex-direction:column;min-width:0;align-items:stretch;flex-shrink:0;";
+          "display:flex;flex-direction:column;min-width:0;align-items:stretch;flex-shrink:0;container-type:inline-size;";
         const safeTitle = esc(it.title);
-        const safeViews = it.viewText ? esc(it.viewText) : "조회수 1.2만회";
+        const safeViews = it.viewText ? esc(it.viewText) : esc(syntheticViewText(it.id));
         card.innerHTML =
           '<div style="width:100%;display:flex;justify-content:center;flex-shrink:0;margin:0;">' +
-          '<div style="position:relative;height:min(200px, 22vw);width:min(100%, calc(0.5625 * min(200px, 22vw)));max-width:100%;border-radius:12px;overflow:hidden;background:#000;flex-shrink:0;">' +
+          '<div style="position:relative;width:min(100cqi, calc(210px * 9 / 16));max-width:100%;aspect-ratio:9/16;max-height:210px;height:auto;margin:0 auto;border-radius:12px;overflow:hidden;background:#000;flex-shrink:0;">' +
           '<img src="' +
           shortThumbSrc(it.id) +
           '" alt="" style="width:100%;height:100%;object-fit:cover;object-position:center;display:block;" loading="lazy" onerror="this.onerror=null;this.src=\'' +
           shortThumbFallback(it.id) +
           '\';" />' +
           "</div></div>" +
-          '<div style="margin-top:8px;display:flex;gap:4px;align-items:flex-start;flex-shrink:0;width:100%;">' +
+          '<div style="margin-top:4px;display:flex;gap:4px;align-items:flex-start;flex-shrink:0;width:100%;">' +
           '<div style="min-width:0;flex:1;font-size:13px;font-weight:500;line-height:18px;color:var(--yt-spec-text-primary,#0f0f0f);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">' +
           safeTitle +
           "</div>" +
@@ -2194,7 +2211,7 @@ export class YouTubeCapture extends BaseChannel {
         const id = shortFallbackIds[fallbackIdx];
         fallbackIdx++;
         if (!id || shortsMid.some((s) => s.id === id)) continue;
-        shortsMid.push({ id, title: "Shorts 추천 영상", channel: "YouTube", viewText: "조회수 1.2만회" });
+        shortsMid.push({ id, title: "Shorts 추천 영상", channel: "YouTube" });
       }
       longTop.slice(0, 2).forEach((it) => pushWide(it, grid));
       shortsMid.forEach((it) => pushShort(it));
