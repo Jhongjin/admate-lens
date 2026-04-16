@@ -2081,7 +2081,7 @@ export class YouTubeCapture extends BaseChannel {
       shortsRow.style.cssText =
         "display:grid;grid-template-columns:repeat(" +
         shortsColCount +
-        ",minmax(0,1fr));gap:10px;width:100%;";
+        ",minmax(0,1fr));gap:10px;width:100%;align-items:start;";
       shortsSection.appendChild(shortsTitle);
       shortsSection.appendChild(shortsRow);
       const postShortsGrid = document.createElement("div");
@@ -2103,13 +2103,11 @@ export class YouTubeCapture extends BaseChannel {
           "border-radius:12px;overflow:hidden;border:none;background:transparent;";
         const safeTitle = esc(it.title);
         const safeCh = esc(it.channel || "YouTube");
-        const safeViews = it.viewText ? esc(it.viewText) : "";
+        const safeViews = it.viewText ? esc(it.viewText) : "조회수 1.2만회";
         const metaSecond =
-          safeViews !== ""
-            ? '<div style="margin-top:4px;font-size:12px;line-height:18px;color:var(--yt-spec-text-secondary,#606060);">' +
-              safeViews +
-              "</div>"
-            : "";
+          '<div style="margin-top:4px;font-size:12px;line-height:18px;color:var(--yt-spec-text-secondary,#606060);">' +
+          safeViews +
+          "</div>";
         const avatarBg = ["#8e24aa", "#1e88e5", "#43a047", "#fb8c00"][
           Math.abs((it.id || "").split("").reduce((acc, ch) => acc + ch.charCodeAt(0), 0)) % 4
         ];
@@ -2158,24 +2156,26 @@ export class YouTubeCapture extends BaseChannel {
       const makeShortCard = (it: SyntheticInfeedHomeItem): HTMLElement => {
         const card = document.createElement("div");
         card.setAttribute("data-admate-synthetic-short-card", "1");
-        card.style.cssText = "display:flex;flex-direction:column;min-width:0;";
+        card.style.cssText =
+          "display:flex;flex-direction:column;min-width:0;align-items:stretch;flex-shrink:0;";
         const safeTitle = esc(it.title);
         const safeViews = it.viewText ? esc(it.viewText) : "조회수 1.2만회";
         card.innerHTML =
-          '<div style="position:relative;width:100%;aspect-ratio:9/16;border-radius:12px;overflow:hidden;background:#000;">' +
+          '<div style="width:100%;display:flex;justify-content:center;flex-shrink:0;margin:0;">' +
+          '<div style="position:relative;height:min(200px, 22vw);width:min(100%, calc(0.5625 * min(200px, 22vw)));max-width:100%;border-radius:12px;overflow:hidden;background:#000;flex-shrink:0;">' +
           '<img src="' +
           shortThumbSrc(it.id) +
           '" alt="" style="width:100%;height:100%;object-fit:cover;object-position:center;display:block;" loading="lazy" onerror="this.onerror=null;this.src=\'' +
           shortThumbFallback(it.id) +
           '\';" />' +
-          "</div>" +
-          '<div style="margin-top:8px;display:flex;gap:4px;align-items:flex-start;">' +
+          "</div></div>" +
+          '<div style="margin-top:8px;display:flex;gap:4px;align-items:flex-start;flex-shrink:0;width:100%;">' +
           '<div style="min-width:0;flex:1;font-size:13px;font-weight:500;line-height:18px;color:var(--yt-spec-text-primary,#0f0f0f);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">' +
           safeTitle +
           "</div>" +
           metaMenuBtn +
           "</div>" +
-          '<div style="margin-top:2px;font-size:11px;line-height:16px;color:var(--yt-spec-text-secondary,#606060);">' +
+          '<div style="margin-top:2px;font-size:11px;line-height:16px;color:var(--yt-spec-text-secondary,#606060);flex-shrink:0;">' +
           safeViews +
           "</div>";
         return card;
