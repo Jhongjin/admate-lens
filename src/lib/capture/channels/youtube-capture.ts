@@ -238,6 +238,8 @@ type SyntheticInfeedHomeItem = {
   channelThumbUrl?: string;
   /** HTML 파싱에서 reelWatchEndpoint로 감지된 쇼츠 플래그 */
   isShort?: boolean;
+  /** 검색/스크랩 시 원본에서 가져온 정확한 썸네일 URL */
+  thumbUrl?: string;
 };
 
 function formatKrViewCount(raw: string | number): string {
@@ -1787,8 +1789,10 @@ export class YouTubeCapture extends BaseChannel {
                   const title = vid.title?.runs?.[0]?.text || vid.title?.simpleText || "";
                   const channel = vid.ownerText?.runs?.[0]?.text || vid.shortBylineText?.runs?.[0]?.text || "";
                   const viewText = vid.shortViewCountText?.simpleText || vid.viewCountText?.simpleText || "";
+                  const tArr = vid.thumbnail?.thumbnails;
+                  const thumbUrl = Array.isArray(tArr) && tArr.length > 0 ? tArr[tArr.length - 1].url : "";
                   if (title) {
-                    out.push({ id, title: String(title).slice(0, 120), channel: String(channel).slice(0, 100), viewText: String(viewText) });
+                    out.push({ id, title: String(title).slice(0, 120), channel: String(channel).slice(0, 100), viewText: String(viewText), thumbUrl });
                   }
                   if (out.length >= needed) break;
                 }
@@ -2278,8 +2282,8 @@ export class YouTubeCapture extends BaseChannel {
         "https://i.ytimg.com/vi_webp/" + id + "/hq720.webp";
       const wideThumbFallback = (id: string): string =>
         "https://i.ytimg.com/vi/" + id + "/hqdefault.jpg";
-      const shortThumbSrc = (id: string): string =>
-        "https://i.ytimg.com/vi_webp/" + id + "/hq720.webp";
+      const shortThumbSrc = (it: SyntheticInfeedHomeItem): string =>
+        it.thumbUrl || "https://i.ytimg.com/vi_webp/" + it.id + "/hq720.webp";
       const shortThumbFallback = (id: string): string =>
         "https://i.ytimg.com/vi/" + id + "/hqdefault.jpg";
       const makeWideCard = (it: SyntheticInfeedHomeItem): HTMLElement => {
@@ -2323,7 +2327,7 @@ export class YouTubeCapture extends BaseChannel {
           '<div style="position:relative;width:100%;aspect-ratio:16/9;background:#000;border-radius:12px;overflow:hidden;">' +
           '<img src="' +
           wideThumbSrc(it.id) +
-          '" alt="" style="width:100%;height:100%;object-fit:cover;display:block;" onerror="this.onerror=null;this.src=\'' +
+          '" alt="" style="width:100%;height:100%;object-fit:cover;display:block;" onload="if(this.naturalWidth<=120){this.src=\'https://i.ytimg.com/vi/'+it.id+'/0.jpg\';}" onerror="this.onerror=null;this.src=\'' +
           wideThumbFallback(it.id) +
           '\'; if(this.src.includes(\'hqdefault\')){this.onerror=function(){this.src=\'https://i.ytimg.com/vi/'+it.id+'/mqdefault.jpg\';};}" />' +
           "</div>" +
@@ -2352,8 +2356,8 @@ export class YouTubeCapture extends BaseChannel {
           '<div style="width:100%;display:flex;justify-content:center;flex-shrink:0;margin:0;">' +
           '<div style="position:relative;width:100%;max-width:100%;aspect-ratio:9/16;margin:0 auto;border-radius:12px;overflow:hidden;background:#000;flex-shrink:0;">' +
           '<img src="' +
-          shortThumbSrc(it.id) +
-          '" alt="" style="width:100%;height:100%;object-fit:cover;object-position:center top;display:block;" onerror="this.onerror=null;this.src=\'' +
+          shortThumbSrc(it) +
+          '" alt="" style="width:100%;height:100%;object-fit:cover;object-position:center top;display:block;" onload="if(this.naturalWidth<=120){this.src=\'https://i.ytimg.com/vi/'+it.id+'/0.jpg\';}" onerror="this.onerror=null;this.src=\'' +
           shortThumbFallback(it.id) +
           '\'; if(this.src.includes(\'hqdefault\')){this.onerror=function(){this.src=\'https://i.ytimg.com/vi/'+it.id+'/mqdefault.jpg\';};}" />' +
           "</div></div>" +
