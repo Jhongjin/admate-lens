@@ -1521,7 +1521,7 @@ export class YouTubeCapture extends BaseChannel {
     let shortsPool = pool.filter(isLikelyShort);
     let longPool = pool.filter((it) => !isLikelyShort(it));
 
-    if (shortsPool.length < 5 && searchOk) {
+    if (shortsPool.length < 6 && searchOk) {
       const extra = await this.fetchKrVideosFromYoutubeSearchApi(region, "#shorts", 24);
       for (const x of extra) {
         if (!shortsPool.some((s) => s.id === x.id)) shortsPool.push(x);
@@ -1555,7 +1555,7 @@ export class YouTubeCapture extends BaseChannel {
       ]);
       const seenShortIds = new Set<string>();
       for (const q of shortSearchQueries) {
-        if (shortsMid.length >= 5) break;
+        if (shortsMid.length >= 6) break;
         const batch = await this.fetchKrVideosFromYoutubeSearchApi(region, q, 25, {
           publishedAfter: new Date(Date.now() - randomInt(2, 168) * 3600 * 1000).toISOString(),
           order: (["date", "relevance", "viewCount"] as const)[randomInt(0, 3)]!,
@@ -1566,18 +1566,18 @@ export class YouTubeCapture extends BaseChannel {
           seenShortIds.add(x.id);
           if (shortsMid.some((s) => s.id === x.id)) continue;
           shortsMid.push(x);
-          if (shortsMid.length >= 5) break;
+          if (shortsMid.length >= 6) break;
         }
       }
     }
     for (const x of shuffleArrayCopy(shortsPool)) {
-      if (shortsMid.length >= 5) break;
+      if (shortsMid.length >= 6) break;
       if (shortsMid.some((s) => s.id === x.id)) continue;
       shortsMid.push(x);
     }
     const shortQueriesFallback = ["쇼츠", "Shorts", "릴스"];
     let sqIdx = 0;
-    while (shortsMid.length < 5 && searchOk && sqIdx < shortQueriesFallback.length) {
+    while (shortsMid.length < 6 && searchOk && sqIdx < shortQueriesFallback.length) {
       const more = await this.fetchKrVideosFromYoutubeSearchApi(
         region,
         shortQueriesFallback[sqIdx]!,
@@ -1592,19 +1592,19 @@ export class YouTubeCapture extends BaseChannel {
         if (!isLikelyShort(x)) continue;
         if (shortsMid.some((s) => s.id === x.id)) continue;
         shortsMid.push(x);
-        if (shortsMid.length >= 5) break;
+        if (shortsMid.length >= 6) break;
       }
     }
-    while (shortsMid.length < 5) {
+    while (shortsMid.length < 6) {
       const extra = shuffleArrayCopy(
         pool.filter((p) => isLikelyShort(p) && !shortsMid.some((s) => s.id === p.id))
       );
       if (extra.length === 0) break;
       shortsMid.push(extra[0]!);
     }
-    if (!searchOk && shortsPool.length >= 5) {
-      const off = randomInt(shortsPool.length - 5 + 1);
-      shortsMid = shortsPool.slice(off, off + 5);
+    if (!searchOk && shortsPool.length >= 6) {
+      const off = randomInt(shortsPool.length - 6 + 1);
+      shortsMid = shortsPool.slice(off, off + 6);
     }
 
     if (searchOk) {
@@ -1657,9 +1657,9 @@ export class YouTubeCapture extends BaseChannel {
       fillLongPreferNonShort();
     }
 
-    if (shortsMid.length < 5) {
+    if (shortsMid.length < 6) {
       console.warn(
-        `[YouTube] 합성 레이아웃: 쇼츠 ${shortsMid.length}/5칸만 확보 — API·풀 후보 부족 시 그리드에 빈 칸이 생길 수 있음`
+        `[YouTube] 합성 레이아웃: 쇼츠 ${shortsMid.length}/6칸만 확보 — API·풀 후보 부족 시 그리드에 빈 칸이 생길 수 있음`
       );
     }
     console.log(
@@ -2070,7 +2070,7 @@ export class YouTubeCapture extends BaseChannel {
       // 인피드 광고 삽입 위치는 첫 롱폼 그리드 기준으로 유지
       grid.setAttribute("data-admate-synthetic-feed-grid", "1");
       grid.style.cssText =
-        "display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px 12px;width:100%;";
+        "display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px 12px;width:100%;";
       const shortsSection = document.createElement("div");
       shortsSection.setAttribute("data-admate-synthetic-shorts-row", "1");
       shortsSection.style.cssText =
@@ -2094,7 +2094,7 @@ export class YouTubeCapture extends BaseChannel {
         '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" focusable="false" aria-hidden="true" style="display:block;">' +
         '<path d="M5.5 12a2 2 0 114 0 2 2 0 01-4 0Zm4.5 0a2 2 0 114 0 2 2 0 01-4 0Zm4.5 0a2 2 0 114 0 2 2 0 01-4 0Z" fill="currentColor"/></svg>' +
         "</button>";
-      const shortsColCount = 5;
+      const shortsColCount = 6;
       const shortsRow = document.createElement("div");
       shortsRow.style.cssText =
         "display:grid;grid-template-columns:repeat(" +
@@ -2152,7 +2152,7 @@ export class YouTubeCapture extends BaseChannel {
           '<div style="position:relative;width:100%;aspect-ratio:16/9;background:#000;border-radius:12px;overflow:hidden;">' +
           '<img src="' +
           wideThumbSrc(it.id) +
-          '" alt="" style="width:100%;height:100%;object-fit:cover;display:block;" loading="lazy" onerror="this.onerror=null;this.src=\'' +
+          '" alt="" style="width:100%;height:100%;object-fit:cover;display:block;" onerror="this.onerror=null;this.src=\'' +
           wideThumbFallback(it.id) +
           '\';" />' +
           "</div>" +
@@ -2182,7 +2182,7 @@ export class YouTubeCapture extends BaseChannel {
           '<div style="position:relative;width:100%;max-width:100%;aspect-ratio:9/16;margin:0 auto;border-radius:12px;overflow:hidden;background:#000;flex-shrink:0;">' +
           '<img src="' +
           shortThumbSrc(it.id) +
-          '" alt="" style="width:100%;height:100%;object-fit:cover;object-position:center;display:block;" loading="lazy" onerror="this.onerror=null;this.src=\'' +
+          '" alt="" style="width:100%;height:100%;object-fit:cover;object-position:center top;display:block;" onerror="this.onerror=null;this.src=\'' +
           shortThumbFallback(it.id) +
           '\';" />' +
           "</div></div>" +
@@ -2205,15 +2205,15 @@ export class YouTubeCapture extends BaseChannel {
         if (!/^[a-zA-Z0-9_-]{6,15}$/.test(it.id)) return;
         shortsRow.appendChild(makeShortCard(it));
       };
-      const shortFallbackIds = ["L_jWHffIx5E", "2Vv-BfVoq4g", "fLexgOxsZu0", "JGwWNGJdvx8", "YQHsXMglC9A", "RgKAFK5djSk"];
+      const shortFallbackIds = ["L_jWHffIx5E", "2Vv-BfVoq4g", "fLexgOxsZu0", "JGwWNGJdvx8", "YQHsXMglC9A", "RgKAFK5djSk", "dQw4w9WgXcQ"];
       let fallbackIdx = 0;
-      while (shortsMid.length < 5 && fallbackIdx < shortFallbackIds.length) {
+      while (shortsMid.length < 6 && fallbackIdx < shortFallbackIds.length) {
         const id = shortFallbackIds[fallbackIdx];
         fallbackIdx++;
         if (!id || shortsMid.some((s) => s.id === id)) continue;
         shortsMid.push({ id, title: "Shorts 추천 영상", channel: "YouTube" });
       }
-      longTop.slice(0, 2).forEach((it) => pushWide(it, grid));
+      longTop.slice(0, 3).forEach((it) => pushWide(it, grid));
       shortsMid.forEach((it) => pushShort(it));
       // 뷰포트 정합: 세 번째 롱폼 행은 노출하지 않음
       root.appendChild(chipRow);
