@@ -1792,7 +1792,7 @@ export class YouTubeCapture extends BaseChannel {
                   const tArr = vid.thumbnail?.thumbnails;
                   const thumbUrl = Array.isArray(tArr) && tArr.length > 0 ? tArr[tArr.length - 1].url : "";
                   if (title) {
-                    out.push({ id, title: String(title).slice(0, 120), channel: String(channel).slice(0, 100), viewText: String(viewText), thumbUrl });
+                    out.push({ id, title: String(title).slice(0, 120), channel: String(channel).slice(0, 100), viewText: String(viewText), thumbUrl, isShort: true });
                   }
                   if (out.length >= needed) break;
                 }
@@ -1853,11 +1853,14 @@ export class YouTubeCapture extends BaseChannel {
             typeof viewCount === "number"
               ? viewCount
               : parseInt(String(viewCount ?? "").replace(/\D/g, ""), 10);
+          const len = typeof o.lengthSeconds === "number" ? o.lengthSeconds : parseInt(String(o.lengthSeconds || "0"), 10);
+          const isShort = len > 0 && len <= 65;
           out.push({
             id,
             title: String(o.title || "동영상").slice(0, 120),
             channel: String(o.author || "").slice(0, 100),
             viewText: Number.isFinite(vc) && vc > 0 ? formatKrViewCount(vc) : "",
+            isShort: isShort || undefined,
           });
           if (out.length >= Math.min(40, Math.max(max, 24))) break;
         }
