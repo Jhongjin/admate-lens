@@ -1466,24 +1466,70 @@ export class YouTubeCapture extends BaseChannel {
   private async enrichSyntheticLongformChannelAvatars(
     items: SyntheticInfeedHomeItem[]
   ): Promise<void> {
+    if (items.length === 0) return;
     const key = process.env.YOUTUBE_DATA_API_KEY?.trim();
-    if (!key || items.length === 0) return;
-    const ids = [...new Set(items.map((x) => x.id).filter((id) => /^[a-zA-Z0-9_-]{6,15}$/.test(id)))];
-    if (ids.length === 0) return;
-    const vidToCh = await this.fetchVideoIdToChannelIdMap(ids);
-    const chIds = [...new Set([...vidToCh.values()])];
-    const chToUrl = await this.fetchChannelIdToDefaultThumbUrl(chIds);
-    let n = 0;
-    for (const it of items) {
-      const ch = vidToCh.get(it.id);
-      const url = ch ? chToUrl.get(ch) : undefined;
-      if (url) {
-        it.channelThumbUrl = url;
-        n++;
+    // 1) Data API 경로 (키 있을 때)
+    if (key) {
+      const ids = [...new Set(items.map((x) => x.id).filter((id) => /^[a-zA-Z0-9_-]{6,15}$/.test(id)))];
+      if (ids.length > 0) {
+        const vidToCh = await this.fetchVideoIdToChannelIdMap(ids);
+        const chIds = [...new Set([...vidToCh.values()])];
+        const chToUrl = await this.fetchChannelIdToDefaultThumbUrl(chIds);
+        let n = 0;
+        for (const it of items) {
+          const ch = vidToCh.get(it.id);
+          const url = ch ? chToUrl.get(ch) : undefined;
+          if (url) { it.channelThumbUrl = url; n++; }
+        }
+        if (n > 0) {
+          console.log(`[YouTube] 합성 롱폼: 채널 로고 URL ${n}/${items.length}건 (Data API)`);
+          return;
+        }
       }
     }
+    // 2) 폴백: YouTube 영상 페이지 HTML에서 채널 아바타 추출 (API 키 불필요)
+    let n = 0;
+    for (const it of items) {
+      if (it.channelThumbUrl) continue;
+      try {
+        const thumbUrl = await this.fetchChannelAvatarFromVideoPage(it.id);
+        if (thumbUrl) { it.channelThumbUrl = thumbUrl; n++; }
+      } catch { /* skip */ }
+    }
     if (n > 0) {
-      console.log(`[YouTube] 합성 롱폼: 채널 로고 URL ${n}/${items.length}건`);
+      console.log(`[YouTube] 합성 롱폼: 채널 로고 URL ${n}/${items.length}건 (HTML 스크랩)`);
+    }
+  }
+
+  /** YouTube 영상 watch 페이지 HTML에서 채널 아바타 URL 추출 */
+  private async fetchChannelAvatarFromVideoPage(videoId: string): Promise<string | null> {
+    if (!/^[a-zA-Z0-9_-]{6,15}$/.test(videoId)) return null;
+    try {
+      const ac = new AbortController();
+      const t = setTimeout(() => ac.abort(), 6000);
+      const res = await fetch(`https://www.youtube.com/watch?v=${videoId}&hl=ko`, {
+        headers: {
+          Accept: "text/html",
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
+        },
+        signal: ac.signal,
+      });
+      clearTimeout(t);
+      if (!res.ok) return null;
+      const html = await res.text();
+      // ytInitialData에서 channelThumbnail 추출
+      const patterns = [
+        /"channelThumbnail":\s*\{"thumbnails":\[\{"url":"(https:\/\/yt3[^"]+)"/,
+        /"avatar":\s*\{"thumbnails":\[\{"url":"(https:\/\/yt3[^"]+)"/,
+        /"ownerProfileUrl"[^}]*"thumbnail":\s*\{"thumbnails":\[\{"url":"(https:\/\/yt3[^"]+)"/,
+      ];
+      for (const pat of patterns) {
+        const m = html.match(pat);
+        if (m?.[1]) return m[1].replace(/s\d+-c-k/g, "s88-c-k");
+      }
+      return null;
+    } catch {
+      return null;
     }
   }
 
@@ -1659,26 +1705,113 @@ export class YouTubeCapture extends BaseChannel {
 
     if (shortsMid.length < 6) {
       console.warn(
-        `[YouTube] 합성 레이아웃: 쇼츠 ${shortsMid.length}/6칸만 확보 — oEmbed 폴백으로 보강 시도`
+        `[YouTube] 합성 레이아웃: 쇼츠 ${shortsMid.length}/6칸만 확보 — 한국 쇼츠 웹 스크래핑으로 보강 시도`
       );
-      const shortsFallbackCandidates = shuffleArrayCopy([
-        "rYEDA3JcQqw", "kJQP7kiw5Fk", "JGwWNGJdvx8", "60ItHLz5WEA",
-        "L_jWHffIx5E", "2Vv-BfVoq4g", "fLexgOxsZu0", "YQHsXMglC9A",
-        "hLQl3WQQoQ0", "9bZkp7q19f0", "DyDfgMOUjCI", "RlPNh_PBZb4",
-      ]);
-      for (const fid of shortsFallbackCandidates) {
+      // 한국 쇼츠 검색으로 동적 보강
+      const krShortsExtra = await this.fetchKoreanShortsFromWebScrape(6 - shortsMid.length);
+      for (const x of krShortsExtra) {
         if (shortsMid.length >= 6) break;
-        if (shortsMid.some((s) => s.id === fid)) continue;
-        const m = await this.fetchYoutubeOembedMeta(fid);
-        if (m.title) {
-          shortsMid.push({ id: fid, title: m.title, channel: m.author || "YouTube", viewText: "" });
-        }
+        if (shortsMid.some((s) => s.id === x.id)) continue;
+        shortsMid.push(x);
       }
     }
     console.log(
       `[YouTube] 합성 레이아웃: 롱 ${longTop.length}+${longBottom.length} / 쇼츠 ${shortsMid.length} (풀 롱${longPool.length}·숏${shortsPool.length}·원본${poolIn.length})`
     );
     return { longTop, shortsMid, longBottom };
+  }
+
+  /** 한국 쇼츠 콘텐츠를 YouTube 검색 페이지에서 동적으로 스크래핑 */
+  private async fetchKoreanShortsFromWebScrape(
+    needed: number
+  ): Promise<SyntheticInfeedHomeItem[]> {
+    const queries = shuffleArrayCopy([
+      "한국 쇼츠",
+      "인기 쇼츠 한국",
+      "쇼츠 모음 한국",
+      "일상 브이로그 쇼츠",
+      "예능 쇼츠",
+      "먹방 쇼츠",
+      "K-pop shorts",
+      "한국 유튜브 쇼츠",
+      "웃긴 쇼츠",
+      "쇼츠 추천",
+    ]);
+    const out: SyntheticInfeedHomeItem[] = [];
+    const seen = new Set<string>();
+
+    for (const q of queries) {
+      if (out.length >= needed) break;
+      try {
+        const searchUrl =
+          `https://www.youtube.com/results?search_query=${encodeURIComponent(q)}&sp=EgIYAQ%3D%3D&hl=ko&gl=KR&app=desktop`;
+        const ac = new AbortController();
+        const t = setTimeout(() => ac.abort(), 8000);
+        const res = await fetch(searchUrl, {
+          headers: {
+            Accept: "text/html,application/xhtml+xml",
+            "User-Agent":
+              "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
+            "Accept-Language": "ko-KR,ko;q=0.9",
+          },
+          signal: ac.signal,
+        });
+        clearTimeout(t);
+        if (!res.ok) continue;
+        const html = await res.text();
+        if (!html || html.length < 1000) continue;
+
+        // ytInitialData에서 videoId + title 추출
+        const initDataMatch = html.match(/var ytInitialData\s*=\s*({[\s\S]+?});\s*<\/script>/);
+        if (initDataMatch?.[1]) {
+          try {
+            const data = JSON.parse(initDataMatch[1]);
+            const contents = data?.contents?.twoColumnSearchResultsRenderer
+              ?.primaryContents?.sectionListRenderer?.contents;
+            if (Array.isArray(contents)) {
+              for (const section of contents) {
+                const items = section?.itemSectionRenderer?.contents;
+                if (!Array.isArray(items)) continue;
+                for (const item of items) {
+                  const vid = item?.videoRenderer;
+                  if (!vid?.videoId) continue;
+                  const id = String(vid.videoId);
+                  if (seen.has(id)) continue;
+                  seen.add(id);
+                  const title = vid.title?.runs?.[0]?.text || vid.title?.simpleText || "";
+                  const channel = vid.ownerText?.runs?.[0]?.text || vid.shortBylineText?.runs?.[0]?.text || "";
+                  const viewText = vid.shortViewCountText?.simpleText || vid.viewCountText?.simpleText || "";
+                  if (title) {
+                    out.push({ id, title: String(title).slice(0, 120), channel: String(channel).slice(0, 100), viewText: String(viewText) });
+                  }
+                  if (out.length >= needed) break;
+                }
+              }
+            }
+          } catch { /* JSON parse fail — fall through to regex */ }
+        }
+
+        // JSON 파싱 실패 시 regex로 videoId만 추출 + oEmbed
+        if (out.length < needed) {
+          const ids = this.extractVideoIdsFromYoutubeHtml(html, 20);
+          for (const id of ids) {
+            if (out.length >= needed) break;
+            if (seen.has(id)) continue;
+            seen.add(id);
+            const m = await this.fetchYoutubeOembedMeta(id);
+            if (m.title) {
+              out.push({ id, title: m.title, channel: m.author || "", viewText: "" });
+            }
+          }
+        }
+      } catch {
+        continue;
+      }
+    }
+    if (out.length > 0) {
+      console.log(`[YouTube] 한국 쇼츠 웹 스크래핑: ${out.length}건 확보`);
+    }
+    return out;
   }
 
   private async fetchTrendingFromInvidious(
