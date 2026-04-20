@@ -236,6 +236,8 @@ type SyntheticInfeedHomeItem = {
   viewText?: string;
   /** Data API `channels.list` 로 채움 — 있으면 롱폼 카드에 원형 채널 로고 표시 */
   channelThumbUrl?: string;
+  /** HTML 파싱에서 reelWatchEndpoint로 감지된 쇼츠 플래그 */
+  isShort?: boolean;
 };
 
 function formatKrViewCount(raw: string | number): string {
@@ -1556,8 +1558,12 @@ export class YouTubeCapture extends BaseChannel {
     const durations = hasKey ? await this.fetchVideoContentDetailsDurations(ids) : new Map<string, number>();
 
     const isLikelyShort = (it: SyntheticInfeedHomeItem): boolean => {
-      if (/#shorts\b/i.test(it.title)) return true;
+      // HTML 파싱에서 이미 쇼츠로 태깅된 경우
+      if (it.isShort === true) return true;
+      if (/#shorts?\b/i.test(it.title)) return true;
       if (/\b쇼츠\b/i.test(it.title) && !/(풀|full|롱폼|full\s*ep)/i.test(it.title)) return true;
+      // 제목 패턴: "... #short", "Shorts", 해시태그 패턴
+      if (/\bshort[s]?\s*$/i.test(it.title)) return true;
       const d = durations.get(it.id);
       if (d != null && d > 0 && d <= 120) return true;
       if (d != null && d > 120 && d <= 180 && /쇼츠|shorts|#short/i.test(it.title)) return true;
@@ -1871,6 +1877,22 @@ export class YouTubeCapture extends BaseChannel {
       if (out.length >= max) break;
     }
     return out;
+  }
+
+  /** HTML에서 reelWatchEndpoint에 등장하는 videoId를 수집하여 쇼츠 ID 세트를 반환 */
+  private extractShortsIdsFromYoutubeHtml(html: string): Set<string> {
+    const shorts = new Set<string>();
+    // reelWatchEndpoint는 YouTube가 쇼츠 영상에만 사용하는 엔드포인트
+    const re = /"reelWatchEndpoint":\s*\{"videoId":"([a-zA-Z0-9_-]{6,15})"/g;
+    for (const m of html.matchAll(re)) {
+      if (m[1]) shorts.add(m[1]);
+    }
+    // reelShelfRenderer 안의 videoId도 쇼츠
+    const shelfRe = /"reelShelfRenderer"[\s\S]{0,5000}?"videoId":"([a-zA-Z0-9_-]{6,15})"/g;
+    for (const m of html.matchAll(shelfRe)) {
+      if (m[1]) shorts.add(m[1]);
+    }
+    return shorts;
   }
 
   private async fetchTrendingFromYoutubeWebScrape(
@@ -2268,11 +2290,14 @@ export class YouTubeCapture extends BaseChannel {
         const safeTitle = esc(it.title);
         const safeCh = esc(it.channel || "YouTube");
         const safeViews = it.viewText ? esc(it.viewText) : esc(syntheticViewText(it.id));
+        // 실제 YouTube: 채널명/조회수 별도 줄
+        const safeTimeAgo = ["3시간 전", "5시간 전", "12시간 전", "1일 전", "2일 전", "3일 전", "1주 전"][Math.abs((it.id || "").split("").reduce((a, c) => a + c.charCodeAt(0), 0)) % 7] || "1일 전";
         const metaLine =
-          '<div style="margin-top:4px;font-size:12px;line-height:17px;color:var(--yt-spec-text-secondary,#606060);">' +
+          '<div style="margin-top:4px;font-size:14px;line-height:20px;color:var(--yt-spec-text-secondary,#606060);">' +
           safeCh +
-          " · " +
-          safeViews +
+          "</div>" +
+          '<div style="font-size:14px;line-height:20px;color:var(--yt-spec-text-secondary,#606060);">' +
+          safeViews + " · " + safeTimeAgo +
           "</div>";
         const avatarBg = ["#8e24aa", "#1e88e5", "#43a047", "#fb8c00"][
           Math.abs((it.id || "").split("").reduce((acc, ch) => acc + ch.charCodeAt(0), 0)) % 4
@@ -2288,7 +2313,7 @@ export class YouTubeCapture extends BaseChannel {
           ? '<div style="width:36px;height:36px;border-radius:50%;overflow:hidden;flex-shrink:0;background:#eee;">' +
             '<img src="' +
             chSrc +
-            '" alt="" style="width:100%;height:100%;object-fit:cover;display:block;" loading="lazy" referrerpolicy="no-referrer" /></div>'
+            '" alt="" style="width:100%;height:100%;object-fit:cover;display:block;" referrerpolicy="no-referrer" onerror="this.onerror=null;this.parentElement.innerHTML=\'<div style=padding:0;width:36px;height:36px;border-radius:50%;background:' + avatarBg + ';color:#fff;display:flex;align-items:center;justify-content:center;font:700_12px_Roboto,sans-serif>' + avatarChar + '</div>\';" /></div>'
           : '<div style="width:36px;height:36px;border-radius:50%;background:' +
             avatarBg +
             ';color:#fff;display:flex;align-items:center;justify-content:center;font:700 12px Roboto,Arial,sans-serif;flex-shrink:0;">' +
@@ -2302,11 +2327,11 @@ export class YouTubeCapture extends BaseChannel {
           wideThumbFallback(it.id) +
           '\';" />' +
           "</div>" +
-          '<div style="padding:10px 0 0 0;display:flex;gap:12px;align-items:flex-start;">' +
+          '<div style="padding:12px 0 0 0;display:flex;gap:12px;align-items:flex-start;">' +
           avatarInner +
           '<div style="min-width:0;flex:1;display:flex;gap:2px;align-items:flex-start;">' +
           '<div style="min-width:0;flex:1;">' +
-          '<div style="font-size:14px;font-weight:500;line-height:20px;color:var(--yt-spec-text-primary,#0f0f0f);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">' +
+          '<div style="font-size:16px;font-weight:500;line-height:22px;color:var(--yt-spec-text-primary,#0f0f0f);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;word-break:break-word;">' +
           safeTitle +
           "</div>" +
           metaLine +
@@ -2332,13 +2357,13 @@ export class YouTubeCapture extends BaseChannel {
           shortThumbFallback(it.id) +
           '\';" />' +
           "</div></div>" +
-          '<div style="margin-top:4px;display:flex;gap:4px;align-items:flex-start;flex-shrink:0;width:100%;">' +
-          '<div style="min-width:0;flex:1;font-size:13px;font-weight:500;line-height:18px;color:var(--yt-spec-text-primary,#0f0f0f);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">' +
+          '<div style="margin-top:8px;display:flex;gap:4px;align-items:flex-start;flex-shrink:0;width:100%;">' +
+          '<div style="min-width:0;flex:1;font-size:14px;font-weight:600;line-height:20px;color:var(--yt-spec-text-primary,#0f0f0f);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;word-break:break-word;">' +
           safeTitle +
           "</div>" +
           metaMenuBtn +
           "</div>" +
-          '<div style="margin-top:2px;font-size:11px;line-height:16px;color:var(--yt-spec-text-secondary,#606060);flex-shrink:0;">' +
+          '<div style="margin-top:4px;font-size:12px;line-height:18px;color:var(--yt-spec-text-secondary,#606060);flex-shrink:0;">' +
           safeViews +
           "</div>";
         return card;
