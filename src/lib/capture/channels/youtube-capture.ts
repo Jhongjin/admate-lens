@@ -1659,8 +1659,21 @@ export class YouTubeCapture extends BaseChannel {
 
     if (shortsMid.length < 6) {
       console.warn(
-        `[YouTube] 합성 레이아웃: 쇼츠 ${shortsMid.length}/6칸만 확보 — API·풀 후보 부족 시 그리드에 빈 칸이 생길 수 있음`
+        `[YouTube] 합성 레이아웃: 쇼츠 ${shortsMid.length}/6칸만 확보 — oEmbed 폴백으로 보강 시도`
       );
+      const shortsFallbackCandidates = shuffleArrayCopy([
+        "rYEDA3JcQqw", "kJQP7kiw5Fk", "JGwWNGJdvx8", "60ItHLz5WEA",
+        "L_jWHffIx5E", "2Vv-BfVoq4g", "fLexgOxsZu0", "YQHsXMglC9A",
+        "hLQl3WQQoQ0", "9bZkp7q19f0", "DyDfgMOUjCI", "RlPNh_PBZb4",
+      ]);
+      for (const fid of shortsFallbackCandidates) {
+        if (shortsMid.length >= 6) break;
+        if (shortsMid.some((s) => s.id === fid)) continue;
+        const m = await this.fetchYoutubeOembedMeta(fid);
+        if (m.title) {
+          shortsMid.push({ id: fid, title: m.title, channel: m.author || "YouTube", viewText: "" });
+        }
+      }
     }
     console.log(
       `[YouTube] 합성 레이아웃: 롱 ${longTop.length}+${longBottom.length} / 쇼츠 ${shortsMid.length} (풀 롱${longPool.length}·숏${shortsPool.length}·원본${poolIn.length})`
@@ -2205,14 +2218,8 @@ export class YouTubeCapture extends BaseChannel {
         if (!/^[a-zA-Z0-9_-]{6,15}$/.test(it.id)) return;
         shortsRow.appendChild(makeShortCard(it));
       };
-      const shortFallbackIds = ["L_jWHffIx5E", "2Vv-BfVoq4g", "fLexgOxsZu0", "JGwWNGJdvx8", "YQHsXMglC9A", "RgKAFK5djSk", "dQw4w9WgXcQ"];
-      let fallbackIdx = 0;
-      while (shortsMid.length < 6 && fallbackIdx < shortFallbackIds.length) {
-        const id = shortFallbackIds[fallbackIdx];
-        fallbackIdx++;
-        if (!id || shortsMid.some((s) => s.id === id)) continue;
-        shortsMid.push({ id, title: "Shorts 추천 영상", channel: "YouTube" });
-      }
+      // 숏츠 폴백은 서버 사이드에서 oEmbed enrichment와 함께 처리됨
+      // 클라이언트 사이드에서 하드코딩 제목 추가하지 않음
       longTop.slice(0, 3).forEach((it) => pushWide(it, grid));
       shortsMid.forEach((it) => pushShort(it));
       // 뷰포트 정합: 세 번째 롱폼 행은 노출하지 않음
@@ -2912,6 +2919,14 @@ export class YouTubeCapture extends BaseChannel {
           ...gridLayout.longTop,
           ...gridLayout.longBottom,
         ]);
+        // 숏츠 제목·채널이 비어 있으면 oEmbed로 보강
+        for (const s of gridLayout.shortsMid) {
+          if (!s.title || s.title === "Shorts 추천 영상" || s.title === "동영상") {
+            const m = await this.fetchYoutubeOembedMeta(s.id);
+            if (m.title) s.title = m.title;
+            if (m.author) s.channel = m.author;
+          }
+        }
         console.log(
           `[YouTube] 인피드 홈: 합성 그리드 주입 (force=${forceSyntheticHome}, source=${synth.source}, pool=${synth.items.length})`
         );
