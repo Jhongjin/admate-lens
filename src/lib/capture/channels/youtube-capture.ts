@@ -1561,9 +1561,9 @@ export class YouTubeCapture extends BaseChannel {
       // HTML 파싱에서 이미 쇼츠로 태깅된 경우
       if (it.isShort === true) return true;
       if (/#shorts?\b/i.test(it.title)) return true;
-      if (/\b쇼츠\b/i.test(it.title) && !/(풀|full|롱폼|full\s*ep)/i.test(it.title)) return true;
+      if (/(?:^|\s|#|\[)(쇼츠|숏|shorts?)(?:\s|$|\])/i.test(it.title) && !/(풀|full|롱폼|full\s*ep)/i.test(it.title)) return true;
       // 제목 패턴: "... #short", "Shorts", 해시태그 패턴
-      if (/\bshort[s]?\s*$/i.test(it.title)) return true;
+      if (/(쇼츠|short[s]?)\s*$/i.test(it.title)) return true;
       const d = durations.get(it.id);
       if (d != null && d > 0 && d <= 120) return true;
       if (d != null && d > 120 && d <= 180 && /쇼츠|shorts|#short/i.test(it.title)) return true;
@@ -1868,7 +1868,7 @@ export class YouTubeCapture extends BaseChannel {
   private extractVideoIdsFromYoutubeHtml(html: string, max: number): string[] {
     const out: string[] = [];
     const seen = new Set<string>();
-    const re = /"videoId":"([a-zA-Z0-9_-]{6,15})"/g;
+    const re = /"videoId":"([a-zA-Z0-9_-]{11})"/g;
     for (const m of html.matchAll(re)) {
       const id = m[1];
       if (!id || seen.has(id)) continue;
@@ -1883,12 +1883,12 @@ export class YouTubeCapture extends BaseChannel {
   private extractShortsIdsFromYoutubeHtml(html: string): Set<string> {
     const shorts = new Set<string>();
     // reelWatchEndpoint는 YouTube가 쇼츠 영상에만 사용하는 엔드포인트
-    const re = /"reelWatchEndpoint":\s*\{"videoId":"([a-zA-Z0-9_-]{6,15})"/g;
+    const re = /"reelWatchEndpoint":\s*\{"videoId":"([a-zA-Z0-9_-]{11})"/g;
     for (const m of html.matchAll(re)) {
       if (m[1]) shorts.add(m[1]);
     }
     // reelShelfRenderer 안의 videoId도 쇼츠
-    const shelfRe = /"reelShelfRenderer"[\s\S]{0,5000}?"videoId":"([a-zA-Z0-9_-]{6,15})"/g;
+    const shelfRe = /"reelShelfRenderer"[\s\S]{0,5000}?"videoId":"([a-zA-Z0-9_-]{11})"/g;
     for (const m of html.matchAll(shelfRe)) {
       if (m[1]) shorts.add(m[1]);
     }
@@ -2325,7 +2325,7 @@ export class YouTubeCapture extends BaseChannel {
           wideThumbSrc(it.id) +
           '" alt="" style="width:100%;height:100%;object-fit:cover;display:block;" onerror="this.onerror=null;this.src=\'' +
           wideThumbFallback(it.id) +
-          '\';" />' +
+          '\'; if(this.src.includes(\'hqdefault\')){this.onerror=function(){this.src=\'https://i.ytimg.com/vi/'+it.id+'/mqdefault.jpg\';};}" />' +
           "</div>" +
           '<div style="padding:12px 0 0 0;display:flex;gap:12px;align-items:flex-start;">' +
           avatarInner +
@@ -2355,7 +2355,7 @@ export class YouTubeCapture extends BaseChannel {
           shortThumbSrc(it.id) +
           '" alt="" style="width:100%;height:100%;object-fit:cover;object-position:center top;display:block;" onerror="this.onerror=null;this.src=\'' +
           shortThumbFallback(it.id) +
-          '\';" />' +
+          '\'; if(this.src.includes(\'hqdefault\')){this.onerror=function(){this.src=\'https://i.ytimg.com/vi/'+it.id+'/mqdefault.jpg\';};}" />' +
           "</div></div>" +
           '<div style="margin-top:8px;display:flex;gap:4px;align-items:flex-start;flex-shrink:0;width:100%;">' +
           '<div style="min-width:0;flex:1;font-size:14px;font-weight:600;line-height:20px;color:var(--yt-spec-text-primary,#0f0f0f);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;word-break:break-word;">' +
