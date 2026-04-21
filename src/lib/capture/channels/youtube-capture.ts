@@ -1229,6 +1229,7 @@ export class YouTubeCapture extends BaseChannel {
     opts?: {
       publishedAfter?: string;
       order?: "date" | "rating" | "relevance" | "title" | "videoCount" | "viewCount";
+      videoDuration?: "any" | "long" | "medium" | "short";
     }
   ): Promise<SyntheticInfeedHomeItem[]> {
     const key = process.env.YOUTUBE_DATA_API_KEY?.trim();
@@ -1245,6 +1246,7 @@ export class YouTubeCapture extends BaseChannel {
       u.searchParams.set("relevanceLanguage", relLang);
       if (opts?.publishedAfter) u.searchParams.set("publishedAfter", opts.publishedAfter);
       if (opts?.order) u.searchParams.set("order", opts.order);
+      if (opts?.videoDuration) u.searchParams.set("videoDuration", opts.videoDuration);
       u.searchParams.set("key", key);
       const ac = new AbortController();
       const t = setTimeout(() => ac.abort(), 10_000);
@@ -1326,7 +1328,7 @@ export class YouTubeCapture extends BaseChannel {
     const seen = new Set<string>();
     const out: SyntheticInfeedHomeItem[] = [];
     for (const q of shuffleArrayCopy(queries)) {
-      const chunk = await this.fetchKrVideosFromYoutubeSearchApi(region, q, 15);
+      const chunk = await this.fetchKrVideosFromYoutubeSearchApi(region, q, 15, { videoDuration: "medium" });
       for (const r of chunk) {
         if (seen.has(r.id)) continue;
         seen.add(r.id);
@@ -1584,11 +1586,12 @@ export class YouTubeCapture extends BaseChannel {
     if (longPool.length < 7 && searchOk) {
       const q =
         rc === "KR"
-          ? ["예능 풀영상", "KBS 뉴스", "다큐멘터리", "스포츠 중계"][randomInt(0, 4)]!
+          ? ["예능 풀영상", "KBS 뉴스", "다큐멘터리", "스포츠 단독중계"][randomInt(0, 4)]!
           : "documentary";
       const extra = await this.fetchKrVideosFromYoutubeSearchApi(region, q, 24, {
         publishedAfter: new Date(Date.now() - randomInt(6, 120) * 3600 * 1000).toISOString(),
         order: (["date", "relevance", "viewCount"] as const)[randomInt(0, 3)]!,
+        videoDuration: "medium",
       });
       for (const x of extra) {
         if (isLikelyShort(x)) continue;
@@ -1600,12 +1603,11 @@ export class YouTubeCapture extends BaseChannel {
     let shortsMid: SyntheticInfeedHomeItem[] = [];
     if (searchOk) {
       const shortSearchQueries = shuffleArrayCopy([
-        "#shorts",
-        "유튜브 쇼츠",
-        "Shorts Korea",
-        "쇼츠 모음",
-        "shorts korea",
-        "YouTube Shorts",
+        "#shorts", "유튜브 쇼츠", "쇼츠 모음", "최신 유행 쇼츠", "꿀잼 쇼츠",
+        "아이돌 교차편집 쇼츠", "브이로그 쇼츠 하루", "귀여운 강아지 쇼츠", "귀여운 고양이 숏",
+        "신작 게임 쇼츠", "명작 영화 쇼츠", "무한도전 쇼츠", "런닝맨 숏", "침착맨 쇼츠 모음",
+        "유튜브 인기 쇼츠", "한국 쇼츠 레전드", "주식 기초 쇼츠", "부동산 쇼츠",
+        "먹방 하이라이트 숏", "kpop shorts challenge", "자동차 블랙박스 쇼츠"
       ]);
       const seenShortIds = new Set<string>();
       for (const q of shortSearchQueries) {
@@ -1664,11 +1666,12 @@ export class YouTubeCapture extends BaseChannel {
     if (searchOk) {
       const longQ =
         rc === "KR"
-          ? ["예능 풀영상", "뉴스 속보", "스포츠 하이라이트", "음악 라이브", "다큐멘터리"][randomInt(0, 5)]!
+          ? ["예능 풀영상", "뉴스 속보", "스포츠 하이라이트", "음악 프로그램", "다큐멘터리 스페셜", "영화 리뷰"][randomInt(0, 6)]!
           : "documentary";
       const extraLong = await this.fetchKrVideosFromYoutubeSearchApi(region, longQ, 25, {
         publishedAfter: new Date(Date.now() - randomInt(4, 96) * 3600 * 1000).toISOString(),
         order: (["date", "relevance"] as const)[randomInt(0, 2)]!,
+        videoDuration: "medium",
       });
       for (const x of extraLong) {
         if (isLikelyShort(x)) continue;
@@ -1734,16 +1737,16 @@ export class YouTubeCapture extends BaseChannel {
     needed: number
   ): Promise<SyntheticInfeedHomeItem[]> {
     const queries = shuffleArrayCopy([
-      "한국 쇼츠",
-      "인기 쇼츠 한국",
-      "쇼츠 모음 한국",
-      "일상 브이로그 쇼츠",
-      "예능 쇼츠",
-      "먹방 쇼츠",
-      "K-pop shorts",
-      "한국 유튜브 쇼츠",
-      "웃긴 쇼츠",
-      "쇼츠 추천",
+      "한국 쇼츠", "인기 쇼츠", "요즘 쇼츠", "강아지 릴스", "고양이 릴스",
+      "웃긴 영상 쇼츠", "영화 명장면 쇼츠", "애니 명장면 쇼츠", "아이브 쇼츠", "뉴진스 직캠",
+      "에스파 쇼츠", "르세라핌 직캠", "롤 매드무비 쇼츠", "배그 쇼츠", "오버워치 쇼츠",
+      "발로란트 숏", "먹방 쇼츠 하이라이트", "여행 브이로그 숏", "캠핑 쇼츠", "요리 쇼츠",
+      "운동 자극 릴스", "헬스 쇼츠", "골프 스윙 쇼츠", "야구 하이라이트 쇼츠", "축구 하이라이트 쇼츠",
+      "손흥민 쇼츠", "이강인 직캠", "페이커 쇼츠", "침착맨 쇼츠", "워크맨 쇼츠",
+      "유퀴즈 쇼츠", "놀면뭐하니 쇼츠", "무한도전 레전드 숏", "런닝맨 쇼츠", "코미디빅리그 쇼츠",
+      "SNL 코리아 쇼츠", "피식대학 쇼츠", "숏박스", "너덜트 숏", "틱톡 레전드",
+      "틱톡 댄스 챌린지", "슬릭백 챌린지", "마술 쇼츠", "차량 블랙박스 쇼츠", "자동차 리뷰 쇼츠",
+      "명언 쇼츠", "동기부여 숏", "재테크 쇼츠", "주식 단타 쇼츠", "부동산 임장 쇼츠", "퇴사 브이로그 숏"
     ]);
     const out: SyntheticInfeedHomeItem[] = [];
     const seen = new Set<string>();
