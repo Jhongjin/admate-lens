@@ -160,6 +160,7 @@ export function runInfeedInjectInPage(...args: unknown[]): boolean {
               ${menuBtn}
             </div>
           </div>
+          ${(ctaP || ctaS) ? `<div style="margin-top:12px;">${btnRow(false, { marginTop: "0px" })}</div>` : ""}
         </div>`;
       return wrap;
     };
@@ -216,7 +217,7 @@ export function runInfeedInjectInPage(...args: unknown[]): boolean {
         (cloned.querySelector("#content") as HTMLElement | null);
 
       if (detailsHost) {
-        // 홈 인피드 카드에서는 CTA 버튼을 노출하지 않습니다.
+        // 기존 유기적 카드의 모든 기본 버튼을 무력화합니다.
         detailsHost.querySelectorAll("button, #buttons, ytd-button-renderer, ytd-toggle-button-renderer").forEach((el) => {
           const t = ((el as HTMLElement).textContent || "").trim();
           if (
@@ -229,6 +230,14 @@ export function runInfeedInjectInPage(...args: unknown[]): boolean {
             (el as HTMLElement).style.display = "none";
           }
         });
+        
+        // 새로 전달받은 CTA 옵션을 삽입합니다.
+        if (ctaP || ctaS) {
+          const btnDiv = document.createElement("div");
+          btnDiv.style.cssText = "margin-top:12px;width:100%;";
+          btnDiv.innerHTML = btnRow(false, { marginTop: "0px" });
+          detailsHost.appendChild(btnDiv);
+        }
       }
 
       return cloned;
