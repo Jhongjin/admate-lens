@@ -3211,7 +3211,7 @@ export class YouTubeCapture extends BaseChannel {
           // 네이티브 햄버거 메뉴를 클릭하여 사이드바를 접고, Polymer의 리사이즈 로직이 자연스럽게 동작하도록 유도
           if (app.hasAttribute("guide-persistent-and-visible")) {
             const guideBtn = document.querySelector("#guide-button button");
-            if (guideBtn) (guideBtn as HTMLElement).click();
+            if (guideBtn) guideBtn.click();
           }
         })()
       `);
