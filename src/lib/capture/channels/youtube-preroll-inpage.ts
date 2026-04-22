@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Puppeteer page.evaluate()에 함수 참조로 전달되는 브라우저 측 프리롤 인젝션.
  * youtube-capture.ts 안의 거대한 백틱 문자열은 Next 번들·특수문자·<br/> 등으로 SyntaxError를 유발할 수 있어 분리함.
@@ -20,7 +21,7 @@ export interface PrerollInjectPagePayload {
 }
 
 export function runPrerollInjectInPage(...args: unknown[]): boolean {
-  const p = args[0] as PrerollInjectPagePayload;
+  const p = args[0];
   try {
     const imgUrl = p.imgUrl;
     const isMobile = p.isMobile;
@@ -144,7 +145,7 @@ export function runPrerollInjectInPage(...args: unknown[]): boolean {
         .querySelectorAll(
           "ytm-mobile-topbar-renderer, ytm-app-header, ytm-header, #header, .mobile-topbar-header-content, .ytm-header-bar"
         )
-        .forEach((el) => ((el as HTMLElement).style.display = "none"));
+        .forEach((el) => (el.style.display = "none"));
       document
         .querySelectorAll(
           "ytm-popup-container, tp-yt-paper-dialog, ytm-confirm-dialog-renderer, ytm-single-option-survey-renderer"

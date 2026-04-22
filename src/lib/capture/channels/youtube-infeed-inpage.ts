@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * YouTube 인피드 광고 UI 인젝션 (page.evaluate에 함수 참조로 전달)
  * 지면: 홈 그리드 카드 | 검색 결과 가로형 | 시청 페이지 관련동영상 사이드바
@@ -26,12 +27,12 @@ export interface InfeedInjectPagePayload {
 
 export function runInfeedInjectInPage(...args: unknown[]): boolean {
   /** page.evaluate로 전달될 때는 이 함수 본문만 브라우저에서 실행되므로 esc는 반드시 내부에 둡니다. */
-  const esc = (s: string): string => {
+  const esc = (s) => {
     const d = document.createElement("div");
     d.textContent = s;
     return d.innerHTML;
   };
-  const p = args[0] as InfeedInjectPagePayload;
+  const p = args[0];
   try {
     document.querySelectorAll('[data-injected="admate-youtube-infeed"]').forEach((el) => el.remove());
 
@@ -96,8 +97,8 @@ export function runInfeedInjectInPage(...args: unknown[]): boolean {
     const btnBase =
       "box-sizing:border-box;margin:0;border:none;cursor:default;font-family:Roboto,'Noto Sans KR',Arial,sans-serif;font-size:14px;line-height:36px;font-weight:500;height:36px;padding:0 16px;border-radius:18px;display:flex;align-items:center;justify-content:center;white-space:nowrap;letter-spacing:0.011px;";
     const btnRow = (
-      compact: boolean,
-      opts?: { primaryFitContent?: boolean; marginTop?: string }
+      compact,
+      opts
     ) => {
       const gap = "8px";
       const primaryFit = opts?.primaryFitContent === true;
@@ -166,8 +167,8 @@ export function runInfeedInjectInPage(...args: unknown[]): boolean {
         </div>`;
       return wrap;
     };
-    const buildHomeFeedCardFromTemplate = (templateItem: Element): HTMLElement | null => {
-      const cloned = templateItem.cloneNode(true) as HTMLElement;
+    const buildHomeFeedCardFromTemplate = (templateItem) => {
+      const cloned = /** @type {HTMLElement} */ (templateItem.cloneNode(true));
       cloned.setAttribute("data-injected", "admate-youtube-infeed");
       cloned.setAttribute("data-admate-home-native-like", "1");
 
@@ -179,7 +180,7 @@ export function runInfeedInjectInPage(...args: unknown[]): boolean {
 
       const thumbImg = cloned.querySelector(
         "#thumbnail img, ytd-thumbnail img, yt-image img"
-      ) as HTMLImageElement | null;
+      );
       if (thumbImg) {
         thumbImg.src = thumb;
         thumbImg.removeAttribute("srcset");
@@ -187,42 +188,42 @@ export function runInfeedInjectInPage(...args: unknown[]): boolean {
 
       const titleNode = cloned.querySelector(
         "#video-title, a#video-title, #video-title-link, h3 a"
-      ) as HTMLElement | null;
+      );
       if (titleNode) titleNode.textContent = title;
 
       const channelNode = cloned.querySelector(
         "#channel-name #text, ytd-channel-name #text, #text.ytd-channel-name"
-      ) as HTMLElement | null;
+      );
       if (channelNode) channelNode.textContent = sponsor;
 
       const metaSpans = cloned.querySelectorAll(
         "#metadata-line span, #metadata-line yt-formatted-string"
       );
-      if (metaSpans[0]) (metaSpans[0] as HTMLElement).textContent = "광고";
-      if (metaSpans[1]) (metaSpans[1] as HTMLElement).textContent = sponsor;
+      if (metaSpans[0]) metaSpans[0].textContent = "광고";
+      if (metaSpans[1]) metaSpans[1].textContent = sponsor;
 
       const avatarImg = cloned.querySelector(
         "#avatar img, #avatar-link img, ytd-channel-name img"
-      ) as HTMLImageElement | null;
+      );
       if (avatar && avatarImg) {
         avatarImg.src = avatar;
         avatarImg.removeAttribute("srcset");
       } else if (!avatar) {
         const avatarWrap = cloned.querySelector("#avatar, #avatar-link, #channel-avatar");
-        if (avatarWrap) (avatarWrap as HTMLElement).style.display = "none";
+        if (avatarWrap) avatarWrap.style.display = "none";
       }
 
       const detailsHost =
-        (cloned.querySelector("ytd-video-meta-block") as HTMLElement | null) ||
-        (cloned.querySelector("#meta") as HTMLElement | null) ||
-        (cloned.querySelector("#details") as HTMLElement | null) ||
-        (cloned.querySelector("#metadata") as HTMLElement | null) ||
-        (cloned.querySelector("#content") as HTMLElement | null);
+        cloned.querySelector("ytd-video-meta-block") ||
+        cloned.querySelector("#meta") ||
+        cloned.querySelector("#details") ||
+        cloned.querySelector("#metadata") ||
+        cloned.querySelector("#content");
 
       if (detailsHost) {
         // 기존 유기적 카드의 모든 기본 버튼을 무력화합니다.
         detailsHost.querySelectorAll("button, #buttons, ytd-button-renderer, ytd-toggle-button-renderer").forEach((el) => {
-          const t = ((el as HTMLElement).textContent || "").trim();
+          const t = (el.textContent || "").trim();
           if (
             t.includes("시청") ||
             t.includes("시작하기") ||
@@ -230,7 +231,7 @@ export function runInfeedInjectInPage(...args: unknown[]): boolean {
             t.includes("Watch") ||
             t.includes("Visit")
           ) {
-            (el as HTMLElement).style.display = "none";
+            el.style.display = "none";
           }
         });
         
@@ -262,7 +263,7 @@ export function runInfeedInjectInPage(...args: unknown[]): boolean {
           .querySelectorAll('[data-injected="admate-youtube-infeed"]')
           .forEach((el) => el.remove());
         const ad = buildHomeFeedCard();
-        const grid = synthRoot.querySelector("[data-admate-synthetic-feed-grid]") as HTMLElement | null;
+        const grid = synthRoot.querySelector("[data-admate-synthetic-feed-grid]");
         if (grid) {
           const cell = document.createElement("div");
           cell.setAttribute("data-injected", "admate-youtube-infeed");
@@ -295,7 +296,7 @@ export function runInfeedInjectInPage(...args: unknown[]): boolean {
           console.log("[admate infeed] home: 첫 rich-item 앞에 네이티브형 광고 삽입");
           return true;
         }
-        const host = (richItem.querySelector("#dismissable") as HTMLElement) || (richItem as HTMLElement);
+        const host = richItem.querySelector("#dismissable") || richItem;
         host.innerHTML = "";
         host.appendChild(buildHomeFeedCard());
         console.log("[admate infeed] home: 첫 rich-item 치환(폴백)");
@@ -303,8 +304,8 @@ export function runInfeedInjectInPage(...args: unknown[]): boolean {
       }
 
       const gridContents =
-        (document.querySelector("#primary ytd-rich-grid-renderer #contents") as HTMLElement | null) ||
-        (document.querySelector("ytd-rich-grid-renderer #contents") as HTMLElement | null);
+        document.querySelector("#primary ytd-rich-grid-renderer #contents") ||
+        document.querySelector("ytd-rich-grid-renderer #contents");
       if (gridContents) {
         const row = document.createElement("div");
         row.style.cssText =
@@ -316,11 +317,11 @@ export function runInfeedInjectInPage(...args: unknown[]): boolean {
       }
 
       const primary =
-        (document.getElementById("primary") as HTMLElement | null) ||
-        (document.querySelector("ytd-browse[page-subtype='home'] #primary") as HTMLElement | null) ||
-        (document.querySelector("ytd-two-column-browse-results-renderer #primary") as HTMLElement | null) ||
-        (document.querySelector("ytd-app[layout] #primary") as HTMLElement | null) ||
-        (document.querySelector("#columns #primary") as HTMLElement | null);
+        document.getElementById("primary") ||
+        document.querySelector("ytd-browse[page-subtype='home'] #primary") ||
+        document.querySelector("ytd-two-column-browse-results-renderer #primary") ||
+        document.querySelector("ytd-app[layout] #primary") ||
+        document.querySelector("#columns #primary");
       if (primary) {
         const slot = document.createElement("div");
         slot.style.cssText =
@@ -339,8 +340,8 @@ export function runInfeedInjectInPage(...args: unknown[]): boolean {
       }
 
       const appContent =
-        (document.querySelector("ytd-app #content") as HTMLElement | null) ||
-        (document.querySelector("#content") as HTMLElement | null);
+        document.querySelector("ytd-app #content") ||
+        document.querySelector("#content");
       if (appContent) {
         const slot = document.createElement("div");
         const ml = window.innerWidth >= 1312 ? "240px" : window.innerWidth >= 792 ? "72px" : "16px";
@@ -350,7 +351,7 @@ export function runInfeedInjectInPage(...args: unknown[]): boolean {
           ";margin-right:auto;";
         slot.appendChild(buildHomeFeedCard());
         const pm = appContent.querySelector("ytd-page-manager");
-        const host = (pm as HTMLElement) || appContent;
+        const host = pm || appContent;
         host.insertBefore(slot, host.firstChild);
         console.log("[admate infeed] home: ytd-app #content / page-manager 상단 삽입");
         return true;
@@ -382,9 +383,9 @@ export function runInfeedInjectInPage(...args: unknown[]): boolean {
         typeof p.searchFeedInsertAfterIndex === "number" && !Number.isNaN(p.searchFeedInsertAfterIndex)
           ? Math.max(0, Math.min(12, Math.floor(p.searchFeedInsertAfterIndex)))
           : 1;
-      const collectSearchResultRows = (container: Element): Element[] => {
+      const collectSearchResultRows = (container) => {
         const rows: Element[] = [];
-        const pushIfRow = (el: Element) => {
+        const pushIfRow = (el) => {
           const t = el.tagName;
           if (
             t === "YTD-VIDEO-RENDERER" ||
@@ -423,8 +424,8 @@ export function runInfeedInjectInPage(...args: unknown[]): boolean {
         const anchorEl = rowsForFeed[anchorIdxPre];
         const thumbEl =
           anchorEl.tagName === "YTD-VIDEO-RENDERER"
-            ? (anchorEl.querySelector("#thumbnail") as HTMLElement | null)
-            : (primaryContents.querySelector("ytd-video-renderer #thumbnail") as HTMLElement | null);
+            ? anchorEl.querySelector("#thumbnail")
+            : primaryContents.querySelector("ytd-video-renderer #thumbnail");
         const tw = thumbEl?.getBoundingClientRect().width || 0;
         if (tw > 80) feedThumbW = Math.round(tw);
       }
@@ -457,14 +458,14 @@ export function runInfeedInjectInPage(...args: unknown[]): boolean {
       const firstShortWidth = (() => {
         if (placement === "feed" && feedThumbW > 80) return feedThumbW;
         if (placement === "feed") {
-          const anyThumb = primaryContents.querySelector("ytd-video-renderer #thumbnail") as HTMLElement | null;
+          const anyThumb = primaryContents.querySelector("ytd-video-renderer #thumbnail");
           const fw = anyThumb?.getBoundingClientRect().width || 0;
           if (fw > 80) return Math.round(fw);
           return 360;
         }
         const shorts = document.querySelector(
           "ytd-rich-shelf-renderer ytd-reel-item-renderer, ytd-reel-shelf-renderer ytd-reel-item-renderer"
-        ) as HTMLElement | null;
+        );
         const w = shorts?.getBoundingClientRect().width || 0;
         return w > 40 ? Math.round(Math.max(450, Math.min(660, w * 2 + 44))) : 500;
       })();
@@ -556,9 +557,9 @@ export function runInfeedInjectInPage(...args: unknown[]): boolean {
       "ytd-feed-filter-chip-bar-renderer, yt-chip-cloud-renderer, #chip-bar, iron-selector#chips"
     );
 
-    const firstVideo = sidebar.querySelector("ytd-compact-video-renderer") as HTMLElement | null;
+    const firstVideo = sidebar.querySelector("ytd-compact-video-renderer");
     let compactThumbW = 168;
-    const compactTh = firstVideo?.querySelector("#thumbnail") as HTMLElement | null;
+    const compactTh = firstVideo?.querySelector("#thumbnail");
     const ctw = compactTh?.getBoundingClientRect().width || 0;
     if (ctw > 80) compactThumbW = Math.round(ctw);
 
@@ -616,7 +617,7 @@ export function runInfeedInjectInPage(...args: unknown[]): boolean {
     }
 
     const roundSid = "admate-watch-next-compact-thumb-round";
-    let stRound = document.getElementById(roundSid) as HTMLStyleElement | null;
+    let stRound = document.getElementById(roundSid);
     if (!stRound) {
       stRound = document.createElement("style");
       stRound.id = roundSid;
