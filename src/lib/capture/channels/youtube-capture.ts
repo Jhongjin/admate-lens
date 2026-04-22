@@ -263,9 +263,9 @@ function isSyntheticInfeedShuffleEnabled(): boolean {
 
 /** 데스크톱 캡처 DPR(기본 2). 품질 저하 시 2~3 권장 */
 function getDesktopCaptureDpr(): number {
-  const raw = Number(process.env.YOUTUBE_CAPTURE_DEVICE_SCALE_FACTOR ?? "3");
-  if (!Number.isFinite(raw)) return 3;
-  return Math.max(1, Math.min(4, Math.round(raw)));
+  const raw = Number(process.env.YOUTUBE_CAPTURE_DEVICE_SCALE_FACTOR ?? "2");
+  if (!Number.isFinite(raw)) return 2;
+  return Math.max(1, Math.min(2, Math.round(raw)));
 }
 
 function shuffleArrayCopy<T>(items: readonly T[]): T[] {
