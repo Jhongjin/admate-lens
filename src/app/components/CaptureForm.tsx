@@ -2310,8 +2310,8 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                         style={{ color: "var(--color-text-secondary)" }}
                       >
                         {form.youtubeAdType === "infeed-watch-next"
-                          ? "CTA 버튼 (비우면 숨김)"
-                          : "주 CTA (비우면 숨김)"}
+                          ? "CTA 버튼 (관련동영상은 1개만)"
+                          : "주 CTA (비우면 기본)"}
                       </label>
                       <input
                         type="text"
@@ -2336,7 +2336,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                           className="text-[11px] font-medium mb-1 block"
                           style={{ color: "var(--color-text-secondary)" }}
                         >
-                          보조 CTA (비우면 숨김)
+                          보조 CTA (비우면 기본)
                         </label>
                         <input
                           type="text"

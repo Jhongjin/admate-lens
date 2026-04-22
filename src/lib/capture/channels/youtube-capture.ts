@@ -2154,11 +2154,11 @@ export class YouTubeCapture extends BaseChannel {
       const grid = document.createElement("div");
       grid.setAttribute("data-admate-synthetic-feed-grid", "1");
       grid.style.cssText =
-        "display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:40px 16px;width:100%;";
+        "display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px 12px;width:100%;";
       const metaMenuBtn =
         '<button type="button" aria-label="작업 더보기" tabindex="-1" style="flex-shrink:0;align-self:flex-start;margin:-4px -3px 0 0;padding:6px 3px;border:none;background:transparent;cursor:default;border-radius:50%;color:var(--yt-spec-text-secondary,#606060);line-height:0;">' +
         '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" focusable="false" aria-hidden="true" style="display:block;">' +
-        '<path d="M5.5 12a2 2 0 114 0 2 2 0 01-4 0Zm4.5 0a2 2 0 114 0 2 2 0 01-4 0Zm4.5 0a2 2 0 114 0 2 2 0 01-4 0Z" fill="currentColor"/></svg>' +
+        '<path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z" fill="currentColor"/></svg>' +
         "</button>";
       const wideThumbSrc = (id: string): string =>
         "https://i.ytimg.com/vi_webp/" + id + "/hq720.webp";
@@ -2170,7 +2170,7 @@ export class YouTubeCapture extends BaseChannel {
         card.style.cssText =
           "border-radius:12px;overflow:hidden;border:none;background:transparent;";
         const safeTitle = esc(it.title);
-        const safeCh = esc(it.channel || "YouTube");
+        const safeCh = esc((it.channel || "YouTube").replace(/\s*·\s*$/, ""));
         const safeViews = it.viewText ? esc(it.viewText) : esc(syntheticViewText(it.id));
         const safeTimeAgo = ["3시간 전", "5시간 전", "12시간 전", "1일 전", "2일 전", "3일 전", "1주 전"][Math.abs((it.id || "").split("").reduce((a, c) => a + c.charCodeAt(0), 0)) % 7] || "1일 전";
         const metaLine =
@@ -2200,9 +2200,6 @@ export class YouTubeCapture extends BaseChannel {
             ';color:#fff;display:flex;align-items:center;justify-content:center;font:700 12px Roboto,Arial,sans-serif;flex-shrink:0;">' +
             avatarChar +
             "</div>";
-        const pseudoRandomSec = Math.abs((it.id || "").split("").reduce((acc, ch) => acc + ch.charCodeAt(0), 0));
-        const durationStr = Math.floor((pseudoRandomSec % 900) / 60) + ":" + String(pseudoRandomSec % 60).padStart(2, "0");
-
         card.innerHTML =
           '<div style="position:relative;width:100%;aspect-ratio:16/9;background:#000;border-radius:12px;overflow:hidden;">' +
           '<img src="' +
@@ -2210,7 +2207,6 @@ export class YouTubeCapture extends BaseChannel {
           '" alt="" style="width:100%;height:100%;object-fit:cover;display:block;" onload="if(this.naturalWidth<=120){this.src=\'https://i.ytimg.com/vi/'+it.id+'/0.jpg\';}" onerror="this.onerror=null;this.src=\'' +
           wideThumbFallback(it.id) +
           '\'; if(this.src.includes(\'hqdefault\')){this.onerror=function(){this.src=\'https://i.ytimg.com/vi/'+it.id+'/mqdefault.jpg\';};}"/>' +
-          '<span style="position:absolute;bottom:4px;right:4px;background:rgba(0,0,0,0.8);color:#fff;font-size:12px;font-weight:500;padding:3px 4px;border-radius:4px;line-height:1;">' + durationStr + '</span>' +
           "</div>" +
           '<div style="padding:12px 0 0 0;display:flex;gap:12px;align-items:flex-start;">' +
           avatarInner +
@@ -2686,16 +2682,11 @@ export class YouTubeCapture extends BaseChannel {
     const infeedSearchTitleOnly =
       adType === "infeed-search" && !description1 && !ctaPrimary && !ctaSecondary;
     if (adType === "infeed-home") {
-      if (!ctaPrimary) ctaPrimary = "시작하기";
-      if (!ctaSecondary) ctaSecondary = "시청";
+      // no default CTA
     } else if (adType === "infeed-search") {
-      if (!infeedSearchTitleOnly) {
-        if (!ctaPrimary) ctaPrimary = "사이트 방문";
-        if (!ctaSecondary) ctaSecondary = "시청";
-      }
+      // no default CTA
     } else {
-      /** 관련동영상: CTA 1개만 — API/옵션의 보조 CTA는 무시 */
-      if (!ctaPrimary) ctaPrimary = "사이트 방문";
+      /** 관련동영상: 보조 CTA는 강제 무시 */
       ctaSecondary = "";
     }
 

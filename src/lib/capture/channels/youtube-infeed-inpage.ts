@@ -82,7 +82,7 @@ export function runInfeedInjectInPage(...args: unknown[]): boolean {
         : "";
 
     const menuBtn =
-      '<button type="button" aria-label="작업 더보기" style="flex-shrink:0;background:none;border:none;padding:3px;cursor:default;color:var(--yt-spec-text-primary,#0f0f0f);border-radius:50%;width:36px;height:36px;display:flex;align-items:center;justify-content:center;margin:-3px -3px 0 0;"><svg width="18" height="18" viewBox="0 0 24 24" focusable="false" aria-hidden="true" style="display:block;"><path d="M5.5 12a2 2 0 114 0 2 2 0 01-4 0Zm4.5 0a2 2 0 114 0 2 2 0 01-4 0Zm4.5 0a2 2 0 114 0 2 2 0 01-4 0Z" fill="currentColor"/></svg></button>';
+      '<button type="button" aria-label="작업 더보기" style="flex-shrink:0;background:none;border:none;padding:3px;cursor:default;color:var(--yt-spec-text-primary,#0f0f0f);border-radius:50%;width:36px;height:36px;display:flex;align-items:center;justify-content:center;margin:-3px -3px 0 0;"><svg width="18" height="18" viewBox="0 0 24 24" focusable="false" aria-hidden="true" style="display:block;"><path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z" fill="currentColor"/></svg></button>';
     const menuBtnSearch = "";
 
     /**
