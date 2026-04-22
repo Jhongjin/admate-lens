@@ -62,13 +62,14 @@ export async function compositePhoneFrame(
     .resize(meta.contentArea.width, meta.contentArea.height, {
       fit: "cover",
       position: "top",
+      kernel: "lanczos3",
     })
     .png()
     .toBuffer();
 
   // 프레임 이미지 로드 → 최종 크기로 리사이즈
   const frameBuffer = await sharp(meta.framePath)
-    .resize(meta.frameSize.width, meta.frameSize.height, { fit: "fill" })
+    .resize(meta.frameSize.width, meta.frameSize.height, { fit: "fill", kernel: "lanczos3" })
     .png()
     .toBuffer();
 

@@ -263,9 +263,9 @@ function isSyntheticInfeedShuffleEnabled(): boolean {
 
 /** 데스크톱 캡처 DPR(기본 2). 품질 저하 시 2~3 권장 */
 function getDesktopCaptureDpr(): number {
-  const raw = Number(process.env.YOUTUBE_CAPTURE_DEVICE_SCALE_FACTOR ?? "2");
-  if (!Number.isFinite(raw)) return 2;
-  return Math.max(1, Math.min(3, Math.round(raw)));
+  const raw = Number(process.env.YOUTUBE_CAPTURE_DEVICE_SCALE_FACTOR ?? "3");
+  if (!Number.isFinite(raw)) return 3;
+  return Math.max(1, Math.min(4, Math.round(raw)));
 }
 
 function shuffleArrayCopy<T>(items: readonly T[]): T[] {
@@ -2161,9 +2161,9 @@ export class YouTubeCapture extends BaseChannel {
         '<path d="M5.5 12a2 2 0 114 0 2 2 0 01-4 0Zm4.5 0a2 2 0 114 0 2 2 0 01-4 0Zm4.5 0a2 2 0 114 0 2 2 0 01-4 0Z" fill="currentColor"/></svg>' +
         "</button>";
       const wideThumbSrc = (id: string): string =>
-        "https://i.ytimg.com/vi_webp/" + id + "/hq720.webp";
+        "https://i.ytimg.com/vi_webp/" + id + "/maxresdefault.webp";
       const wideThumbFallback = (id: string): string =>
-        "https://i.ytimg.com/vi/" + id + "/hqdefault.jpg";
+        "https://i.ytimg.com/vi_webp/" + id + "/hq720.webp";
       const makeWideCard = (it: SyntheticInfeedHomeItem): HTMLElement => {
         const card = document.createElement("div");
         card.setAttribute("data-admate-synthetic-feed-card", "1");
@@ -2204,9 +2204,9 @@ export class YouTubeCapture extends BaseChannel {
           '<div style="position:relative;width:100%;aspect-ratio:16/9;background:#000;border-radius:12px;overflow:hidden;">' +
           '<img src="' +
           wideThumbSrc(it.id) +
-          '" alt="" style="width:100%;height:100%;object-fit:cover;display:block;" onload="if(this.naturalWidth<=120){this.src=\'https://i.ytimg.com/vi/'+it.id+'/0.jpg\';}" onerror="this.onerror=null;this.src=\'' +
+          '" alt="" style="width:100%;height:100%;object-fit:cover;display:block;" onload="if(this.naturalWidth<=120){this.src=\'https://i.ytimg.com/vi/'+it.id+'/hqdefault.jpg\';}" onerror="this.onerror=null;this.src=\'' +
           wideThumbFallback(it.id) +
-          '\'; if(this.src.includes(\'hqdefault\')){this.onerror=function(){this.src=\'https://i.ytimg.com/vi/'+it.id+'/mqdefault.jpg\';};}"/>' +
+          '\'; this.onerror=function(){this.src=\'https://i.ytimg.com/vi/'+it.id+'/hqdefault.jpg\';};"/>' +
           "</div>" +
           '<div style="padding:12px 0 0 0;display:flex;gap:12px;align-items:flex-start;">' +
           avatarInner +
