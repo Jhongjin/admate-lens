@@ -32,8 +32,8 @@ type PuppeteerBrowser = import("puppeteer-core").Browser;
 type PuppeteerPage = import("puppeteer-core").Page;
 
 const DEFAULT_VIEWPORT: IViewport = {
-  width: 2560,
-  height: 1440,
+  width: 1920,
+  height: 1080,
   deviceScaleFactor: 2,
   isMobile: false,
 };

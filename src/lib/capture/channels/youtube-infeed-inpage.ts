@@ -150,17 +150,19 @@ export function runInfeedInjectInPage(...args: unknown[]): boolean {
         <div style="padding:10px 0 0 0;">
           <div style="display:flex;gap:${avatar ? "12px" : "0"};align-items:flex-start;">
             ${avatarCol || ""}
-            <div style="flex:1;min-width:0;display:flex;align-items:flex-start;gap:2px;">
-              <div style="min-width:0;flex:1;">
-                <div style="font-size:1.4rem;font-weight:500;line-height:2rem;color:var(--yt-spec-text-primary,#0f0f0f);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">${esc(
-                  title
-                )}</div>
-                <div style="margin-top:6px;font-size:1.2rem;display:flex;align-items:center;flex-wrap:wrap;">${sponsorHtml}</div>
+            <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:8px;">
+              <div style="display:flex;align-items:flex-start;gap:2px;width:100%;">
+                <div style="min-width:0;flex:1;">
+                  <div style="font-size:1.4rem;font-weight:500;line-height:2rem;color:var(--yt-spec-text-primary,#0f0f0f);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">${esc(
+                    title
+                  )}</div>
+                  <div style="margin-top:4px;font-size:1.2rem;line-height:1.6rem;display:flex;align-items:center;flex-wrap:wrap;color:var(--yt-spec-text-secondary,#606060);">${sponsorHtml}</div>
+                </div>
+                ${menuBtn}
               </div>
-              ${menuBtn}
+              ${(ctaP || ctaS) ? `<div style="width:100%;">${btnRow(false, { marginTop: "0px" })}</div>` : ""}
             </div>
           </div>
-          ${(ctaP || ctaS) ? `<div style="margin-top:12px;">${btnRow(false, { marginTop: "0px" })}</div>` : ""}
         </div>`;
       return wrap;
     };
@@ -211,8 +213,9 @@ export function runInfeedInjectInPage(...args: unknown[]): boolean {
       }
 
       const detailsHost =
-        (cloned.querySelector("#details") as HTMLElement | null) ||
+        (cloned.querySelector("ytd-video-meta-block") as HTMLElement | null) ||
         (cloned.querySelector("#meta") as HTMLElement | null) ||
+        (cloned.querySelector("#details") as HTMLElement | null) ||
         (cloned.querySelector("#metadata") as HTMLElement | null) ||
         (cloned.querySelector("#content") as HTMLElement | null);
 
@@ -234,9 +237,18 @@ export function runInfeedInjectInPage(...args: unknown[]): boolean {
         // 새로 전달받은 CTA 옵션을 삽입합니다.
         if (ctaP || ctaS) {
           const btnDiv = document.createElement("div");
-          btnDiv.style.cssText = "margin-top:12px;width:100%;";
+          // 상단 여백을 없애 기존 타이틀/스폰서와의 간격을 네이티브와 똑같이 맞춥니다.
+          btnDiv.style.cssText = "margin-top:8px;width:100%;";
           btnDiv.innerHTML = btnRow(false, { marginTop: "0px" });
-          detailsHost.appendChild(btnDiv);
+          
+          // 핵심: 버튼 컨테이너를 무조건 텍스트를 감싸는 컬럼 요소 내부에 넣어야 합니다. 
+          // 만약 #details 에 넣으면 프로필 아바타 아래까지 폭격맞듯 침범하게 됩니다.
+          const trueMetaContainer = 
+              cloned.querySelector("#meta") || 
+              cloned.querySelector("ytd-video-meta-block")?.parentElement ||
+              detailsHost;
+
+          trueMetaContainer.appendChild(btnDiv);
         }
       }
 

@@ -2277,13 +2277,13 @@ export class YouTubeCapture extends BaseChannel {
       shortsRow.style.cssText =
         "display:grid;grid-template-columns:repeat(" +
         shortsColCount +
-        ",minmax(0,1fr));gap:10px;width:100%;align-items:start;";
+        ",minmax(0,1fr));gap:16px;width:100%;align-items:start;";
       shortsSection.appendChild(shortsTitle);
       shortsSection.appendChild(shortsRow);
       const postShortsGrid = document.createElement("div");
       postShortsGrid.setAttribute("data-admate-synthetic-post-shorts-grid", "1");
       postShortsGrid.style.cssText =
-        "display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px 12px;width:100%;max-height:190px;overflow:hidden;";
+        "display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px 12px;width:100%;max-height:210px;overflow:hidden;";
       const wideThumbSrc = (id: string): string =>
         "https://i.ytimg.com/vi_webp/" + id + "/hq720.webp";
       const wideThumbFallback = (id: string): string =>
@@ -2358,16 +2358,18 @@ export class YouTubeCapture extends BaseChannel {
           "display:flex;flex-direction:column;min-width:0;align-items:stretch;flex-shrink:0;container-type:inline-size;";
         const safeTitle = esc(it.title);
         const safeViews = it.viewText ? esc(it.viewText) : esc(syntheticViewText(it.id));
+        const thumbStr = shortThumbSrc(it);
         card.innerHTML =
           '<div style="width:100%;display:flex;justify-content:center;flex-shrink:0;margin:0;">' +
-          '<div style="position:relative;width:100%;max-width:100%;aspect-ratio:9/16;margin:0 auto;border-radius:12px;overflow:hidden;background:#000;flex-shrink:0;">' +
+          '<div style="position:relative;width:100%;max-width:218px;aspect-ratio:214/366;margin:0;border-radius:12px;overflow:hidden;background:#000;flex-shrink:0;">' +
+          '<div style="position:absolute;top:-10%;left:-10%;width:120%;height:120%;background:url(\'' + thumbStr + '\') center/cover no-repeat;filter:blur(16px);opacity:0.6;"></div>' +
           '<img src="' +
-          shortThumbSrc(it) +
-          '" alt="" style="width:100%;height:100%;object-fit:cover;object-position:center top;display:block;" onload="if(this.naturalWidth<=120){this.src=\'https://i.ytimg.com/vi/'+it.id+'/0.jpg\';}" onerror="this.onerror=null;this.src=\'' +
+          thumbStr +
+          '" alt="" style="width:100%;height:100%;object-fit:contain;object-position:center;display:block;position:relative;z-index:1;" onload="if(this.naturalWidth<=120){this.src=\'https://i.ytimg.com/vi/'+it.id+'/0.jpg\';}" onerror="this.onerror=null;this.src=\'' +
           shortThumbFallback(it.id) +
           '\'; if(this.src.includes(\'hqdefault\')){this.onerror=function(){this.src=\'https://i.ytimg.com/vi/'+it.id+'/mqdefault.jpg\';};}" />' +
           "</div></div>" +
-          '<div style="margin-top:8px;display:flex;gap:4px;align-items:flex-start;flex-shrink:0;width:100%;">' +
+          '<div style="margin-top:12px;display:flex;gap:4px;align-items:flex-start;flex-shrink:0;width:100%;">' +
           '<div style="min-width:0;flex:1;font-size:14px;font-weight:600;line-height:20px;color:var(--yt-spec-text-primary,#0f0f0f);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;word-break:break-word;">' +
           safeTitle +
           "</div>" +
@@ -3206,20 +3208,15 @@ export class YouTubeCapture extends BaseChannel {
         (() => {
           const app = document.querySelector("ytd-app");
           if (!app) return;
-          app.setAttribute("mini-guide-visible", "true");
-          app.removeAttribute("guide-persistent-and-visible");
-          app.removeAttribute("guide-persistent-and-visible-in-section-list");
-          const guide = app.querySelector("#guide");
-          if (guide) guide.style.setProperty("display", "none", "important");
-          const miniGuide = app.querySelector("ytd-mini-guide-renderer");
-          if (miniGuide) {
-            miniGuide.style.removeProperty("display");
-            miniGuide.style.setProperty("display", "block", "important");
-            miniGuide.style.setProperty("visibility", "visible", "important");
-            miniGuide.style.setProperty("opacity", "1", "important");
+          // 네이티브 햄버거 메뉴를 클릭하여 사이드바를 접고, Polymer의 리사이즈 로직이 자연스럽게 동작하도록 유도
+          if (app.hasAttribute("guide-persistent-and-visible")) {
+            const guideBtn = document.querySelector("#guide-button button");
+            if (guideBtn) (guideBtn as HTMLElement).click();
           }
         })()
       `);
+      // Polymer 리사이즈 및 레이아웃 재계산 대기
+      await new Promise((r) => setTimeout(r, 500));
     }
 
     this.diagnostics.infeedCaptureUrl = page.url();
