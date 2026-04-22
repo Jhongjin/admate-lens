@@ -2154,7 +2154,7 @@ export class YouTubeCapture extends BaseChannel {
       const grid = document.createElement("div");
       grid.setAttribute("data-admate-synthetic-feed-grid", "1");
       grid.style.cssText =
-        "display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px 12px;width:100%;";
+        "display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:40px 16px;width:100%;";
       const metaMenuBtn =
         '<button type="button" aria-label="작업 더보기" tabindex="-1" style="flex-shrink:0;align-self:flex-start;margin:-4px -3px 0 0;padding:6px 3px;border:none;background:transparent;cursor:default;border-radius:50%;color:var(--yt-spec-text-secondary,#606060);line-height:0;">' +
         '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" focusable="false" aria-hidden="true" style="display:block;">' +
@@ -2200,6 +2200,9 @@ export class YouTubeCapture extends BaseChannel {
             ';color:#fff;display:flex;align-items:center;justify-content:center;font:700 12px Roboto,Arial,sans-serif;flex-shrink:0;">' +
             avatarChar +
             "</div>";
+        const pseudoRandomSec = Math.abs((it.id || "").split("").reduce((acc, ch) => acc + ch.charCodeAt(0), 0));
+        const durationStr = Math.floor((pseudoRandomSec % 900) / 60) + ":" + String(pseudoRandomSec % 60).padStart(2, "0");
+
         card.innerHTML =
           '<div style="position:relative;width:100%;aspect-ratio:16/9;background:#000;border-radius:12px;overflow:hidden;">' +
           '<img src="' +
@@ -2207,6 +2210,7 @@ export class YouTubeCapture extends BaseChannel {
           '" alt="" style="width:100%;height:100%;object-fit:cover;display:block;" onload="if(this.naturalWidth<=120){this.src=\'https://i.ytimg.com/vi/'+it.id+'/0.jpg\';}" onerror="this.onerror=null;this.src=\'' +
           wideThumbFallback(it.id) +
           '\'; if(this.src.includes(\'hqdefault\')){this.onerror=function(){this.src=\'https://i.ytimg.com/vi/'+it.id+'/mqdefault.jpg\';};}"/>' +
+          '<span style="position:absolute;bottom:4px;right:4px;background:rgba(0,0,0,0.8);color:#fff;font-size:12px;font-weight:500;padding:3px 4px;border-radius:4px;line-height:1;">' + durationStr + '</span>' +
           "</div>" +
           '<div style="padding:12px 0 0 0;display:flex;gap:12px;align-items:flex-start;">' +
           avatarInner +

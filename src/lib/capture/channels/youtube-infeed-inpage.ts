@@ -44,12 +44,7 @@ export function runInfeedInjectInPage(...args: unknown[]): boolean {
     const sponsor = p.sponsorName || "brand.example";
     const ctaRawP = (p.ctaPrimary || "").trim();
     const ctaS = (p.ctaSecondary || "").trim();
-    const ctaP =
-      p.surface === "search"
-        ? ctaRawP
-        : p.surface === "watch-next"
-          ? ctaRawP || "사이트 방문"
-          : ctaRawP || "시작하기";
+    const ctaP = ctaRawP;
     /** 관련동영상은 CTA 1개만(보조 CTA 무시) */
     const showSecondary = p.surface !== "watch-next" && ctaS.length > 0;
     const showSearchCtaRow = p.surface === "search" && (ctaP.length > 0 || showSecondary);
