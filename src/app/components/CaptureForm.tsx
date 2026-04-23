@@ -279,6 +279,7 @@ type YouTubeAdType =
   | "mobile-preroll-aos"
   | "mobile-preroll-ios"
   | "infeed-home"
+  | "mobile-infeed-home"
   | "infeed-search"
   | "infeed-watch-next";
 
@@ -884,6 +885,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
   const isYoutubeInfeed =
     isYouTubeChannel &&
     (form.youtubeAdType === "infeed-home" ||
+      form.youtubeAdType === "mobile-infeed-home" ||
       form.youtubeAdType === "infeed-search" ||
       form.youtubeAdType === "infeed-watch-next");
 
@@ -920,7 +922,8 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
     "pc-non-skip": "Pc instream (Non skip)",
     "mo-skip": "Mo instream (Skip)",
     "mo-non-skip": "Mo instream (Non skip)",
-    "infeed-home": "인피드 홈",
+    "infeed-home": "PC 인피드 홈",
+    "mo-infeed-home": "Mo 인피드 홈",
     "infeed-search": "인피드 검색",
     "infeed-watch-next": "인피드 관련동영상",
     "yt-other": "YouTube 기타",
@@ -991,7 +994,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
       const contentVideoUrl = form.instreamPublisherVideoUrl?.trim() || randomKoreanUrl;
       const publisherUrls =
         isYouTubeChannel && form.selectedPublishers.length === 0
-          ? form.youtubeAdType === "infeed-home"
+          ? form.youtubeAdType === "infeed-home" || form.youtubeAdType === "mobile-infeed-home"
             ? ["https://www.youtube.com/"]
             : form.youtubeAdType === "infeed-search"
               ? [
@@ -1343,6 +1346,14 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                   }));
                   return;
                 }
+                if (preset === "mo-infeed-home") {
+                  setForm((prev) => ({
+                    ...prev,
+                    channel: "youtube",
+                    youtubeAdType: "mobile-infeed-home",
+                  }));
+                  return;
+                }
                 if (preset === "infeed-search") {
                   setForm((prev) => ({
                     ...prev,
@@ -1366,7 +1377,8 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                   <option value="pc-non-skip">Pc instream (Non skip)</option>
                   <option value="mo-skip">Mo instream (Skip)</option>
                   <option value="mo-non-skip">Mo instream (Non skip)</option>
-                  <option value="infeed-home">In-feed 홈 (트렌딩)</option>
+                  <option value="infeed-home">Pc In-feed 홈</option>
+                  <option value="mo-infeed-home">Mo In-feed 홈</option>
                   <option value="infeed-search">In-feed 검색</option>
                   <option value="infeed-watch-next">In-feed 관련동영상</option>
                   <option value="yt-other">Display / Overlay 등</option>

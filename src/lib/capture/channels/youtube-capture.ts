@@ -19,6 +19,7 @@ import {
 } from "../engine/puppeteer-engine";
 import { runPrerollInjectInPage, type PrerollInjectPagePayload } from "./youtube-preroll-inpage";
 import { runInfeedInjectInPage, type InfeedSurface } from "./youtube-infeed-inpage";
+import { generateMobileSyntheticInfeedHomeHtml } from "./mobile-synthetic-infeed";
 
 /** YouTube 광고 유형 */
 export type YouTubeAdType =
@@ -28,15 +29,16 @@ export type YouTubeAdType =
   | "mobile-preroll-aos"
   | "mobile-preroll-ios"
   | "infeed-home"
+  | "mobile-infeed-home"
   | "infeed-search"
   | "infeed-watch-next";
 
-function isInfeedAdType(t: YouTubeAdType): t is "infeed-home" | "infeed-search" | "infeed-watch-next" {
-  return t === "infeed-home" || t === "infeed-search" || t === "infeed-watch-next";
+function isInfeedAdType(t: YouTubeAdType): t is "infeed-home" | "mobile-infeed-home" | "infeed-search" | "infeed-watch-next" {
+  return t === "infeed-home" || t === "mobile-infeed-home" || t === "infeed-search" || t === "infeed-watch-next";
 }
 
 function infeedSurfaceFromAdType(t: YouTubeAdType): InfeedSurface | null {
-  if (t === "infeed-home") return "home";
+  if (t === "infeed-home" || t === "mobile-infeed-home") return "home";
   if (t === "infeed-search") return "search";
   if (t === "infeed-watch-next") return "watch-next";
   return null;
@@ -228,7 +230,7 @@ const INFEED_HOME_SYNTHETIC_FALLBACK_IDS: string[] = [
   "67yxoKs30Oo",
 ];
 
-type SyntheticInfeedHomeItem = {
+export type SyntheticInfeedHomeItem = {
   id: string;
   title: string;
   channel: string;
@@ -2566,12 +2568,19 @@ export class YouTubeCapture extends BaseChannel {
   private async captureInfeedPlacement(
     page: IPageHandle,
     request: CaptureRequest,
-    adType: "infeed-home" | "infeed-search" | "infeed-watch-next"
+    adType: "infeed-home" | "mobile-infeed-home" | "infeed-search" | "infeed-watch-next"
   ): Promise<Buffer> {
     const surface = infeedSurfaceFromAdType(adType)!;
     console.log(`[YouTube] ===== 인피드 캡처 시작 (${surface}) =====`);
 
-    await page.setViewport({ width: 1920, height: 1080, deviceScaleFactor: getDesktopCaptureDpr() });
+    let vpWidth = 1920;
+    let vpHeight = 1080;
+    if (adType === "mobile-infeed-home") {
+      vpWidth = 390;
+      vpHeight = 844;
+      await page.setUserAgent(UA_MOBILE_IOS);
+    }
+    await page.setViewport({ width: vpWidth, height: vpHeight, deviceScaleFactor: getDesktopCaptureDpr() });
 
     this.diagnostics = {
       adType,
@@ -2859,6 +2868,36 @@ export class YouTubeCapture extends BaseChannel {
     }
 
     let injectSurface: InfeedSurface = surface;
+
+    if (adType === "mobile-infeed-home") {
+      const organicItems = await this.resolveSyntheticInfeedHomeItems(infeedVideo).then(r => r.items);
+      const adData = {
+        title: instreamOpts.adTitle?.trim() || sponsorName,
+        description: infeedOpts.description1?.trim() || "광고",
+        channel: sponsorName,
+        channelAvatarUrl: avatarDataUrl,
+        adThumbUrl: creativeDataUrl,
+        ctaPrimary: infeedOpts.ctaPrimary?.trim() || instreamOpts.ctaText?.trim() || ""
+      };
+      const html = generateMobileSyntheticInfeedHomeHtml(adData, organicItems);
+
+      // DOM 완전 대체 및 렌더링 대기
+      await page.evaluate(`
+        document.open();
+        document.write(${JSON.stringify(html)});
+        document.close();
+        window.scrollTo(0, 0);
+      `);
+
+      
+      // 이미지 및 폰트 로드 대기
+      await new Promise(r => setTimeout(r, 2000));
+      
+      const screenshot = await page.screenshot({ fullPage: false, type: "png" });
+      console.log(`[YouTube] ===== 모바일 인피드 홈 합성 캡처 완료 =====`);
+      return screenshot;
+    }
+
     if (adType === "infeed-home") {
       const ready = await this.ensureInfeedHomeFeedReady(page, mastheadProfileDataUrl);
       injectSurface = ready.injectSurface;
