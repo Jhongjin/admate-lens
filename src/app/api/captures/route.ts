@@ -78,6 +78,7 @@ export async function POST(request: NextRequest) {
         | "mobile-preroll-aos"
         | "mobile-preroll-ios"
         | "infeed-home"
+        | "mobile-infeed-home"
         | "infeed-search"
         | "infeed-watch-next";
       infeedOpts?: {
