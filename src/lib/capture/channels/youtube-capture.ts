@@ -2873,7 +2873,7 @@ export class YouTubeCapture extends BaseChannel {
       const organicItems = await this.resolveSyntheticInfeedHomeItems(infeedVideo).then(r => r.items);
       const adData = {
         title: instreamOpts.adTitle?.trim() || sponsorName,
-        description: infeedOpts.description1?.trim() || "광고",
+        description: infeedOpts.description1?.trim() || "",
         channel: sponsorName,
         channelAvatarUrl: avatarDataUrl,
         adThumbUrl: creativeDataUrl,

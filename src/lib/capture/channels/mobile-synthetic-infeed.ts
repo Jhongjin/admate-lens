@@ -18,7 +18,7 @@ export function generateMobileSyntheticInfeedHomeHtml(
   const iconMenuDots = `<svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M12 16.5c.83 0 1.5.67 1.5 1.5s-.67 1.5-1.5 1.5-1.5-.67-1.5-1.5.67-1.5 1.5-1.5zM10.5 12c0 .83.67 1.5 1.5 1.5s1.5-.67 1.5-1.5-.67-1.5-1.5-1.5-1.5.67-1.5 1.5zm0-6c0 .83.67 1.5 1.5 1.5s1.5-.67 1.5-1.5-.67-1.5-1.5-1.5-1.5.67-1.5 1.5z"/></svg>`;
   const iconCompass = `<svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="m14.94 9.06-7.07 1.99 1.99-7.07 7.07-1.99-1.99 7.07zm-2.07-5.06-4.5 1.25 1.25 4.5 4.5-1.25-1.25-4.5zM12 3c-4.96 0-9 4.04-9 9s4.04 9 9 9 9-4.04 9-9-4.04-9-9-9zM12 20c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"/></svg>`;
   const iconHomeFill = `<svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M4 21V10.08l8-6.96 8 6.96V21h-6v-6h-4v6H4z"/></svg>`;
-  const iconShorts = `<svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M17.77 10.32l-1.2-.5L18 9.06c1.84-.85 2.56-3 1.62-4.72a3.525 3.525 0 0 0-4.75-1.6l-8.54 3.95c-1.84.85-2.56 3-1.62 4.72a3.524 3.524 0 0 0 2.22 1.83l1.2.5L6 14.94c-1.84.85-2.56 3-1.62 4.72a3.525 3.525 0 0 0 4.75 1.6l8.54-3.95c1.84-.85 2.56-3 1.62-4.72a3.524 3.524 0 0 0-1.52-2.27zM10 14.65v-5.3L15 12l-5 2.65z"/></svg>`;
+  const iconShortsOutline = `<svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M10 14.65v-5.3L15 12l-5 2.65zm7.77-4.33-1.2-.5L18 9.06c1.84-.85 2.56-3 1.62-4.72A3.525 3.525 0 0 0 14.87 2.74L6.33 6.69C4.49 7.54 3.77 9.7 4.71 11.42a3.524 3.524 0 0 0 2.22 1.83l1.2.5L6 14.94c-1.84.85-2.56 3-1.62 4.72a3.525 3.525 0 0 0 4.75 1.6l8.54-3.95c1.84-.85 2.56-3 1.62-4.72a3.524 3.524 0 0 0-1.52-2.27zM18.8 11.53l-8.54 3.95a2.525 2.525 0 0 1-3.39-1.14 2.524 2.524 0 0 1 1.14-3.39l1.9-.88-.41-.17a2.525 2.525 0 0 1-1.61-2.26 2.525 2.525 0 0 1 1.61-2.26l8.54-3.95a2.525 2.525 0 0 1 3.39 1.14 2.524 2.524 0 0 1-1.14 3.39l-1.9.88.41.17a2.525 2.525 0 0 1 1.61 2.26 2.525 2.525 0 0 1-1.61 2.26z"/></svg>`;
   const iconShortsLogo = `<svg viewBox="0 0 24 24" width="24" height="24" focusable="false" style="pointer-events: none; display: block; width: 100%; height: 100%;"><path d="M17.77,10.32l-1.2-.5L18,9.06c1.84-.85,2.56-3,1.62-4.72A3.525,3.525,0,0,0,14.87,2.74L6.33,6.69C4.49,7.54,3.77,9.7,4.71,11.42a3.524,3.524,0,0,0,2.22,1.83l1.2.5L6,14.94c-1.84.85-2.56,3-1.62,4.72a3.525,3.525,0,0,0,4.75,1.6l8.54-3.95c1.84-.85,2.56-3,1.62-4.72A3.524,3.524,0,0,0,17.77,10.32ZM10,14.65v-5.3L15,12Z" fill="#ff0000"></path></svg>`;
   const iconPlus = `<svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="1.2"><circle cx="12" cy="12" r="10"/><path d="M12 7v10M7 12h10"/></svg>`;
   const iconSubs = `<svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M10 18v-6l5 3-5 3zm7-15H7v1h10V3zm3 3H4v1h16V6zm2 3H2v12h20V9zM3 10h18v10H3V10z"/></svg>`;
@@ -44,10 +44,14 @@ export function generateMobileSyntheticInfeedHomeHtml(
   };
 
   const adHtml = `
-    <div style="width:100%;display:flex;flex-direction:column;margin-bottom:24px;border-bottom:4px solid #f2f2f2;padding-bottom:12px;">
+    <div style="width:100%;display:flex;flex-direction:column;margin-bottom:28px;">
       <!-- Thumbnail -->
       <div style="position:relative;width:100%;aspect-ratio:16/9;background:#e5e5e5;overflow:hidden;">
         <img src="${adData.adThumbUrl}" style="width:100%;height:100%;object-fit:cover;display:block;" onerror="this.src='https://via.placeholder.com/640x360.png?text=Preview+Image'" />
+        <!-- Linkout Arrow overlay -->
+        <div style="position:absolute;right:8px;bottom:8px;width:32px;height:32px;border-radius:50%;background:rgba(0,0,0,0.6);display:flex;justify-content:center;align-items:center;color:#fff;">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M18 6v6h-1.2V7.7L7.7 16.8l-.9-.8 9.1-9.1H9.6V5.7H18z"/></svg>
+        </div>
       </div>
       <!-- Meta -->
       <div style="display:flex;padding:12px 16px 0 16px;gap:12px;align-items:flex-start;">
@@ -171,7 +175,7 @@ export function generateMobileSyntheticInfeedHomeHtml(
       <span style="font-size:10px;margin-top:2px;">홈</span>
     </div>
     <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;color:#0f0f0f;flex:1;">
-      ${iconShorts}
+      ${iconShortsOutline}
       <span style="font-size:10px;margin-top:2px;">Shorts</span>
     </div>
     <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;color:#0f0f0f;flex:1;">
