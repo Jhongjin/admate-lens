@@ -132,6 +132,7 @@ export async function POST(request: NextRequest) {
     const isInfeedYt =
       channel === "youtube" &&
       (youtubeAdType === "infeed-home" ||
+        youtubeAdType === "mobile-infeed-home" ||
         youtubeAdType === "infeed-search" ||
         youtubeAdType === "infeed-watch-next");
     /** 인피드·디스플레이·오버레이 등 프리롤이 아닌 YouTube 유형 */
