@@ -2109,45 +2109,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                           )}
                         </div>
                       </div>
-                      <div>
-                        <label
-                          className="text-[11px] font-medium mb-1 block"
-                          style={{ color: "var(--color-text-secondary)" }}
-                        >
-                          제목 바로 아래 텍스트
-                        </label>
-                        <input
-                          type="text"
-                          className="form-input"
-                          placeholder="예: 이걸로도 안가려지는 기미가 없어요"
-                          value={form.infeedDescription1}
-                          onChange={(e) =>
-                            setForm((prev) => ({
-                              ...prev,
-                              infeedDescription1: e.target.value,
-                            }))
-                          }
-                        />
-                      </div>
-                      <div>
-                        <label
-                          className="text-[11px] font-medium mb-1 block"
-                          style={{ color: "var(--color-text-secondary)" }}
-                        >
-                          보조 설명 텍스트 (선택)
-                        </label>
-                        <input
-                          type="text"
-                          className="form-input"
-                          value={form.infeedDescription2}
-                          onChange={(e) =>
-                            setForm((prev) => ({
-                              ...prev,
-                              infeedDescription2: e.target.value,
-                            }))
-                          }
-                        />
-                      </div>
+
                     </>
                   )}
                   {form.youtubeAdType === "infeed-watch-next" && (
@@ -2178,46 +2140,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                           }
                         />
                       </div>
-                      <div>
-                        <label
-                          className="text-[11px] font-medium mb-1 block"
-                          style={{ color: "var(--color-text-secondary)" }}
-                        >
-                          설명 첫 줄
-                        </label>
-                        <input
-                          type="text"
-                          className="form-input"
-                          placeholder="번거롭고 어려운 의사 검색,굿닥터넷이"
-                          value={form.infeedDescription1}
-                          onChange={(e) =>
-                            setForm((prev) => ({
-                              ...prev,
-                              infeedDescription1: e.target.value,
-                            }))
-                          }
-                        />
-                      </div>
-                      <div>
-                        <label
-                          className="text-[11px] font-medium mb-1 block"
-                          style={{ color: "var(--color-text-secondary)" }}
-                        >
-                          설명 둘째 줄
-                        </label>
-                        <input
-                          type="text"
-                          className="form-input"
-                          placeholder="대신 해 드려요"
-                          value={form.infeedDescription2}
-                          onChange={(e) =>
-                            setForm((prev) => ({
-                              ...prev,
-                              infeedDescription2: e.target.value,
-                            }))
-                          }
-                        />
-                      </div>
+
                     </>
                   )}
                   <div>
@@ -2239,6 +2162,48 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                       }
                     />
                   </div>
+                  <div>
+                    <label
+                      className="text-[11px] font-medium mb-1 block"
+                      style={{ color: "var(--color-text-secondary)" }}
+                    >
+                      설명(Description) 텍스트 (본문 첫 줄)
+                    </label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      placeholder="예: 이걸로도 안가려지는 기미가 없어요"
+                      value={form.infeedDescription1}
+                      onChange={(e) =>
+                        setForm((prev) => ({
+                          ...prev,
+                          infeedDescription1: e.target.value,
+                        }))
+                      }
+                    />
+                  </div>
+                  {form.youtubeAdType !== "infeed-home" && form.youtubeAdType !== "mobile-infeed-home" && (
+                    <div>
+                      <label
+                        className="text-[11px] font-medium mb-1 block"
+                        style={{ color: "var(--color-text-secondary)" }}
+                      >
+                        보조 설명 텍스트 (본문 둘째 줄, 필요시)
+                      </label>
+                      <input
+                        type="text"
+                        className="form-input"
+                        placeholder="대신 해 드려요"
+                        value={form.infeedDescription2}
+                        onChange={(e) =>
+                          setForm((prev) => ({
+                            ...prev,
+                            infeedDescription2: e.target.value,
+                          }))
+                        }
+                      />
+                    </div>
+                  )}
                   <div>
                     <label
                       className="text-[11px] font-medium mb-1 block"
