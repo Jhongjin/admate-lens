@@ -2877,7 +2877,8 @@ export class YouTubeCapture extends BaseChannel {
         channel: sponsorName,
         channelAvatarUrl: avatarDataUrl,
         adThumbUrl: creativeDataUrl,
-        ctaPrimary: infeedOpts.ctaPrimary?.trim() || instreamOpts.ctaText?.trim() || ""
+        ctaPrimary: infeedOpts.ctaPrimary?.trim() || instreamOpts.ctaText?.trim() || "",
+        ctaSecondary: infeedOpts.ctaSecondary?.trim() || "",
       };
       const html = generateMobileSyntheticInfeedHomeHtml(adData, organicItems);
 
