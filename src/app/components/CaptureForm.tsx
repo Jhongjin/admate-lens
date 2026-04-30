@@ -241,6 +241,7 @@ type YouTubeAdType =
   | "mobile-preroll-ios"
   | "mobile-bumper-aos"
   | "mobile-bumper-ios"
+  | "shorts-feed"
   | "infeed-home"
   | "mobile-infeed-home"
   | "infeed-search"
@@ -269,7 +270,7 @@ const INJECTION_MODES: InjectionModeOption[] = [
   },
 ];
 
-type ProductMenu = "instream" | "infeed" | "network-ads";
+type ProductMenu = "instream" | "shorts" | "infeed" | "network-ads";
 type DetailOptionPreset =
   | "pc-skip"
   | "pc-non-skip"
@@ -280,6 +281,7 @@ type DetailOptionPreset =
   | "ios-skip"
   | "ios-non-skip"
   | "ios-bumper"
+  | "shorts-feed"
   | "infeed-home"
   | "mo-infeed-home"
   | "infeed-search"
@@ -302,6 +304,7 @@ interface DetailMenuOption {
 
 const YOUTUBE_PRODUCT_OPTIONS: ProductMenuOption[] = [
   { value: "instream", label: "In-stream / Bumper" },
+  { value: "shorts", label: "Shorts" },
   { value: "infeed", label: "In-feed" },
 ];
 
@@ -315,6 +318,7 @@ const YOUTUBE_DETAIL_OPTIONS: DetailMenuOption[] = [
   { value: "ios-skip", label: "iOS 인스트림 · Skip" },
   { value: "ios-non-skip", label: "iOS 인스트림 · Non-skip" },
   { value: "ios-bumper", label: "iOS 범퍼 · 6초" },
+  { value: "shorts-feed", label: "Shorts 피드" },
   { value: "infeed-home", label: "PC In-feed 홈" },
   { value: "mo-infeed-home", label: "MO In-feed 홈" },
   { value: "infeed-search", label: "In-feed 검색" },
@@ -322,7 +326,6 @@ const YOUTUBE_DETAIL_OPTIONS: DetailMenuOption[] = [
 ];
 
 const YOUTUBE_PLANNED_OPTIONS: DetailMenuOption[] = [
-  { value: "yt-other", label: "Shorts 피드 · 구현 예정", disabled: true },
   { value: "yt-other", label: "Masthead 홈 · 구현 예정", disabled: true },
   { value: "yt-other", label: "CTV Pause · 구현 예정", disabled: true },
   { value: "yt-other", label: "Audio Reach · 구현 예정", disabled: true },
@@ -850,6 +853,8 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
     (form.youtubeAdType === "preroll" ||
       form.youtubeAdType === "bumper" ||
       isMobilePreroll);
+  const isYoutubeShorts =
+    isYouTubeChannel && form.youtubeAdType === "shorts-feed";
 
   const isYoutubeInfeed =
     isYouTubeChannel &&
@@ -861,42 +866,35 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
   const selectedMediaMenu = (form.channel === "youtube" ? "youtube" : "gdn") as MediaMenu;
   const selectedProduct =
     selectedMediaMenu === "youtube"
-      ? isYoutubeInfeed
+      ? isYoutubeShorts
+        ? "shorts"
+        : isYoutubeInfeed
         ? "infeed"
         : "instream"
       : "network-ads";
-  const selectedOptionPreset: DetailOptionPreset =
-    selectedMediaMenu === "youtube"
-      ? form.youtubeAdType === "bumper"
-        ? "pc-bumper"
-        : form.youtubeAdType === "mobile-bumper-aos"
-          ? "aos-bumper"
-          : form.youtubeAdType === "mobile-bumper-ios"
-            ? "ios-bumper"
-            : form.youtubeAdType === "preroll"
-              ? form.instreamSkipMode === "non-skippable"
-                ? "pc-non-skip"
-                : "pc-skip"
-              : form.youtubeAdType === "mobile-preroll-aos"
-                ? form.instreamSkipMode === "non-skippable"
-                  ? "aos-non-skip"
-                  : "aos-skip"
-                : form.youtubeAdType === "mobile-preroll-ios"
-                  ? form.instreamSkipMode === "non-skippable"
-                    ? "ios-non-skip"
-                    : "ios-skip"
-                  : form.youtubeAdType === "infeed-home"
-                    ? "infeed-home"
-                    : form.youtubeAdType === "mobile-infeed-home"
-                      ? "mo-infeed-home"
-                      : form.youtubeAdType === "infeed-search"
-                        ? "infeed-search"
-                        : form.youtubeAdType === "infeed-watch-next"
-                          ? "infeed-watch-next"
-                          : "yt-other"
-      : form.gdnViewportMode === "mobile"
-        ? "gdn-mobile"
-        : "gdn-pc";
+  const selectedOptionPreset: DetailOptionPreset = (() => {
+    if (selectedMediaMenu !== "youtube") {
+      return form.gdnViewportMode === "mobile" ? "gdn-mobile" : "gdn-pc";
+    }
+    if (form.youtubeAdType === "bumper") return "pc-bumper";
+    if (form.youtubeAdType === "mobile-bumper-aos") return "aos-bumper";
+    if (form.youtubeAdType === "mobile-bumper-ios") return "ios-bumper";
+    if (form.youtubeAdType === "shorts-feed") return "shorts-feed";
+    if (form.youtubeAdType === "preroll") {
+      return form.instreamSkipMode === "non-skippable" ? "pc-non-skip" : "pc-skip";
+    }
+    if (form.youtubeAdType === "mobile-preroll-aos") {
+      return form.instreamSkipMode === "non-skippable" ? "aos-non-skip" : "aos-skip";
+    }
+    if (form.youtubeAdType === "mobile-preroll-ios") {
+      return form.instreamSkipMode === "non-skippable" ? "ios-non-skip" : "ios-skip";
+    }
+    if (form.youtubeAdType === "infeed-home") return "infeed-home";
+    if (form.youtubeAdType === "mobile-infeed-home") return "mo-infeed-home";
+    if (form.youtubeAdType === "infeed-search") return "infeed-search";
+    if (form.youtubeAdType === "infeed-watch-next") return "infeed-watch-next";
+    return "yt-other";
+  })();
 
   const detailOptionLabel: Record<string, string> = {
     "pc-skip": "PC 인스트림 · Skip",
@@ -908,6 +906,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
     "ios-skip": "iOS 인스트림 · Skip",
     "ios-non-skip": "iOS 인스트림 · Non-skip",
     "ios-bumper": "iOS 범퍼 · 6초",
+    "shorts-feed": "Shorts 피드",
     "infeed-home": "PC 인피드 홈",
     "mo-infeed-home": "MO 인피드 홈",
     "infeed-search": "인피드 검색",
@@ -947,7 +946,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
 
   const hasValidSource = isYoutubeInstream
     ? form.instreamVideoUrl.trim().length > 0 && isValidHttpSource(form.instreamVideoUrl)
-    : isYoutubeInfeed
+    : isYoutubeInfeed || isYoutubeShorts
       ? (form.creativeUrl.trim() && isValidHttpSource(form.creativeUrl.trim())) ||
         (form.infeedVideoUrl.trim() && isValidHttpSource(form.infeedVideoUrl.trim()))
       : form.creativeUrl && isValidUrl(form.creativeUrl);
@@ -984,7 +983,13 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
       const contentVideoUrl = form.instreamPublisherVideoUrl?.trim() || randomKoreanUrl;
       const publisherUrls =
         isYouTubeChannel && form.selectedPublishers.length === 0
-          ? form.youtubeAdType === "infeed-home" || form.youtubeAdType === "mobile-infeed-home"
+          ? form.youtubeAdType === "shorts-feed"
+            ? [
+                form.infeedVideoUrl.trim()
+                  ? normalizeHttpUrl(form.infeedVideoUrl.trim())
+                  : "https://www.youtube.com/shorts/",
+              ]
+            : form.youtubeAdType === "infeed-home" || form.youtubeAdType === "mobile-infeed-home"
             ? ["https://www.youtube.com/"]
             : form.youtubeAdType === "infeed-search"
               ? [
@@ -1075,7 +1080,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                   enableCompanionBanner: form.instreamEnableCompanionBanner,
                   instreamSkipMode: isBumperAd ? "non-skippable" : form.instreamSkipMode,
                 }
-              : form.channel === "youtube" && isYoutubeInfeed
+              : form.channel === "youtube" && (isYoutubeInfeed || isYoutubeShorts)
                 ? {
                     adTitle: form.instreamAdTitle || undefined,
                     landingUrl: form.instreamLandingUrl.trim()
@@ -1091,7 +1096,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                   }
                 : undefined,
           infeedOpts:
-            form.channel === "youtube" && isYoutubeInfeed
+            form.channel === "youtube" && (isYoutubeInfeed || isYoutubeShorts)
               ? {
                   videoUrl: form.infeedVideoUrl.trim()
                     ? normalizeHttpUrl(form.infeedVideoUrl.trim())
@@ -1243,6 +1248,12 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                     channel: "youtube",
                     youtubeAdType: "mobile-preroll-aos",
                   }));
+                } else if (next === "shorts") {
+                  setForm((prev) => ({
+                    ...prev,
+                    channel: "youtube",
+                    youtubeAdType: "shorts-feed",
+                  }));
                 } else if (next === "infeed") {
                   setForm((prev) => ({
                     ...prev,
@@ -1379,6 +1390,14 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                   }));
                   return;
                 }
+                if (preset === "shorts-feed") {
+                  setForm((prev) => ({
+                    ...prev,
+                    channel: "youtube",
+                    youtubeAdType: "shorts-feed",
+                  }));
+                  return;
+                }
                 if (preset === "infeed-home") {
                   setForm((prev) => ({
                     ...prev,
@@ -1466,6 +1485,8 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
               상품:{" "}
               {selectedProduct === "instream"
                 ? "In-stream / Bumper"
+                : selectedProduct === "shorts"
+                  ? "Shorts"
                 : selectedProduct === "infeed"
                   ? "In-feed"
                   : "Network Ads"}
@@ -1490,6 +1511,8 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                 "모바일 인스트림은 Android(Pixel 8) 뷰포트 기준으로 캡처됩니다."}
               {form.youtubeAdType === "mobile-preroll-ios" &&
                 "모바일 인스트림은 iPhone 15 뷰포트 기준으로 캡처됩니다."}
+              {isYoutubeShorts &&
+                "Shorts 피드는 9:16 모바일 화면에서 광고 소재, 스폰서 정보, CTA를 합성 렌더링합니다."}
               {isYoutubeInfeed &&
                 infeedSurfaceHint}
             </p>
@@ -2019,7 +2042,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
               </div>
             )}
 
-            {isYoutubeInfeed && (
+            {(isYoutubeInfeed || isYoutubeShorts) && (
               <div
                 className="mt-4 rounded-xl border p-4 animate-fade-in"
                 style={{
@@ -2033,7 +2056,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                     className="text-sm font-semibold"
                     style={{ color: "var(--color-text-primary)" }}
                   >
-                    인피드 광고 정보
+                    {isYoutubeShorts ? "Shorts 광고 정보" : "인피드 광고 정보"}
                   </p>
                   <span
                     className="text-[10px] px-1.5 py-0.5 rounded-full"
@@ -2042,7 +2065,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                       color: "var(--color-text-muted)",
                     }}
                   >
-                    {infeedTypeLabel}
+                    {isYoutubeShorts ? "Shorts 피드" : infeedTypeLabel}
                   </span>
                 </div>
                 <p
@@ -2058,7 +2081,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                   className="text-[10px] mb-3"
                   style={{ color: "var(--color-text-muted)" }}
                 >
-                  지면 안내: {infeedSurfaceHint}
+                  지면 안내: {isYoutubeShorts ? "Shorts 모바일 피드 화면으로 합성 렌더링합니다." : infeedSurfaceHint}
                 </p>
                 <div className="space-y-3">
                   <div>

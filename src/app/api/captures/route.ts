@@ -80,6 +80,7 @@ export async function POST(request: NextRequest) {
         | "mobile-preroll-ios"
         | "mobile-bumper-aos"
         | "mobile-bumper-ios"
+        | "shorts-feed"
         | "infeed-home"
         | "mobile-infeed-home"
         | "infeed-search"
@@ -147,13 +148,20 @@ export async function POST(request: NextRequest) {
         youtubeAdType === "mobile-infeed-home" ||
         youtubeAdType === "infeed-search" ||
         youtubeAdType === "infeed-watch-next");
+    const isShortsYt = channel === "youtube" && youtubeAdType === "shorts-feed";
     /** 인피드·디스플레이·오버레이 등 프리롤이 아닌 YouTube 유형 */
     const hasValidCreativeSource = !isPreroll && isValidHttpUrl(creativeUrl);
     const hasValidInfeedThumbSource =
       isInfeedYt &&
       (isValidHttpUrl(creativeUrl) || isValidHttpUrl(infeedOpts?.videoUrl));
+    const hasValidShortsSource =
+      isShortsYt &&
+      (isValidHttpUrl(creativeUrl) || isValidHttpUrl(infeedOpts?.videoUrl));
     const hasSource =
-      hasValidVideoSource || hasValidInfeedThumbSource || (!isPreroll && !isInfeedYt && isValidHttpUrl(creativeUrl));
+      hasValidVideoSource ||
+      hasValidInfeedThumbSource ||
+      hasValidShortsSource ||
+      (!isPreroll && !isInfeedYt && !isShortsYt && isValidHttpUrl(creativeUrl));
 
     if (!channel || normalizedUrls.length === 0 || !hasSource) {
       return NextResponse.json(
@@ -233,7 +241,7 @@ export async function POST(request: NextRequest) {
       };
       const creativeUrlForRow =
         (creativeUrl?.trim() ? normalizeHttpUrl(creativeUrl) : "") ||
-        (isInfeedYt && infeedOpts?.videoUrl?.trim()
+        ((isInfeedYt || isShortsYt) && infeedOpts?.videoUrl?.trim()
           ? normalizeHttpUrl(infeedOpts.videoUrl)
           : "") ||
         "";
