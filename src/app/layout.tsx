@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
-import { Noto_Sans_KR, Roboto } from "next/font/google";
+import { Inter, Noto_Sans_KR } from "next/font/google";
 import "./globals.css";
 
-const roboto = Roboto({
+const inter = Inter({
   subsets: ["latin"],
-  weight: ["400", "500", "700"],
-  variable: "--font-roboto",
+  weight: ["400", "500", "600", "700", "800"],
+  variable: "--font-inter",
   display: "swap",
 });
 
@@ -27,7 +27,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="ko" className={`${roboto.variable} ${notoSansKR.variable}`}>
+    <html lang="ko" className={`${inter.variable} ${notoSansKR.variable}`}>
       <body className="antialiased">{children}</body>
     </html>
   );

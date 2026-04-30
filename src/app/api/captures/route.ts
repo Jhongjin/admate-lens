@@ -73,10 +73,13 @@ export async function POST(request: NextRequest) {
       creativeObjectFit?: "contain" | "cover";
       youtubeAdType?:
         | "preroll"
+        | "bumper"
         | "display"
         | "overlay"
         | "mobile-preroll-aos"
         | "mobile-preroll-ios"
+        | "mobile-bumper-aos"
+        | "mobile-bumper-ios"
         | "infeed-home"
         | "mobile-infeed-home"
         | "infeed-search"
@@ -127,8 +130,16 @@ export async function POST(request: NextRequest) {
     const isPreroll =
       channel === "youtube" &&
       (youtubeAdType === "preroll" ||
+        youtubeAdType === "bumper" ||
         youtubeAdType === "mobile-preroll-aos" ||
-        youtubeAdType === "mobile-preroll-ios");
+        youtubeAdType === "mobile-preroll-ios" ||
+        youtubeAdType === "mobile-bumper-aos" ||
+        youtubeAdType === "mobile-bumper-ios");
+    const isBumper =
+      channel === "youtube" &&
+      (youtubeAdType === "bumper" ||
+        youtubeAdType === "mobile-bumper-aos" ||
+        youtubeAdType === "mobile-bumper-ios");
     const hasValidVideoSource = isPreroll && isValidHttpUrl(instreamOpts?.videoUrl);
     const isInfeedYt =
       channel === "youtube" &&
@@ -161,6 +172,20 @@ export async function POST(request: NextRequest) {
       instreamOpts &&
       ({
         ...instreamOpts,
+        skipSeconds: isBumper
+          ? Math.max(
+              0,
+              Math.min(
+                5,
+                Number.isFinite(Number(instreamOpts.skipSeconds))
+                  ? Number(instreamOpts.skipSeconds)
+                  : 3,
+              ),
+            )
+          : instreamOpts.skipSeconds,
+        instreamSkipMode: isBumper
+          ? "non-skippable"
+          : instreamOpts.instreamSkipMode,
         videoUrl: instreamOpts.videoUrl?.trim()
           ? normalizeHttpUrl(instreamOpts.videoUrl)
           : undefined,

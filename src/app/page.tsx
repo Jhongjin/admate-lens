@@ -30,9 +30,9 @@ export default function Home() {
           </div>
 
           <nav className="ops-nav">
-            <span className="ops-nav-item active">캡처 요청</span>
-            <span className="ops-nav-item">결과 이력</span>
-            <span className="ops-nav-item">프로젝트</span>
+            <span className="ops-nav-item active">캡처</span>
+            <span className="ops-nav-item">이력</span>
+            <span className="ops-nav-item">캠페인</span>
             <span className="ops-nav-item">설정</span>
           </nav>
         </div>
@@ -42,9 +42,8 @@ export default function Home() {
         <header className="ops-topbar">
           <div className="ops-topbar-inner">
             <div>
-              <p className="ops-kicker">AdMate Capture Pro</p>
-              <p className="text-sm font-semibold text-[var(--color-text-primary)]">
-                광고 게재 화면 렌더링 관리
+              <p className="text-[13px] font-semibold text-[var(--color-text-primary)]">
+                광고 캡처 운영
               </p>
             </div>
 
@@ -61,11 +60,34 @@ export default function Home() {
         <main className="ops-content">
           <div className="ops-page-header">
             <div>
-              <p className="ops-kicker">Capture Operations</p>
+              <p className="ops-kicker">AdMate Capture Pro</p>
               <h2 className="ops-title">캡처 요청 및 결과 이력</h2>
               <p className="ops-subtitle">
-                운영자가 검토해야 할 요청 조건과 최근 렌더링 상태를 한 화면에서 확인합니다.
+                YouTube/GDN 게재 화면 캡처 요청과 렌더링 결과를 관리합니다.
               </p>
+            </div>
+          </div>
+
+          <div className="ops-summary-grid">
+            <div className="ops-kpi-card">
+              <p className="ops-kpi-label">지원 매체</p>
+              <p className="ops-kpi-value">2</p>
+              <p className="ops-kpi-meta">YouTube · GDN</p>
+            </div>
+            <div className="ops-kpi-card">
+              <p className="ops-kpi-label">주요 작업</p>
+              <p className="ops-kpi-value">캡처</p>
+              <p className="ops-kpi-meta">요청 생성과 결과 확인</p>
+            </div>
+            <div className="ops-kpi-card">
+              <p className="ops-kpi-label">렌더링 상태</p>
+              <p className="ops-kpi-value">정상</p>
+              <p className="ops-kpi-meta">서버리스 실행 준비</p>
+            </div>
+            <div className="ops-kpi-card">
+              <p className="ops-kpi-label">결과 관리</p>
+              <p className="ops-kpi-value">이미지</p>
+              <p className="ops-kpi-meta">게재면/랜딩 결과 보관</p>
             </div>
           </div>
 

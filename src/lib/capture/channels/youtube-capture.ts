@@ -3,9 +3,10 @@
  *
  * 지원 광고 유형:
  * 1. 인스트림 (프리롤) — 영상 플레이어에 프리롤 광고 시뮬레이션
- * 2. 디스플레이 — 사이드바 컴패니언 배너 영역에 인젝션
- * 3. 오버레이 — 영상 플레이어 하단 반투명 오버레이 배너
- * 4. 인피드 — 홈 피드 / 검색 결과 / 관련동영상(시청 사이드바) 카드 시뮬레이션
+ * 2. 범퍼 — 6초 이하 non-skippable 인스트림 프리셋
+ * 3. 디스플레이 — 사이드바 컴패니언 배너 영역에 인젝션(레거시)
+ * 4. 오버레이 — 영상 플레이어 하단 반투명 오버레이 배너(레거시)
+ * 5. 인피드 — 홈 피드 / 검색 결과 / 관련동영상(시청 사이드바) 카드 시뮬레이션
  */
 
 import { randomInt } from "node:crypto";
@@ -24,10 +25,13 @@ import { generateMobileSyntheticInfeedHomeHtml } from "./mobile-synthetic-infeed
 /** YouTube 광고 유형 */
 export type YouTubeAdType =
   | "preroll"
+  | "bumper"
   | "display"
   | "overlay"
   | "mobile-preroll-aos"
   | "mobile-preroll-ios"
+  | "mobile-bumper-aos"
+  | "mobile-bumper-ios"
   | "infeed-home"
   | "mobile-infeed-home"
   | "infeed-search"
@@ -361,11 +365,34 @@ export class YouTubeCapture extends BaseChannel {
     console.log(`[YouTube] ===== 캡처 시작 =====`);
     console.log(`[YouTube] 영상 URL: ${request.publisherUrl}`);
     console.log(`[YouTube] 광고 유형: ${adType}`);
-    const instreamOpts = (request.options?.instreamOpts as InstreamOptsPayload | undefined) ?? {};
+    const rawInstreamOpts = (request.options?.instreamOpts as InstreamOptsPayload | undefined) ?? {};
+    const isBumperAd =
+      adType === "bumper" ||
+      adType === "mobile-bumper-aos" ||
+      adType === "mobile-bumper-ios";
+    const instreamOpts = isBumperAd
+      ? {
+          ...rawInstreamOpts,
+          instreamSkipMode: "non-skippable" as const,
+          skipSeconds: Math.max(
+            0,
+            Math.min(
+              5,
+              Number.isFinite(Number(rawInstreamOpts.skipSeconds))
+                ? Number(rawInstreamOpts.skipSeconds)
+                : 3,
+            ),
+          ),
+        }
+      : rawInstreamOpts;
 
     // 모바일 여부 판정
-    const isMobilePlatform = adType === "mobile-preroll-aos" || adType === "mobile-preroll-ios";
-    const isAOS = adType === "mobile-preroll-aos";
+    const isMobilePlatform =
+      adType === "mobile-preroll-aos" ||
+      adType === "mobile-preroll-ios" ||
+      adType === "mobile-bumper-aos" ||
+      adType === "mobile-bumper-ios";
+    const isAOS = adType === "mobile-preroll-aos" || adType === "mobile-bumper-aos";
     // 모바일은 컴패니언 배너 강제 비활성화
     if (isMobilePlatform) {
       instreamOpts.enableCompanionBanner = false;
@@ -385,7 +412,7 @@ export class YouTubeCapture extends BaseChannel {
 
 
     // preroll 계열(인스트림)은 PC/모바일 통일 로직
-    const isPrerollFamily = adType === "preroll" || isMobilePlatform;
+    const isPrerollFamily = adType === "preroll" || adType === "bumper" || isMobilePlatform;
     const prerollCaptureSeconds = isPrerollFamily
         ? (() => {
             const sec = instreamOpts.skipSeconds;

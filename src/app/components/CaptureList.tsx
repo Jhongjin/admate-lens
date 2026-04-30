@@ -26,10 +26,10 @@ interface CaptureListProps {
 
 /** 상태 라벨 매핑 */
 const STATUS_LABELS: Record<string, { label: string; class: string; icon: string }> = {
-  pending: { label: "대기중", class: "badge-pending", icon: "⏳" },
-  processing: { label: "처리중", class: "badge-processing", icon: "⚙️" },
-  completed: { label: "완료", class: "badge-completed", icon: "✅" },
-  failed: { label: "실패", class: "badge-failed", icon: "❌" },
+  pending: { label: "대기중", class: "badge-pending", icon: "•" },
+  processing: { label: "처리중", class: "badge-processing", icon: "•" },
+  completed: { label: "완료", class: "badge-completed", icon: "•" },
+  failed: { label: "실패", class: "badge-failed", icon: "•" },
 };
 
 /** 채널 라벨 */
@@ -83,6 +83,23 @@ function getYoutubeMeta(metadata: Record<string, unknown> | null): {
         ? Number(captureSecondRaw)
         : undefined;
   return { adType, captureSecond };
+}
+
+function getYoutubeAdTypeLabel(adType?: string): string | null {
+  if (!adType) return null;
+  if (adType === "preroll") return "인스트림";
+  if (adType === "bumper") return "범퍼";
+  if (adType === "mobile-preroll-aos") return "AOS 인스트림";
+  if (adType === "mobile-preroll-ios") return "iOS 인스트림";
+  if (adType === "mobile-bumper-aos") return "AOS 범퍼";
+  if (adType === "mobile-bumper-ios") return "iOS 범퍼";
+  if (adType === "display") return "디스플레이(레거시)";
+  if (adType === "overlay") return "오버레이(레거시)";
+  if (adType === "infeed-home") return "인피드 · PC 홈";
+  if (adType === "mobile-infeed-home") return "인피드 · 모바일 홈";
+  if (adType === "infeed-search") return "인피드 · 검색";
+  if (adType === "infeed-watch-next") return "인피드 · 관련동영상";
+  return null;
 }
 
 function getResultCategoryLabel(metadata: Record<string, unknown> | null): string | null {
@@ -228,14 +245,9 @@ export default function CaptureList({ refreshTrigger }: CaptureListProps) {
       {/* 헤더 + 필터 */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4">
         <div className="flex items-center gap-3">
-          <div
-            className="w-10 h-10 rounded-xl flex items-center justify-center text-lg"
-            style={{ background: "linear-gradient(135deg, #3b82f6, #6366f1)" }}
-          >
-            📋
-          </div>
+          <div className="ops-icon-tile">이력</div>
           <div>
-            <h2 className="text-lg font-bold text-[var(--color-text-primary)]">캡처 이력</h2>
+            <h2 className="ops-section-title">캡처 이력</h2>
             <p className="text-xs text-[var(--color-text-muted)]">
               총 {statusCounts.all || 0}건
               {captures.some((c) => c.status === "processing") && (
@@ -425,22 +437,9 @@ export default function CaptureList({ refreshTrigger }: CaptureListProps) {
                       <p className="text-[11px] text-[var(--color-text-muted)] mt-1">
                         {(() => {
                           const yt = getYoutubeMeta(capture.metadata);
-                          const adLabel =
-                            yt.adType === "preroll"
-                              ? "인스트림"
-                              : yt.adType === "display"
-                                ? "디스플레이"
-                                : yt.adType === "overlay"
-                                  ? "오버레이"
-                                  : yt.adType === "infeed-home"
-                                    ? "인피드·홈"
-                                    : yt.adType === "infeed-search"
-                                      ? "인피드·검색"
-                                      : yt.adType === "infeed-watch-next"
-                                        ? "인피드·관련"
-                                        : null;
+                          const adLabel = getYoutubeAdTypeLabel(yt.adType);
                           if (!adLabel && yt.captureSecond === undefined) return null;
-                          return `▶️ ${adLabel || "YouTube"}${yt.captureSecond !== undefined ? ` · ${yt.captureSecond}초` : ""}`;
+                          return `${adLabel || "YouTube"}${yt.captureSecond !== undefined ? ` · ${yt.captureSecond}초` : ""}`;
                         })()}
                       </p>
                     )}
@@ -739,13 +738,7 @@ function CaptureDetailModal({
                   <span className="text-[var(--color-text-secondary)]">
                     {(() => {
                       const yt = getYoutubeMeta(capture.metadata);
-                      if (yt.adType === "preroll") return "인스트림";
-                      if (yt.adType === "display") return "디스플레이";
-                      if (yt.adType === "overlay") return "오버레이";
-                      if (yt.adType === "infeed-home") return "인피드 · 홈";
-                      if (yt.adType === "infeed-search") return "인피드 · 검색";
-                      if (yt.adType === "infeed-watch-next") return "인피드 · 관련동영상";
-                      return "-";
+                      return getYoutubeAdTypeLabel(yt.adType) ?? "-";
                     })()}
                   </span>
                 </div>

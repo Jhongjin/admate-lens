@@ -2,46 +2,6 @@
 
 import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 
-/** 채널 타입 */
-type ChannelOption = {
-  value: string;
-  label: string;
-  description: string;
-  icon: string;
-  enabled: boolean;
-};
-
-const CHANNELS: ChannelOption[] = [
-  {
-    value: "gdn",
-    label: "GDN",
-    description: "Google Display Network",
-    icon: "🌐",
-    enabled: true,
-  },
-  {
-    value: "youtube",
-    label: "YouTube",
-    description: "YouTube 광고",
-    icon: "▶️",
-    enabled: true,
-  },
-  {
-    value: "meta",
-    label: "Meta",
-    description: "Facebook / Instagram",
-    icon: "📘",
-    enabled: false,
-  },
-  {
-    value: "naver",
-    label: "Naver",
-    description: "네이버 DA",
-    icon: "🇳",
-    enabled: false,
-  },
-];
-
 const MEDIA_SELECT_OPTIONS: Array<{ value: MediaMenu; label: string; enabled: boolean }> = [
   { value: "gdn", label: "Google Ads", enabled: true },
   { value: "youtube", label: "YouTube", enabled: true },
@@ -274,81 +234,17 @@ type CreativeObjectFitMode = "contain" | "cover";
 /** YouTube 광고 유형 */
 type YouTubeAdType =
   | "preroll"
+  | "bumper"
   | "display"
   | "overlay"
   | "mobile-preroll-aos"
   | "mobile-preroll-ios"
+  | "mobile-bumper-aos"
+  | "mobile-bumper-ios"
   | "infeed-home"
   | "mobile-infeed-home"
   | "infeed-search"
   | "infeed-watch-next";
-
-interface YouTubeAdTypeOption {
-  value: YouTubeAdType;
-  label: string;
-  icon: string;
-  description: string;
-  sizeHint: string;
-}
-
-const YOUTUBE_AD_TYPES: YouTubeAdTypeOption[] = [
-  {
-    value: "preroll",
-    label: "PC 인스트림",
-    icon: "🎬",
-    description: "데스크톱 프리롤 광고",
-    sizeHint: "16:9 권장",
-  },
-  {
-    value: "mobile-preroll-aos",
-    label: "AOS 인스트림",
-    icon: "📱",
-    description: "Android 모바일 (Pixel 8)",
-    sizeHint: "393×852",
-  },
-  {
-    value: "mobile-preroll-ios",
-    label: "iOS 인스트림",
-    icon: "🍎",
-    description: "iPhone 15 모바일",
-    sizeHint: "390×844",
-  },
-  {
-    value: "infeed-home",
-    label: "인피드 · 홈",
-    icon: "🏠",
-    description: "홈 피드 그리드 첫 카드 형태",
-    sizeHint: "16:9 썸네일",
-  },
-  {
-    value: "infeed-search",
-    label: "인피드 · 검색",
-    icon: "🔎",
-    description: "검색 결과 가로형 카드",
-    sizeHint: "16:9 썸네일",
-  },
-  {
-    value: "infeed-watch-next",
-    label: "인피드 · 관련동영상",
-    icon: "📎",
-    description: "시청 페이지 사이드바 추천 상단",
-    sizeHint: "컴팩트 가로",
-  },
-  {
-    value: "display",
-    label: "디스플레이",
-    icon: "📺",
-    description: "사이드바 컴패니언 배너",
-    sizeHint: "300×250",
-  },
-  {
-    value: "overlay",
-    label: "오버레이",
-    icon: "🎭",
-    description: "영상 하단 반투명 배너",
-    sizeHint: "가로형",
-  },
-];
 
 type InjectionMode = "single" | "custom";
 interface InjectionModeOption {
@@ -371,6 +267,71 @@ const INJECTION_MODES: InjectionModeOption[] = [
     icon: "⚙️",
     description: "원하는 슬롯 개수를 직접 선택",
   },
+];
+
+type ProductMenu = "instream" | "infeed" | "network-ads";
+type DetailOptionPreset =
+  | "pc-skip"
+  | "pc-non-skip"
+  | "pc-bumper"
+  | "aos-skip"
+  | "aos-non-skip"
+  | "aos-bumper"
+  | "ios-skip"
+  | "ios-non-skip"
+  | "ios-bumper"
+  | "infeed-home"
+  | "mo-infeed-home"
+  | "infeed-search"
+  | "infeed-watch-next"
+  | "gdn-pc"
+  | "gdn-mobile"
+  | "yt-other";
+
+interface ProductMenuOption {
+  value: ProductMenu;
+  label: string;
+  disabled?: boolean;
+}
+
+interface DetailMenuOption {
+  value: DetailOptionPreset;
+  label: string;
+  disabled?: boolean;
+}
+
+const YOUTUBE_PRODUCT_OPTIONS: ProductMenuOption[] = [
+  { value: "instream", label: "In-stream / Bumper" },
+  { value: "infeed", label: "In-feed" },
+];
+
+const YOUTUBE_DETAIL_OPTIONS: DetailMenuOption[] = [
+  { value: "pc-skip", label: "PC 인스트림 · Skip" },
+  { value: "pc-non-skip", label: "PC 인스트림 · Non-skip" },
+  { value: "pc-bumper", label: "PC 범퍼 · 6초" },
+  { value: "aos-skip", label: "AOS 인스트림 · Skip" },
+  { value: "aos-non-skip", label: "AOS 인스트림 · Non-skip" },
+  { value: "aos-bumper", label: "AOS 범퍼 · 6초" },
+  { value: "ios-skip", label: "iOS 인스트림 · Skip" },
+  { value: "ios-non-skip", label: "iOS 인스트림 · Non-skip" },
+  { value: "ios-bumper", label: "iOS 범퍼 · 6초" },
+  { value: "infeed-home", label: "PC In-feed 홈" },
+  { value: "mo-infeed-home", label: "MO In-feed 홈" },
+  { value: "infeed-search", label: "In-feed 검색" },
+  { value: "infeed-watch-next", label: "In-feed 관련동영상" },
+];
+
+const YOUTUBE_PLANNED_OPTIONS: DetailMenuOption[] = [
+  { value: "yt-other", label: "Shorts 피드 · 구현 예정", disabled: true },
+  { value: "yt-other", label: "Masthead 홈 · 구현 예정", disabled: true },
+  { value: "yt-other", label: "CTV Pause · 구현 예정", disabled: true },
+  { value: "yt-other", label: "Audio Reach · 구현 예정", disabled: true },
+  { value: "yt-other", label: "Display / Overlay · 레거시", disabled: true },
+];
+
+const GDN_DETAIL_OPTIONS: DetailMenuOption[] = [
+  { value: "gdn-pc", label: "PC 지면" },
+  { value: "gdn-mobile", label: "MO 지면" },
 ];
 
 /** 폼 데이터 타입 */
@@ -877,10 +838,18 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
   const isYouTubeChannel = form.channel === "youtube";
   const isMobilePreroll =
     form.youtubeAdType === "mobile-preroll-aos" ||
-    form.youtubeAdType === "mobile-preroll-ios";
+    form.youtubeAdType === "mobile-preroll-ios" ||
+    form.youtubeAdType === "mobile-bumper-aos" ||
+    form.youtubeAdType === "mobile-bumper-ios";
+  const isBumperAd =
+    form.youtubeAdType === "bumper" ||
+    form.youtubeAdType === "mobile-bumper-aos" ||
+    form.youtubeAdType === "mobile-bumper-ios";
   const isYoutubeInstream =
     isYouTubeChannel &&
-    (form.youtubeAdType === "preroll" || isMobilePreroll);
+    (form.youtubeAdType === "preroll" ||
+      form.youtubeAdType === "bumper" ||
+      isMobilePreroll);
 
   const isYoutubeInfeed =
     isYouTubeChannel &&
@@ -896,43 +865,62 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
         ? "infeed"
         : "instream"
       : "network-ads";
-  const selectedOptionPreset =
+  const selectedOptionPreset: DetailOptionPreset =
     selectedMediaMenu === "youtube"
-      ? form.youtubeAdType === "preroll"
-        ? form.instreamSkipMode === "non-skippable"
-          ? "pc-non-skip"
-          : "pc-skip"
-        : isMobilePreroll
-          ? form.instreamSkipMode === "non-skippable"
-            ? "mo-non-skip"
-            : "mo-skip"
-          : form.youtubeAdType === "infeed-home"
-            ? "infeed-home"
-            : form.youtubeAdType === "infeed-search"
-              ? "infeed-search"
-              : form.youtubeAdType === "infeed-watch-next"
-                ? "infeed-watch-next"
-                : "yt-other"
+      ? form.youtubeAdType === "bumper"
+        ? "pc-bumper"
+        : form.youtubeAdType === "mobile-bumper-aos"
+          ? "aos-bumper"
+          : form.youtubeAdType === "mobile-bumper-ios"
+            ? "ios-bumper"
+            : form.youtubeAdType === "preroll"
+              ? form.instreamSkipMode === "non-skippable"
+                ? "pc-non-skip"
+                : "pc-skip"
+              : form.youtubeAdType === "mobile-preroll-aos"
+                ? form.instreamSkipMode === "non-skippable"
+                  ? "aos-non-skip"
+                  : "aos-skip"
+                : form.youtubeAdType === "mobile-preroll-ios"
+                  ? form.instreamSkipMode === "non-skippable"
+                    ? "ios-non-skip"
+                    : "ios-skip"
+                  : form.youtubeAdType === "infeed-home"
+                    ? "infeed-home"
+                    : form.youtubeAdType === "mobile-infeed-home"
+                      ? "mo-infeed-home"
+                      : form.youtubeAdType === "infeed-search"
+                        ? "infeed-search"
+                        : form.youtubeAdType === "infeed-watch-next"
+                          ? "infeed-watch-next"
+                          : "yt-other"
       : form.gdnViewportMode === "mobile"
         ? "gdn-mobile"
         : "gdn-pc";
 
   const detailOptionLabel: Record<string, string> = {
-    "pc-skip": "Pc instream (Skip)",
-    "pc-non-skip": "Pc instream (Non skip)",
-    "mo-skip": "Mo instream (Skip)",
-    "mo-non-skip": "Mo instream (Non skip)",
+    "pc-skip": "PC 인스트림 · Skip",
+    "pc-non-skip": "PC 인스트림 · Non-skip",
+    "pc-bumper": "PC 범퍼 · 6초",
+    "aos-skip": "AOS 인스트림 · Skip",
+    "aos-non-skip": "AOS 인스트림 · Non-skip",
+    "aos-bumper": "AOS 범퍼 · 6초",
+    "ios-skip": "iOS 인스트림 · Skip",
+    "ios-non-skip": "iOS 인스트림 · Non-skip",
+    "ios-bumper": "iOS 범퍼 · 6초",
     "infeed-home": "PC 인피드 홈",
-    "mo-infeed-home": "Mo 인피드 홈",
+    "mo-infeed-home": "MO 인피드 홈",
     "infeed-search": "인피드 검색",
     "infeed-watch-next": "인피드 관련동영상",
-    "yt-other": "YouTube 기타",
-    "gdn-pc": "PC지면",
-    "gdn-mobile": "MO지면",
+    "yt-other": "YouTube 레거시/준비중",
+    "gdn-pc": "PC 지면",
+    "gdn-mobile": "MO 지면",
   };
   const infeedTypeLabel =
     form.youtubeAdType === "infeed-home"
-      ? "인피드 · 홈"
+      ? "인피드 · PC 홈"
+      : form.youtubeAdType === "mobile-infeed-home"
+        ? "인피드 · 모바일 홈"
       : form.youtubeAdType === "infeed-search"
         ? "인피드 · 검색"
         : form.youtubeAdType === "infeed-watch-next"
@@ -941,6 +929,8 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
   const infeedSurfaceHint =
     form.youtubeAdType === "infeed-home"
       ? "홈 지면은 빈 게스트 피드를 피하기 위해 인기(/feed/trending) 그리드 기준으로 캡처합니다."
+      : form.youtubeAdType === "mobile-infeed-home"
+        ? "모바일 홈 지면은 합성 피드로 안정적인 모바일 카드 화면을 렌더링합니다."
       : form.youtubeAdType === "infeed-search"
         ? "검색 지면은 검색어 기준 결과 목록에 광고 카드를 삽입합니다."
         : form.youtubeAdType === "infeed-watch-next"
@@ -1039,7 +1029,8 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                     : undefined,
                   skipSeconds: (() => {
                     const n = parseInt(form.instreamCaptureSecond, 10);
-                    return Number.isFinite(n) && n >= 0 ? n : 5;
+                    const safe = Number.isFinite(n) && n >= 0 ? n : 3;
+                    return isBumperAd ? Math.min(safe, 5) : safe;
                   })(),
                   adTitle: form.instreamAdTitle || undefined,
                   enableCtaText: form.instreamEnableCtaText,
@@ -1082,7 +1073,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                         : undefined,
                   companionUseChannelBanner: form.instreamUseChannelBanner,
                   enableCompanionBanner: form.instreamEnableCompanionBanner,
-                  instreamSkipMode: form.instreamSkipMode,
+                  instreamSkipMode: isBumperAd ? "non-skippable" : form.instreamSkipMode,
                 }
               : form.channel === "youtube" && isYoutubeInfeed
                 ? {
@@ -1195,15 +1186,10 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
       >
         {/* 헤더 */}
         <div className="flex items-center gap-3 mb-6">
-          <div
-            className="w-10 h-10 rounded-xl flex items-center justify-center text-lg"
-            style={{ background: "linear-gradient(135deg, #6366f1, #8b5cf6)" }}
-          >
-            📸
-          </div>
+          <div className="ops-icon-tile">요청</div>
           <div>
             <h2
-              className="text-lg font-bold"
+              className="ops-section-title"
               style={{ color: "var(--color-text-primary)" }}
             >
               새 캡처 요청
@@ -1270,8 +1256,15 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
             >
               {selectedMediaMenu === "youtube" ? (
                 <>
-                  <option value="instream">Instream</option>
-                  <option value="infeed">In-feed</option>
+                  {YOUTUBE_PRODUCT_OPTIONS.map((option) => (
+                    <option
+                      key={option.value}
+                      value={option.value}
+                      disabled={option.disabled}
+                    >
+                      {option.label}
+                    </option>
+                  ))}
                 </>
               ) : (
                 <option value="network-ads">Network Ads</option>
@@ -1320,7 +1313,17 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                   }));
                   return;
                 }
-                if (preset === "mo-skip") {
+                if (preset === "pc-bumper") {
+                  setForm((prev) => ({
+                    ...prev,
+                    channel: "youtube",
+                    youtubeAdType: "bumper",
+                    instreamSkipMode: "non-skippable",
+                    instreamCaptureSecond: "3",
+                  }));
+                  return;
+                }
+                if (preset === "aos-skip") {
                   setForm((prev) => ({
                     ...prev,
                     channel: "youtube",
@@ -1329,12 +1332,50 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                   }));
                   return;
                 }
-                if (preset === "mo-non-skip") {
+                if (preset === "aos-non-skip") {
                   setForm((prev) => ({
                     ...prev,
                     channel: "youtube",
                     youtubeAdType: "mobile-preroll-aos",
                     instreamSkipMode: "non-skippable",
+                  }));
+                  return;
+                }
+                if (preset === "aos-bumper") {
+                  setForm((prev) => ({
+                    ...prev,
+                    channel: "youtube",
+                    youtubeAdType: "mobile-bumper-aos",
+                    instreamSkipMode: "non-skippable",
+                    instreamCaptureSecond: "3",
+                  }));
+                  return;
+                }
+                if (preset === "ios-skip") {
+                  setForm((prev) => ({
+                    ...prev,
+                    channel: "youtube",
+                    youtubeAdType: "mobile-preroll-ios",
+                    instreamSkipMode: "skippable",
+                  }));
+                  return;
+                }
+                if (preset === "ios-non-skip") {
+                  setForm((prev) => ({
+                    ...prev,
+                    channel: "youtube",
+                    youtubeAdType: "mobile-preroll-ios",
+                    instreamSkipMode: "non-skippable",
+                  }));
+                  return;
+                }
+                if (preset === "ios-bumper") {
+                  setForm((prev) => ({
+                    ...prev,
+                    channel: "youtube",
+                    youtubeAdType: "mobile-bumper-ios",
+                    instreamSkipMode: "non-skippable",
+                    instreamCaptureSecond: "3",
                   }));
                   return;
                 }
@@ -1373,20 +1414,36 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
             >
               {selectedMediaMenu === "youtube" ? (
                 <>
-                  <option value="pc-skip">Pc instream (Skip)</option>
-                  <option value="pc-non-skip">Pc instream (Non skip)</option>
-                  <option value="mo-skip">Mo instream (Skip)</option>
-                  <option value="mo-non-skip">Mo instream (Non skip)</option>
-                  <option value="infeed-home">Pc In-feed 홈</option>
-                  <option value="mo-infeed-home">Mo In-feed 홈</option>
-                  <option value="infeed-search">In-feed 검색</option>
-                  <option value="infeed-watch-next">In-feed 관련동영상</option>
-                  <option value="yt-other">Display / Overlay 등</option>
+                  <optgroup label="구현됨">
+                    {YOUTUBE_DETAIL_OPTIONS.map((option) => (
+                      <option
+                        key={option.value}
+                        value={option.value}
+                        disabled={option.disabled}
+                      >
+                        {option.label}
+                      </option>
+                    ))}
+                  </optgroup>
+                  <optgroup label="구현 예정 / 레거시">
+                    {YOUTUBE_PLANNED_OPTIONS.map((option) => (
+                      <option
+                        key={option.label}
+                        value={option.value}
+                        disabled={option.disabled}
+                      >
+                        {option.label}
+                      </option>
+                    ))}
+                  </optgroup>
                 </>
               ) : (
                 <>
-                  <option value="gdn-pc">PC지면</option>
-                  <option value="gdn-mobile">MO지면</option>
+                  {GDN_DETAIL_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
                 </>
               )}
             </select>
@@ -1408,7 +1465,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
             <span className="text-[10px] px-2 py-1 rounded-full bg-[var(--color-bg-tertiary)] text-[var(--color-text-secondary)]">
               상품:{" "}
               {selectedProduct === "instream"
-                ? "Instream"
+                ? "In-stream / Bumper"
                 : selectedProduct === "infeed"
                   ? "In-feed"
                   : "Network Ads"}
@@ -1423,15 +1480,21 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
         {isOptionPanelExpanded && form.channel === "youtube" && (
           <div className="mb-5 animate-fade-in">
             <p className="form-helper mt-1.5">
-              💡 {form.youtubeAdType === "mobile-preroll-aos" &&
+              {form.youtubeAdType === "bumper" &&
+                "범퍼는 6초 이하 non-skippable 인스트림으로 처리되며 캡처 시점은 0~5초로 제한됩니다."}
+              {form.youtubeAdType === "mobile-bumper-aos" &&
+                "AOS 범퍼는 Pixel 8 뷰포트의 6초 이하 non-skippable 인스트림으로 캡처됩니다."}
+              {form.youtubeAdType === "mobile-bumper-ios" &&
+                "iOS 범퍼는 iPhone 15 뷰포트의 6초 이하 non-skippable 인스트림으로 캡처됩니다."}
+              {form.youtubeAdType === "mobile-preroll-aos" &&
                 "모바일 인스트림은 Android(Pixel 8) 뷰포트 기준으로 캡처됩니다."}
               {form.youtubeAdType === "mobile-preroll-ios" &&
                 "모바일 인스트림은 iPhone 15 뷰포트 기준으로 캡처됩니다."}
               {isYoutubeInfeed &&
-                `인피드는 PC 1920×1080 뷰포트에서 열립니다. ${infeedSurfaceHint}`}
+                infeedSurfaceHint}
             </p>
 
-            {/* 🎬 인스트림 광고 상세 옵션 (프리롤 + 모바일 인스트림 공통) */}
+            {/* 인스트림/범퍼 광고 상세 옵션 */}
             {isYoutubeInstream && (
               <div
                 className="mt-4 rounded-xl border p-4 animate-fade-in"
@@ -1446,7 +1509,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                     className="text-sm font-semibold"
                     style={{ color: "var(--color-text-primary)" }}
                   >
-                    인스트림 광고 정보
+                    {isBumperAd ? "범퍼 광고 정보" : "인스트림 광고 정보"}
                   </p>
                   <span
                     className="text-[10px] px-1.5 py-0.5 rounded-full"
@@ -1462,8 +1525,8 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                   className="text-[11px] mb-3"
                   style={{ color: "var(--color-text-muted)" }}
                 >
-                  실제 YouTube 인스트림 광고처럼 CTA 카드, 스폰서 정보가
-                  표시됩니다. 아래 값으로 "원본 영상 + 캡처 시점"을 지정하세요.
+                  실제 YouTube 인스트림 계열 광고처럼 CTA 카드, 스폰서 정보가
+                  표시됩니다. 범퍼는 non-skippable 6초 상품으로 저장됩니다.
                 </p>
 
                 <div className="space-y-3">
@@ -1548,7 +1611,9 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                       className="text-[10px] mt-0.5"
                       style={{ color: "var(--color-text-muted)" }}
                     >
-                      입력한 초수의 프레임을 추출합니다. 예: 10 입력 시 10초 프레임 캡처
+                      {isBumperAd
+                        ? "범퍼는 6초 이하 상품이므로 0~5초 범위에서 캡처합니다."
+                        : "입력한 초수의 프레임을 추출합니다. 예: 10 입력 시 10초 프레임 캡처"}
                     </p>
                   </div>
 
