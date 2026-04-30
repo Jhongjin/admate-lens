@@ -14,66 +14,72 @@ export default function Home() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-[var(--color-bg-primary)] bg-grid relative">
-      {/* 배경 그라디언트 */}
-      <div className="bg-gradient-radial fixed inset-0 pointer-events-none" />
-
-      {/* 헤더 */}
-      <header className="relative z-10 border-b border-[var(--color-border-subtle)]">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            {/* 로고 */}
-            <div
-              className="w-9 h-9 rounded-xl flex items-center justify-center text-white font-bold text-sm"
-              style={{ background: "linear-gradient(135deg, #6366f1, #8b5cf6)" }}
-            >
-              AV
-            </div>
+    <div className="ops-shell">
+      <aside className="ops-sidebar" aria-label="관리자 메뉴">
+        <div className="ops-sidebar-inner">
+          <div className="ops-sidebar-brand">
+            <div className="ops-logo">AC</div>
             <div>
-              <h1 className="text-base font-bold text-[var(--color-text-primary)] leading-tight">
-                Ad Vision
+              <h1 className="text-sm font-bold leading-tight text-[var(--color-text-primary)]">
+                AdMate Capture
               </h1>
-              <p className="text-[10px] text-[var(--color-text-muted)] leading-tight">
-                AdMate Capture Pro
+              <p className="text-xs leading-tight text-[var(--color-text-muted)]">
+                운영 콘솔
               </p>
             </div>
           </div>
 
-          {/* 상태 뱃지 */}
-          <div className="flex items-center gap-2">
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 text-xs rounded-full bg-[var(--color-success)]/10 text-[var(--color-success)] border border-[var(--color-success)]/20">
-              <span className="w-1.5 h-1.5 rounded-full bg-[var(--color-success)] animate-pulse" />
-              Engine Online
-            </span>
-            <span className="px-3 py-1 text-xs rounded-full bg-[var(--color-accent-subtle)] text-[var(--color-accent)] border border-[var(--color-accent)]/20">
-              MVP v0.1
-            </span>
-          </div>
+          <nav className="ops-nav">
+            <span className="ops-nav-item active">캡처 요청</span>
+            <span className="ops-nav-item">결과 이력</span>
+            <span className="ops-nav-item">프로젝트</span>
+            <span className="ops-nav-item">설정</span>
+          </nav>
         </div>
-      </header>
+      </aside>
 
-      {/* 메인 컨텐츠 */}
-      <main className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
-          {/* 좌측: 캡처 요청 폼 */}
-          <div className="lg:col-span-2">
-            <CaptureForm onCaptureCreated={handleCaptureCreated} />
+      <div className="ops-main">
+        <header className="ops-topbar">
+          <div className="ops-topbar-inner">
+            <div>
+              <p className="ops-kicker">AdMate Capture Pro</p>
+              <p className="text-sm font-semibold text-[var(--color-text-primary)]">
+                광고 게재 화면 렌더링 관리
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span className="badge badge-completed">
+                <span className="w-1.5 h-1.5 rounded-full bg-[var(--color-success)]" />
+                엔진 정상
+              </span>
+              <span className="badge badge-processing">MVP v0.1</span>
+            </div>
+          </div>
+        </header>
+
+        <main className="ops-content">
+          <div className="ops-page-header">
+            <div>
+              <p className="ops-kicker">Capture Operations</p>
+              <h2 className="ops-title">캡처 요청 및 결과 이력</h2>
+              <p className="ops-subtitle">
+                운영자가 검토해야 할 요청 조건과 최근 렌더링 상태를 한 화면에서 확인합니다.
+              </p>
+            </div>
           </div>
 
-          {/* 우측: 캡처 이력 리스트 */}
-          <div className="lg:col-span-3">
-            <CaptureList refreshTrigger={refreshTrigger} />
-          </div>
-        </div>
-      </main>
+          <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
+            <div className="lg:col-span-2">
+              <CaptureForm onCaptureCreated={handleCaptureCreated} />
+            </div>
 
-      {/* 푸터 */}
-      <footer className="relative z-10 border-t border-[var(--color-border-subtle)] mt-12">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between text-xs text-[var(--color-text-muted)]">
-          <span>© 2026 AdMate Vision</span>
-          <span>Powered by Puppeteer + Supabase</span>
-        </div>
-      </footer>
+            <div className="lg:col-span-3">
+              <CaptureList refreshTrigger={refreshTrigger} />
+            </div>
+          </div>
+        </main>
+      </div>
     </div>
   );
 }
