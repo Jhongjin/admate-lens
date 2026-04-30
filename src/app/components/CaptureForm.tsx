@@ -28,7 +28,7 @@ const PUBLISHER_PRESETS: PublisherPreset[] = [
     name: "연합뉴스",
     url: "https://www.yna.co.kr/",
     category: "뉴스",
-    icon: "📰",
+    icon: "NEWS",
     adSizes: ["300x250", "728x90"],
     description: "국내 대표 통신사",
   },
@@ -36,7 +36,7 @@ const PUBLISHER_PRESETS: PublisherPreset[] = [
     name: "조선일보",
     url: "https://www.chosun.com/",
     category: "뉴스",
-    icon: "📰",
+    icon: "NEWS",
     adSizes: ["300x250", "970x250"],
     description: "종합일간지",
   },
@@ -44,7 +44,7 @@ const PUBLISHER_PRESETS: PublisherPreset[] = [
     name: "중앙일보",
     url: "https://www.joongang.co.kr/",
     category: "뉴스",
-    icon: "📰",
+    icon: "NEWS",
     adSizes: ["300x250", "728x90"],
     description: "종합일간지",
   },
@@ -52,7 +52,7 @@ const PUBLISHER_PRESETS: PublisherPreset[] = [
     name: "동아일보",
     url: "https://www.donga.com/",
     category: "뉴스",
-    icon: "📰",
+    icon: "NEWS",
     adSizes: ["300x250", "728x90"],
     description: "종합일간지",
   },
@@ -61,7 +61,7 @@ const PUBLISHER_PRESETS: PublisherPreset[] = [
     name: "매일경제",
     url: "https://www.mk.co.kr/",
     category: "경제",
-    icon: "💰",
+    icon: "FIN",
     adSizes: ["300x250", "728x90"],
     description: "경제전문지",
   },
@@ -69,7 +69,7 @@ const PUBLISHER_PRESETS: PublisherPreset[] = [
     name: "헤럴드경제",
     url: "https://biz.heraldcorp.com/",
     category: "경제",
-    icon: "💰",
+    icon: "FIN",
     adSizes: ["300x250", "728x90"],
     description: "경제전문지",
   },
@@ -78,7 +78,7 @@ const PUBLISHER_PRESETS: PublisherPreset[] = [
     name: "ZDNet Korea",
     url: "https://zdnet.co.kr/",
     category: "IT",
-    icon: "💻",
+    icon: "TECH",
     adSizes: ["300x250", "970x90"],
     description: "IT전문 미디어",
   },
@@ -86,7 +86,7 @@ const PUBLISHER_PRESETS: PublisherPreset[] = [
     name: "블로터",
     url: "https://www.bloter.net/",
     category: "IT",
-    icon: "💻",
+    icon: "TECH",
     adSizes: ["300x250"],
     description: "테크 미디어",
   },
@@ -94,7 +94,7 @@ const PUBLISHER_PRESETS: PublisherPreset[] = [
     name: "디지털데일리",
     url: "https://www.ddaily.co.kr/",
     category: "IT",
-    icon: "💻",
+    icon: "TECH",
     adSizes: ["300x250", "728x90"],
     description: "디지털 전문 미디어",
   },
@@ -102,7 +102,7 @@ const PUBLISHER_PRESETS: PublisherPreset[] = [
     name: "전자신문",
     url: "https://www.etnews.com/",
     category: "IT",
-    icon: "💻",
+    icon: "TECH",
     adSizes: ["300x250", "728x90"],
     description: "전자/IT 전문지",
   },
@@ -111,7 +111,7 @@ const PUBLISHER_PRESETS: PublisherPreset[] = [
     name: "SBS 뉴스",
     url: "https://news.sbs.co.kr/",
     category: "방송",
-    icon: "📺",
+    icon: "TV",
     adSizes: ["300x250", "728x90"],
     description: "SBS 뉴스 포털",
   },
@@ -260,18 +260,24 @@ const INJECTION_MODES: InjectionModeOption[] = [
   {
     value: "single",
     label: "최상위 1개",
-    icon: "🎯",
+    icon: "1",
     description: "가장 좋은 위치의 슬롯 1개만 교체",
   },
   {
     value: "custom",
     label: "직접 지정",
-    icon: "⚙️",
+    icon: "N",
     description: "원하는 슬롯 개수를 직접 선택",
   },
 ];
 
-type ProductMenu = "instream" | "shorts" | "masthead" | "infeed" | "network-ads";
+type ProductMenu =
+  | "instream"
+  | "shorts"
+  | "masthead"
+  | "infeed"
+  | "demandgen"
+  | "network-ads";
 type DetailOptionPreset =
   | "pc-skip"
   | "pc-non-skip"
@@ -309,6 +315,7 @@ const YOUTUBE_PRODUCT_OPTIONS: ProductMenuOption[] = [
   { value: "shorts", label: "Shorts" },
   { value: "masthead", label: "Masthead" },
   { value: "infeed", label: "In-feed" },
+  { value: "demandgen", label: "Demand Gen · 구현 예정", disabled: true },
 ];
 
 const YOUTUBE_DETAIL_OPTIONS: DetailMenuOption[] = [
@@ -329,11 +336,40 @@ const YOUTUBE_DETAIL_OPTIONS: DetailMenuOption[] = [
   { value: "infeed-watch-next", label: "In-feed 관련동영상" },
 ];
 
-const YOUTUBE_PLANNED_OPTIONS: DetailMenuOption[] = [
-  { value: "yt-other", label: "CTV Pause · 구현 예정", disabled: true },
-  { value: "yt-other", label: "Audio Reach · 구현 예정", disabled: true },
-  { value: "yt-other", label: "Display / Overlay · 레거시", disabled: true },
-];
+const YOUTUBE_DETAIL_OPTIONS_BY_PRODUCT: Record<
+  Exclude<ProductMenu, "network-ads">,
+  DetailMenuOption[]
+> = {
+  instream: YOUTUBE_DETAIL_OPTIONS.filter((option) =>
+    [
+      "pc-skip",
+      "pc-non-skip",
+      "pc-bumper",
+      "aos-skip",
+      "aos-non-skip",
+      "aos-bumper",
+      "ios-skip",
+      "ios-non-skip",
+      "ios-bumper",
+    ].includes(option.value),
+  ),
+  shorts: YOUTUBE_DETAIL_OPTIONS.filter((option) => option.value === "shorts-feed"),
+  masthead: YOUTUBE_DETAIL_OPTIONS.filter((option) => option.value === "masthead-home"),
+  infeed: YOUTUBE_DETAIL_OPTIONS.filter((option) =>
+    [
+      "infeed-home",
+      "mo-infeed-home",
+      "infeed-search",
+      "infeed-watch-next",
+    ].includes(option.value),
+  ),
+  demandgen: [
+    { value: "yt-other", label: "Single Image · 구현 예정", disabled: true },
+    { value: "yt-other", label: "Carousel · 구현 예정", disabled: true },
+    { value: "yt-other", label: "Product Feed · 구현 예정", disabled: true },
+    { value: "yt-other", label: "Shorts Image · 구현 예정", disabled: true },
+  ],
+};
 
 const GDN_DETAIL_OPTIONS: DetailMenuOption[] = [
   { value: "gdn-pc", label: "PC 지면" },
@@ -354,7 +390,7 @@ interface CaptureFormData {
   creativeObjectFit: CreativeObjectFitMode;
   targetAdSizes: string[]; // 수동 모드에서 선택한 사이즈 (예: ["300x250", "728x90"])
   youtubeAdType: YouTubeAdType; // YouTube 광고 유형
-  // 🎬 인스트림 광고 옵션
+  // 인스트림 광고 옵션
   instreamVideoUrl: string; // YouTube 동영상 URL
   instreamPublisherVideoUrl: string; // 콘텐츠(게재면) 영상 URL
   instreamCaptureSecond: string; // 캡처 시점(초)
@@ -619,7 +655,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
     const preview = URL.createObjectURL(file);
     setIsUploading(true);
 
-    // 📐 이미지 실제 픽셀 사이즈 감지
+    // 이미지 실제 픽셀 사이즈 감지
     const dimensions = await new Promise<{ width: number; height: number }>(
       (resolve) => {
         const img = new Image();
@@ -638,7 +674,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
       height: dimensions.height,
     });
     console.log(
-      `[CaptureForm] 📐 업로드 배너 사이즈: ${dimensions.width}x${dimensions.height}`,
+      `[CaptureForm] 업로드 배너 사이즈: ${dimensions.width}x${dimensions.height}`,
     );
 
     try {
@@ -869,7 +905,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
       form.youtubeAdType === "infeed-watch-next");
 
   const selectedMediaMenu = (form.channel === "youtube" ? "youtube" : "gdn") as MediaMenu;
-  const selectedProduct =
+  const selectedProduct: ProductMenu =
     selectedMediaMenu === "youtube"
       ? isYoutubeShorts
         ? "shorts"
@@ -924,6 +960,20 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
     "gdn-pc": "PC 지면",
     "gdn-mobile": "MO 지면",
   };
+
+  const availableYoutubeDetailOptions =
+    selectedMediaMenu === "youtube" && selectedProduct !== "network-ads"
+      ? YOUTUBE_DETAIL_OPTIONS_BY_PRODUCT[selectedProduct]
+      : [];
+  const productLabel: Record<ProductMenu, string> = {
+    instream: "In-stream / Bumper",
+    shorts: "Shorts",
+    masthead: "Masthead",
+    infeed: "In-feed",
+    demandgen: "Demand Gen",
+    "network-ads": "Network Ads",
+  };
+
   const infeedTypeLabel =
     form.youtubeAdType === "infeed-home"
       ? "인피드 · PC 홈"
@@ -976,7 +1026,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
     setIsSubmitting(true);
 
     try {
-      // 🎬 YouTube 채널인 경우 기본 게재면 URL 자동 지정
+      // YouTube 채널인 경우 기본 게재면 URL 자동 지정
       // 콘텐츠 URL이 입력되었으면 해당 URL, 없으면 한국 인기 콘텐츠 중 랜덤
       const KOREAN_FALLBACK_VIDEOS = [
         "https://www.youtube.com/watch?v=09R8_2nJtjg", // BLACKPINK - Pink Venom
@@ -1022,21 +1072,21 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
           captureLanding: form.captureLanding,
           injectionMode: form.injectionMode,
           slotCount: form.slotCount,
-          // 📐 업로드한 배너의 실제 사이즈 (슬롯 매칭용)
+          // 업로드한 배너의 실제 사이즈 (슬롯 매칭용)
           creativeDimensions:
             uploadedFile?.width && uploadedFile?.height
               ? { width: uploadedFile.width, height: uploadedFile.height }
               : undefined,
-          // 📐 사이즈 선택 모드 & 타겟 사이즈
+          // 사이즈 선택 모드 & 타겟 사이즈
           adSizeMode: form.adSizeMode,
           creativeObjectFit: form.creativeObjectFit,
           targetAdSizes: form.adSizeMode === "manual" ? form.targetAdSizes : [],
-          // 🎬 YouTube 광고 유형
+          // YouTube 광고 유형
           youtubeAdType:
             form.channel === "youtube" ? form.youtubeAdType : undefined,
           gdnViewportMode:
             form.channel === "gdn" ? form.gdnViewportMode : undefined,
-          // 🎬 인스트림 광고 옵션
+          // 인스트림 광고 옵션
           instreamOpts:
             form.channel === "youtube" && isYoutubeInstream
               ? {
@@ -1458,21 +1508,10 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
             >
               {selectedMediaMenu === "youtube" ? (
                 <>
-                  <optgroup label="구현됨">
-                    {YOUTUBE_DETAIL_OPTIONS.map((option) => (
+                  <optgroup label="선택 가능한 상세 옵션">
+                    {availableYoutubeDetailOptions.map((option) => (
                       <option
                         key={option.value}
-                        value={option.value}
-                        disabled={option.disabled}
-                      >
-                        {option.label}
-                      </option>
-                    ))}
-                  </optgroup>
-                  <optgroup label="구현 예정 / 레거시">
-                    {YOUTUBE_PLANNED_OPTIONS.map((option) => (
-                      <option
-                        key={option.label}
                         value={option.value}
                         disabled={option.disabled}
                       >
@@ -1507,16 +1546,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
               매체: {selectedMediaMenu === "youtube" ? "YouTube" : "Google Ads"}
             </span>
             <span className="text-[10px] px-2 py-1 rounded-full bg-[var(--color-bg-tertiary)] text-[var(--color-text-secondary)]">
-              상품:{" "}
-              {selectedProduct === "instream"
-                ? "In-stream / Bumper"
-                : selectedProduct === "shorts"
-                  ? "Shorts"
-                  : selectedProduct === "masthead"
-                    ? "Masthead"
-                : selectedProduct === "infeed"
-                  ? "In-feed"
-                  : "Network Ads"}
+              상품: {productLabel[selectedProduct]}
             </span>
             <span className="text-[10px] px-2 py-1 rounded-full bg-[var(--color-accent-subtle)] text-[var(--color-accent)]">
               상세:{" "}
@@ -1556,7 +1586,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                 }}
               >
                 <div className="flex items-center gap-2 mb-3">
-                  <span className="text-sm">🎬</span>
+                  <span className="form-section-code">YT</span>
                   <p
                     className="text-sm font-semibold"
                     style={{ color: "var(--color-text-primary)" }}
@@ -1588,7 +1618,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                       className="text-[11px] font-medium mb-1 block"
                       style={{ color: "var(--color-text-secondary)" }}
                     >
-                      ▶️ 광고 동영상 원본 URL <span style={{ color: "var(--color-error)" }}>*</span>
+                      광고 동영상 원본 URL <span style={{ color: "var(--color-error)" }}>*</span>
                     </label>
                     <input
                       type="url"
@@ -1616,7 +1646,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                       className="text-[11px] font-medium mb-1 block"
                       style={{ color: "var(--color-text-secondary)" }}
                     >
-                      📺 콘텐츠 영상 URL <span className="text-[10px] font-normal" style={{ color: "var(--color-text-muted)" }}>(선택 – 미입력 시 한국 인기 영상 랜덤)</span>
+                      콘텐츠 영상 URL <span className="text-[10px] font-normal" style={{ color: "var(--color-text-muted)" }}>(선택 – 미입력 시 한국 인기 영상 랜덤)</span>
                     </label>
                     <input
                       type="url"
@@ -1644,7 +1674,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                       className="text-[11px] font-medium mb-1 block"
                       style={{ color: "var(--color-text-secondary)" }}
                     >
-                      ⏰ 프레임 캡처 시점 (초) <span style={{ color: "var(--color-error)" }}>*</span>
+                      프레임 캡처 시점 (초) <span style={{ color: "var(--color-error)" }}>*</span>
                     </label>
                     <input
                       type="number"
@@ -1675,7 +1705,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                       className="text-[11px] font-medium mb-1 block"
                       style={{ color: "var(--color-text-secondary)" }}
                     >
-                      🔗 랜딩 URL
+                      랜딩 URL
                     </label>
                     <input
                       type="url"
@@ -1719,7 +1749,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                       className="text-[11px] font-medium mb-1 block"
                       style={{ color: "var(--color-text-secondary)" }}
                     >
-                      📢 CTA 버튼 텍스트
+                      CTA 버튼 텍스트
                     </label>
                     <div className="relative">
                       <input
@@ -1768,7 +1798,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                       className="text-[11px] font-medium mb-1 block"
                       style={{ color: "var(--color-text-secondary)" }}
                     >
-                      🏷️ 광고 제목
+                      광고 제목
                     </label>
                     <div className="relative">
                       <input
@@ -1809,7 +1839,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                       className="text-[11px] font-medium mb-1 block"
                       style={{ color: "var(--color-text-secondary)" }}
                     >
-                      🔗 표시 URL
+                      표시 URL
                     </label>
                     <input
                       type="text"
@@ -1857,7 +1887,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                       className="text-[11px] font-medium mb-1 block"
                       style={{ color: "var(--color-text-secondary)" }}
                     >
-                      🧩 로고 이미지
+                      로고 이미지
                     </label>
 
                     {isMobilePreroll && (
@@ -1952,7 +1982,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                         className="text-[11px] font-medium block"
                         style={{ color: "var(--color-text-secondary)" }}
                       >
-                        🖼️ 컴패니언 배너 (컴퓨터)
+                        컴패니언 배너 (컴퓨터)
                       </label>
                       <label className="flex items-center gap-1.5 cursor-pointer">
                         <input
@@ -2080,7 +2110,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                 }}
               >
                 <div className="flex items-center gap-2 mb-3">
-                  <span className="text-sm">📰</span>
+                  <span className="form-section-code">FEED</span>
                   <p
                     className="text-sm font-semibold"
                     style={{ color: "var(--color-text-primary)" }}
@@ -2131,7 +2161,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                       className="text-[11px] font-medium mb-1 block"
                       style={{ color: "var(--color-text-secondary)" }}
                     >
-                      ▶️ 광고 영상 URL{" "}
+                      광고 영상 URL{" "}
                       <span
                         className="text-[10px] font-normal"
                         style={{ color: "var(--color-text-muted)" }}
@@ -2249,7 +2279,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                           className="text-[11px] font-medium mb-1 block"
                           style={{ color: "var(--color-text-secondary)" }}
                         >
-                          📺 콘텐츠(시청) 영상 URL{" "}
+                          콘텐츠(시청) 영상 URL{" "}
                           <span
                             className="text-[10px] font-normal"
                             style={{ color: "var(--color-text-muted)" }}
@@ -2467,7 +2497,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
         )}
 
         {/* ===== 게재면 URL (멀티 선택) ===== */}
-        {/* 🎬 YouTube 채널 선택 시 자동 게재면 안내 */}
+        {/* YouTube 채널 선택 시 자동 게재면 안내 */}
         {isYouTubeChannel && (
           <div
             className="mb-5 rounded-xl border p-4 animate-fade-in"
@@ -2477,7 +2507,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
             }}
           >
             <div className="flex items-center gap-2">
-              <span className="text-lg">▶️</span>
+              <span className="form-section-code">YT</span>
               <div>
                 <p
                   className="text-sm font-semibold"
@@ -2545,7 +2575,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                       : "var(--color-text-muted)",
                 }}
               >
-                🏢 프리셋
+                프리셋
               </button>
               <button
                 type="button"
@@ -2562,7 +2592,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                       : "var(--color-text-muted)",
                 }}
               >
-                ✏️ 직접 입력
+                직접 입력
               </button>
             </div>
           </div>
@@ -2683,7 +2713,9 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                           </svg>
                         )}
                       </div>
-                      <span className="text-lg shrink-0">{preset.icon}</span>
+                      <span className="preset-code-chip shrink-0">
+                        {preset.icon}
+                      </span>
                       <div className="min-w-0 flex-1">
                         <p
                           className="font-semibold text-xs truncate"
@@ -2790,7 +2822,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                 className="text-[11px] mb-2 font-semibold"
                 style={{ color: "var(--color-text-muted)" }}
               >
-                📋 선택된 게재면 ({form.selectedPublishers.length}개)
+                선택된 게재면 ({form.selectedPublishers.length}개)
               </p>
               <div className="flex flex-wrap gap-1.5">
                 {form.selectedPublishers.map((url) => (
@@ -2856,7 +2888,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                       : "var(--color-text-muted)",
                 }}
               >
-                📁 파일 업로드
+                파일 업로드
               </button>
               <button
                 type="button"
@@ -2871,7 +2903,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                     uploadMode === "url" ? "white" : "var(--color-text-muted)",
                 }}
               >
-                🔗 URL 입력
+                URL 입력
               </button>
             </div>
           </div>
@@ -2896,11 +2928,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                       : "var(--color-bg-primary)",
                   }}
                 >
-                  <div
-                    className={`text-3xl ${isDragOver ? "animate-float" : ""}`}
-                  >
-                    {isDragOver ? "📥" : "🖼️"}
-                  </div>
+                  <div className="upload-drop-code">IMG</div>
                   <div className="text-center">
                     <p
                       className="text-sm font-medium"
@@ -2920,7 +2948,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                       className="text-[10px] mt-0.5"
                       style={{ color: "var(--color-accent)" }}
                     >
-                      💡 어떤 사이즈든 광고 슬롯에 자동 맞춤됩니다
+                      안내: 어떤 사이즈든 광고 슬롯에 자동 맞춤됩니다
                     </p>
                   </div>
                   <input
@@ -2980,7 +3008,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                             className="ml-1"
                             style={{ color: "var(--color-accent)" }}
                           >
-                            📐 {uploadedFile.width}×{uploadedFile.height}
+                            · {uploadedFile.width}×{uploadedFile.height}
                           </span>
                         )}
                         {!isUploading && form.creativeUrl && (
@@ -3050,7 +3078,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
             </div>
           )}
 
-          {/* ===== 📐 광고 사이즈 선택 ===== */}
+          {/* ===== 광고 사이즈 선택 ===== */}
           <div
             className="mt-4 rounded-xl border p-4"
             style={{
@@ -3060,7 +3088,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
           >
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
-                <span className="text-sm">📐</span>
+                <span className="form-section-code">SIZE</span>
                 <p
                   className="text-sm font-semibold"
                   style={{ color: "var(--color-text-primary)" }}
@@ -3109,7 +3137,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                         : "var(--color-text-muted)",
                   }}
                 >
-                  ✨ 자동 매칭
+                  자동 매칭
                 </button>
                 <button
                   type="button"
@@ -3131,7 +3159,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                         : "var(--color-text-muted)",
                   }}
                 >
-                  🎯 직접 선택
+                  직접 선택
                 </button>
               </div>
             </div>
@@ -3143,7 +3171,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                   className="flex items-start gap-2 p-2.5 rounded-lg"
                   style={{ backgroundColor: "var(--color-accent-subtle)" }}
                 >
-                  <span className="text-sm mt-0.5">✨</span>
+                  <span className="form-section-code">AUTO</span>
                   <div>
                     <p
                       className="text-xs font-semibold"
@@ -3266,7 +3294,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                   {gdnAdSizeCatalog.map((ad) => {
                     const sizeKey = `${ad.width}x${ad.height}`;
                     const isSelected = form.targetAdSizes.includes(sizeKey);
-                    // 📐 추천 배지: 업로드한 이미지 사이즈와 비교
+                    // 업로드한 이미지 사이즈와 비교
                     const isRecommended =
                       uploadedFile?.width && uploadedFile?.height
                         ? Math.abs(uploadedFile.width - ad.width) <= 50 &&
@@ -3384,7 +3412,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                                   border: "1px solid rgba(251,191,36,0.3)",
                                 }}
                               >
-                                ⭐ 추천
+                                추천
                               </span>
                             )}
                             {ad.popularity === "높음" && (
@@ -3395,7 +3423,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                                   color: "var(--color-text-muted)",
                                 }}
                               >
-                                🔥
+                                인기
                               </span>
                             )}
                           </div>
@@ -3454,7 +3482,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                     className="mt-2 text-[10px] text-center py-1"
                     style={{ color: "var(--color-warning, #d97706)" }}
                   >
-                    ⚠️ 사이즈를 선택하지 않으면 자동 매칭으로 동작합니다
+                    주의: 사이즈를 선택하지 않으면 자동 매칭으로 동작합니다
                   </p>
                 )}
               </div>
@@ -3487,7 +3515,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
               className="text-sm font-medium mb-2"
               style={{ color: "var(--color-text-primary)" }}
             >
-              🎯 광고 슬롯 교체 방식
+              광고 슬롯 교체 방식
             </p>
             <div className="grid grid-cols-3 gap-2">
               {INJECTION_MODES.map((mode) => (
@@ -3691,9 +3719,9 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
       {/* Toast */}
       {toast && (
         <div className={`toast toast-${toast.type}`}>
-          {toast.type === "success" && "✅ "}
-          {toast.type === "error" && "❌ "}
-          {toast.type === "info" && "ℹ️ "}
+          {toast.type === "success" && "완료: "}
+          {toast.type === "error" && "오류: "}
+          {toast.type === "info" && "안내: "}
           {toast.message}
         </div>
       )}
