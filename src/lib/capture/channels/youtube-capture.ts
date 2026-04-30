@@ -22,6 +22,7 @@ import { runPrerollInjectInPage, type PrerollInjectPagePayload } from "./youtube
 import { runInfeedInjectInPage, type InfeedSurface } from "./youtube-infeed-inpage";
 import { generateMobileSyntheticInfeedHomeHtml } from "./mobile-synthetic-infeed";
 import { generateYouTubeShortsSyntheticHtml } from "./youtube-shorts-synthetic";
+import { generateYouTubeMastheadSyntheticHtml } from "./youtube-masthead-synthetic";
 
 /** YouTube 광고 유형 */
 export type YouTubeAdType =
@@ -34,6 +35,7 @@ export type YouTubeAdType =
   | "mobile-bumper-aos"
   | "mobile-bumper-ios"
   | "shorts-feed"
+  | "masthead-home"
   | "infeed-home"
   | "mobile-infeed-home"
   | "infeed-search"
@@ -363,6 +365,9 @@ export class YouTubeCapture extends BaseChannel {
     const adType = (request.options?.youtubeAdType as YouTubeAdType) || "preroll";
     if (adType === "shorts-feed") {
       return this.captureShortsFeedPlacement(page, request);
+    }
+    if (adType === "masthead-home") {
+      return this.captureMastheadHomePlacement(page, request);
     }
     if (isInfeedAdType(adType)) {
       return this.captureInfeedPlacement(page, request, adType);
@@ -2597,6 +2602,119 @@ export class YouTubeCapture extends BaseChannel {
   /**
    * 인피드 동영상 광고 — 홈 / 검색 / 관련동영상(시청 사이드바) 카드 UI 주입
    */
+  private async captureMastheadHomePlacement(
+    page: IPageHandle,
+    request: CaptureRequest
+  ): Promise<Buffer> {
+    console.log("[YouTube] ===== Masthead 홈 캡처 시작 =====");
+    await page.setViewport({ width: 1920, height: 1080, deviceScaleFactor: getDesktopCaptureDpr() });
+
+    const instreamOpts = (request.options?.instreamOpts as InstreamOptsPayload | undefined) ?? {};
+    const infeedOpts = (request.options?.infeedOpts as InfeedOptsPayload | undefined) ?? {};
+    const adVideoUrl = infeedOpts.videoUrl?.trim() || instreamOpts.videoUrl?.trim() || "";
+    const adVideoId = adVideoUrl ? extractVideoId(adVideoUrl) : null;
+
+    let creativeDataUrl = "";
+    const creativeSource = request.creativeUrl?.trim();
+    if (creativeSource && !/youtube\.com|youtu\.be/i.test(creativeSource)) {
+      const creative = await imageUrlToDataUrl(creativeSource);
+      if (creative.ok) {
+        creativeDataUrl = creative.dataUrl;
+      }
+    }
+    if (!creativeDataUrl && adVideoId) {
+      let thumb = await imageUrlToDataUrl(getThumbnailUrl(adVideoId));
+      if (!thumb.ok) {
+        thumb = await imageUrlToDataUrl(`https://img.youtube.com/vi/${adVideoId}/hqdefault.jpg`);
+      }
+      if (thumb.ok) {
+        creativeDataUrl = thumb.dataUrl;
+      }
+    }
+    if (!creativeDataUrl && creativeSource && /youtube\.com|youtu\.be/i.test(creativeSource)) {
+      const id = extractVideoId(creativeSource);
+      if (id) {
+        const thumb = await imageUrlToDataUrl(getThumbnailUrl(id));
+        if (thumb.ok) {
+          creativeDataUrl = thumb.dataUrl;
+        }
+      }
+    }
+
+    let avatarDataUrl = "";
+    if (instreamOpts.avatarImageUrl?.trim()) {
+      const av = await imageUrlToDataUrl(instreamOpts.avatarImageUrl.trim());
+      if (av.ok) {
+        avatarDataUrl = av.dataUrl;
+      }
+    }
+    if (!avatarDataUrl && instreamOpts.companionChannelUrl?.trim()) {
+      const logoUrl = await fetchYoutubeChannelLogoUrl(instreamOpts.companionChannelUrl.trim());
+      if (logoUrl) {
+        const av = await imageUrlToDataUrl(logoUrl);
+        if (av.ok) {
+          avatarDataUrl = av.dataUrl;
+        }
+      }
+    }
+
+    let sponsorName = "brand.example";
+    try {
+      if (instreamOpts.displayUrl?.trim()) {
+        sponsorName = instreamOpts.displayUrl
+          .trim()
+          .replace(/^https?:\/\//i, "")
+          .replace(/^www\./i, "")
+          .split("/")[0]!;
+      } else if (request.clickUrl?.trim()) {
+        sponsorName = new URL(request.clickUrl.trim()).hostname.replace(/^www\./i, "");
+      }
+    } catch {
+      /* keep default */
+    }
+
+    const displayUrl =
+      instreamOpts.displayUrl?.trim().replace(/^https?:\/\//i, "").replace(/^www\./i, "") ||
+      sponsorName;
+    const description = [infeedOpts.description1?.trim(), infeedOpts.description2?.trim()]
+      .filter(Boolean)
+      .join(" ");
+    const html = generateYouTubeMastheadSyntheticHtml({
+      title: instreamOpts.adTitle?.trim() || sponsorName,
+      description,
+      sponsorName,
+      creativeDataUrl,
+      avatarDataUrl,
+      ctaText: infeedOpts.ctaPrimary?.trim() || instreamOpts.ctaText?.trim() || "자세히 알아보기",
+      displayUrl,
+    });
+
+    this.diagnostics = {
+      adType: "masthead-home",
+      playerFound: true,
+      playerSize: { width: 1920, height: 420 },
+      sidebarFound: true,
+      injectionSuccess: true,
+      creativeDownloaded: !!creativeDataUrl,
+      creativeBase64Size: creativeDataUrl ? Math.round(creativeDataUrl.length / 1024) : 0,
+      infeedCaptureUrl: "https://www.youtube.com/",
+    };
+
+    await page.goto("about:blank", { waitUntil: "load", timeout: 10000 });
+    await page.evaluate(`
+      document.open();
+      document.write(${JSON.stringify(html)});
+      document.close();
+      window.scrollTo(0, 0);
+    `);
+    await this.injectKoreanFonts(page);
+    await new Promise((r) => setTimeout(r, 1600));
+
+    const screenshot = await page.screenshot({ fullPage: false, type: "png" });
+    console.log("[YouTube] ===== Masthead 홈 캡처 완료 =====");
+    return screenshot;
+  }
+
   private async captureShortsFeedPlacement(
     page: IPageHandle,
     request: CaptureRequest

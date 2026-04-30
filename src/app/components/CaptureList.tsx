@@ -94,6 +94,7 @@ function getYoutubeAdTypeLabel(adType?: string): string | null {
   if (adType === "mobile-bumper-aos") return "AOS 범퍼";
   if (adType === "mobile-bumper-ios") return "iOS 범퍼";
   if (adType === "shorts-feed") return "Shorts 피드";
+  if (adType === "masthead-home") return "Masthead 홈";
   if (adType === "display") return "디스플레이(레거시)";
   if (adType === "overlay") return "오버레이(레거시)";
   if (adType === "infeed-home") return "인피드 · PC 홈";

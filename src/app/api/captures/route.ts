@@ -81,6 +81,7 @@ export async function POST(request: NextRequest) {
         | "mobile-bumper-aos"
         | "mobile-bumper-ios"
         | "shorts-feed"
+        | "masthead-home"
         | "infeed-home"
         | "mobile-infeed-home"
         | "infeed-search"
@@ -149,6 +150,7 @@ export async function POST(request: NextRequest) {
         youtubeAdType === "infeed-search" ||
         youtubeAdType === "infeed-watch-next");
     const isShortsYt = channel === "youtube" && youtubeAdType === "shorts-feed";
+    const isMastheadYt = channel === "youtube" && youtubeAdType === "masthead-home";
     /** 인피드·디스플레이·오버레이 등 프리롤이 아닌 YouTube 유형 */
     const hasValidCreativeSource = !isPreroll && isValidHttpUrl(creativeUrl);
     const hasValidInfeedThumbSource =
@@ -157,11 +159,15 @@ export async function POST(request: NextRequest) {
     const hasValidShortsSource =
       isShortsYt &&
       (isValidHttpUrl(creativeUrl) || isValidHttpUrl(infeedOpts?.videoUrl));
+    const hasValidMastheadSource =
+      isMastheadYt &&
+      (isValidHttpUrl(creativeUrl) || isValidHttpUrl(infeedOpts?.videoUrl));
     const hasSource =
       hasValidVideoSource ||
       hasValidInfeedThumbSource ||
       hasValidShortsSource ||
-      (!isPreroll && !isInfeedYt && !isShortsYt && isValidHttpUrl(creativeUrl));
+      hasValidMastheadSource ||
+      (!isPreroll && !isInfeedYt && !isShortsYt && !isMastheadYt && isValidHttpUrl(creativeUrl));
 
     if (!channel || normalizedUrls.length === 0 || !hasSource) {
       return NextResponse.json(
@@ -241,7 +247,7 @@ export async function POST(request: NextRequest) {
       };
       const creativeUrlForRow =
         (creativeUrl?.trim() ? normalizeHttpUrl(creativeUrl) : "") ||
-        ((isInfeedYt || isShortsYt) && infeedOpts?.videoUrl?.trim()
+        ((isInfeedYt || isShortsYt || isMastheadYt) && infeedOpts?.videoUrl?.trim()
           ? normalizeHttpUrl(infeedOpts.videoUrl)
           : "") ||
         "";
