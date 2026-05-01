@@ -347,7 +347,8 @@ async function executeBatchCaptures(captureIds: string[]): Promise<void> {
   }
 
   try {
-    for (const captureId of captureIds) {
+    for (let captureIndex = 0; captureIndex < captureIds.length; captureIndex++) {
+      const captureId = captureIds[captureIndex]!;
       const captureStart = Date.now();
       let captureMetadata: Record<string, unknown> = {};
       let sourceUrlForFailure: string | null = null;
@@ -422,23 +423,12 @@ async function executeBatchCaptures(captureIds: string[]): Promise<void> {
 
         const perCaptureTimeoutMs = resolveBatchPerCaptureTimeoutMs(multiBatch, startTime);
         if (perCaptureTimeoutMs === null) {
-          await supabase
-            .from("vision_da_captures")
-            .update({
-              status: "failed",
-              error_message:
-                "배치 서버 시간 한도(남은 시간 부족)로 건너뜁니다. 사이트를 나눠 다시 실행해 주세요.",
-              metadata: {
-                ...captureMetadata,
-                failureCategory: "timeout",
-                failureCode: "batch_serverless_budget_exhausted",
-                failedAt: new Date().toISOString(),
-              },
-              updated_at: new Date().toISOString(),
-            })
-            .eq("id", captureId);
-          console.warn(`[BatchCapture] ⏭️ 서버 시간 한도로 스킵: ${captureId}`);
-          continue;
+          const remainingIds = captureIds.slice(captureIndex);
+          await markRemainingPendingAsBudgetSkipped(supabase, remainingIds);
+          console.warn(
+            `[BatchCapture] ⏭️ 서버 시간 예산 부족 — 남은 ${remainingIds.length}건 실패 처리 후 배치 종료`
+          );
+          break;
         }
 
         // 2) 상태 → processing
@@ -737,6 +727,19 @@ async function executeBatchCaptures(captureIds: string[]): Promise<void> {
     } catch (cleanupErr) {
       console.warn("[BatchCapture] processing 정리 실패:", cleanupErr);
     }
+    try {
+      await supabase
+        .from("vision_da_captures")
+        .update({
+          status: "failed",
+          error_message: "배치 실행 시간이 부족해 처리되지 못했습니다. 사이트를 나눠 다시 실행해 주세요.",
+          updated_at: new Date().toISOString(),
+        })
+        .in("id", captureIds)
+        .eq("status", "pending");
+    } catch (cleanupErr) {
+      console.warn("[BatchCapture] pending 정리 실패:", cleanupErr);
+    }
 
     if (engineLaunched) {
       await sharedEngine.close();
@@ -746,6 +749,23 @@ async function executeBatchCaptures(captureIds: string[]): Promise<void> {
 
   const totalMs = Date.now() - startTime;
   console.log(`[BatchCapture] 📊 배치 완료 (${totalMs}ms)`);
+}
+
+async function markRemainingPendingAsBudgetSkipped(
+  supabase: ReturnType<typeof createServerClient>,
+  captureIds: string[]
+): Promise<void> {
+  if (captureIds.length === 0) return;
+  await supabase
+    .from("vision_da_captures")
+    .update({
+      status: "failed",
+      error_message:
+        "배치 서버 시간 한도에 가까워 캡처를 시작하지 않았습니다. 사이트를 나눠 다시 실행해 주세요.",
+      updated_at: new Date().toISOString(),
+    })
+    .in("id", captureIds)
+    .eq("status", "pending");
 }
 
 function isBrowserSessionClosedError(err: unknown): boolean {
