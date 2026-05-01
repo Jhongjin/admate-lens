@@ -3541,6 +3541,108 @@ export class YouTubeCapture extends BaseChannel {
     const ctaText = instreamOpts.ctaText || '자세히 알아보기';
 
     const showSkipButton = instreamOpts.instreamSkipMode !== "non-skippable";
+    let resolvedServerPlayerBox:
+      | { left: number; top: number; width: number; height: number }
+      | undefined =
+      playerInfo.found && playerInfo.width > 80 && playerInfo.height > 80
+        ? {
+            left: playerInfo.left,
+            top: playerInfo.top,
+            width: playerInfo.width,
+            height: playerInfo.height,
+          }
+        : undefined;
+
+    if (!resolvedServerPlayerBox && !isMobile) {
+      resolvedServerPlayerBox = await page.evaluate<
+        { left: number; top: number; width: number; height: number } | undefined
+      >(`
+        (() => {
+          const visibleRect = (el) => {
+            if (!el) return null;
+            const r = el.getBoundingClientRect();
+            const st = window.getComputedStyle(el);
+            if (
+              r.width <= 16 ||
+              r.height <= 8 ||
+              st.display === "none" ||
+              st.visibility === "hidden" ||
+              Number(st.opacity || "1") <= 0
+            ) return null;
+            return r;
+          };
+
+          const sidebarSelectors = [
+            "#admate-watch-context-sidebar",
+            "#secondary",
+            "#secondary-inner",
+            "#related",
+            "ytd-watch-next-secondary-results-renderer"
+          ];
+          let sidebarRect = null;
+          for (const sel of sidebarSelectors) {
+            const r = visibleRect(document.querySelector(sel));
+            if (r && r.width > 160 && r.height > 80 && r.left > 420 && r.left < window.innerWidth - 80) {
+              sidebarRect = r;
+              break;
+            }
+          }
+
+          const playerSelectors = [
+            "video",
+            "#movie_player",
+            "#player-container-inner",
+            "#player-container-outer",
+            "ytd-player#ytd-player",
+            "ytd-player",
+            ".html5-video-player",
+            "#player",
+            "#ytd-player",
+            "div.ytd-watch-flexy#player",
+            "#player-container-id",
+            ".player-container"
+          ];
+
+          const normalize = (r) => {
+            if (!r) return null;
+            const left = Math.max(24, Math.round(r.left || 86));
+            const top = Math.max(50, Math.round(r.top || 56));
+            const safeRight = sidebarRect
+              ? Math.min(window.innerWidth - 24, sidebarRect.left - 24)
+              : window.innerWidth - 24;
+            let width = Math.floor(Math.min(r.width || 0, safeRight - left));
+            if (width < 480) return null;
+            let height = Math.round(r.height || 0);
+            const ratio = width / Math.max(height, 1);
+            if (height < 220 || height > window.innerHeight * 0.82 || ratio > 1.95 || ratio < 1.45) {
+              height = Math.round((width * 9) / 16);
+            }
+            return { left, top, width, height };
+          };
+
+          for (const sel of playerSelectors) {
+            const r = visibleRect(document.querySelector(sel));
+            const box = normalize(r);
+            if (box) return box;
+          }
+
+          const left = Math.max(24, Math.round(Math.min(86, window.innerWidth * 0.06)));
+          const top = Math.max(50, Math.round(Math.min(72, window.innerHeight * 0.08)));
+          const safeRight = sidebarRect
+            ? Math.min(window.innerWidth - 24, sidebarRect.left - 24)
+            : window.innerWidth - 24;
+          const width = Math.floor(Math.min(Math.max(640, window.innerWidth * 0.64), safeRight - left));
+          if (width < 480) return undefined;
+          return { left, top, width, height: Math.round((width * 9) / 16) };
+        })()
+      `);
+
+      if (resolvedServerPlayerBox) {
+        console.log(
+          `[YouTube] 프리롤 플레이어 fallback: ✅ ${resolvedServerPlayerBox.width}x${resolvedServerPlayerBox.height} @ ${resolvedServerPlayerBox.left},${resolvedServerPlayerBox.top}`
+        );
+      }
+    }
 
     const prerollPayload: PrerollInjectPagePayload = {
       imgUrl: imgDataUrl,
@@ -3553,15 +3655,7 @@ export class YouTubeCapture extends BaseChannel {
       ctaBtnText: ctaText,
       progressFillPct: Math.min(100, Math.max(0, instreamOpts.progressFillPercent ?? 33)),
       showSkipButton,
-      serverPlayerBox:
-        playerInfo.found && playerInfo.width > 80 && playerInfo.height > 80
-          ? {
-              left: playerInfo.left,
-              top: playerInfo.top,
-              width: playerInfo.width,
-              height: playerInfo.height,
-            }
-          : undefined,
+      serverPlayerBox: resolvedServerPlayerBox,
     };
     const result = await page.evaluate(runPrerollInjectInPage, prerollPayload);
 

@@ -54,12 +54,14 @@ export function runPrerollInjectInPage(...args: unknown[]): boolean {
     let pw = window.innerWidth * 0.7;
     let ph = window.innerHeight * 0.6;
     let playerRect: DOMRect | null = null;
+    let usedMeasuredPlayer = false;
 
     if (srv && srv.width > 80 && srv.height > 80) {
       px = srv.left;
       py = srv.top;
       pw = srv.width;
       ph = srv.height;
+      usedMeasuredPlayer = true;
     } else {
       const videoEl = document.querySelector("video");
       if (videoEl) {
@@ -83,6 +85,59 @@ export function runPrerollInjectInPage(...args: unknown[]): boolean {
         py = playerRect.top;
         pw = playerRect.width;
         ph = playerRect.height;
+        usedMeasuredPlayer = true;
+      }
+    }
+
+    if (!isMobile) {
+      const sidebarSelectors = [
+        "#admate-watch-context-sidebar",
+        "#secondary",
+        "#secondary-inner",
+        "#related",
+        "ytd-watch-next-secondary-results-renderer",
+      ];
+      let sidebarRect: DOMRect | null = null;
+      for (const sel of sidebarSelectors) {
+        const el = document.querySelector(sel);
+        if (!el) continue;
+        const r = el.getBoundingClientRect();
+        if (
+          r.width > 160 &&
+          r.height > 80 &&
+          r.left > Math.max(360, px + 320) &&
+          r.left < window.innerWidth - 80
+        ) {
+          sidebarRect = r;
+          break;
+        }
+      }
+
+      if (!usedMeasuredPlayer) {
+        px = Math.max(24, Math.round(Math.min(86, window.innerWidth * 0.06)));
+        py = Math.max(50, Math.round(Math.min(72, window.innerHeight * 0.08)));
+      }
+
+      const safeRight = sidebarRect
+        ? Math.min(window.innerWidth - 24, sidebarRect.left - 24)
+        : window.innerWidth - 24;
+      const maxPlayerWidth = Math.floor(safeRight - px);
+      if (maxPlayerWidth > 480 && pw > maxPlayerWidth) {
+        pw = maxPlayerWidth;
+      }
+
+      const aspectHeight = Math.round((pw * 9) / 16);
+      const aspectRatio = pw / Math.max(ph, 1);
+      const overlapsSidebar = sidebarRect ? px + pw > sidebarRect.left - 16 : false;
+      if (
+        !usedMeasuredPlayer ||
+        overlapsSidebar ||
+        aspectRatio > 1.95 ||
+        aspectRatio < 1.45 ||
+        ph < 220 ||
+        ph > window.innerHeight * 0.82
+      ) {
+        ph = aspectHeight;
       }
     }
 
