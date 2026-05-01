@@ -50,6 +50,9 @@ export interface CaptureDiagnostics {
     score: number;
     needsReview: boolean;
     viewportCoverage: number;
+    visibleRatio: number;
+    viewportWidthRatio: number;
+    viewportHeightRatio: number;
     creativeAspect?: number;
     renderedAspect?: number;
     flags: string[];
@@ -438,6 +441,9 @@ export class GdnCapture extends BaseChannel {
         adHintSlots.forEach((s) => slots.push(s));
       }
     }
+    if (mobileSurface) {
+      this.prioritizeMobileReportSlots(slots, viewport);
+    }
     
     // 슬롯 상세 로깅 (대형 페이지는 상위 일부만 로깅해 안정성 확보)
     const logLimit = hugePageLikely ? 60 : slots.length;
@@ -587,6 +593,7 @@ export class GdnCapture extends BaseChannel {
       host,
       preferViewportOnly: gdnViewportMode === "mobile",
       preferTargetViewport: injectedCount > 0,
+      mobileViewport: gdnViewportMode === "mobile",
     });
     this.diagnostics.screenshotMode = screenshotResult.mode;
     this.diagnostics.fullPageCaptureError = screenshotResult.errorMessage;
@@ -594,6 +601,7 @@ export class GdnCapture extends BaseChannel {
     this.diagnostics.captureQuality = await this.measureCaptureQuality(
       page,
       creativeDims,
+      { mobileViewport: gdnViewportMode === "mobile" },
     );
 
     console.log(`[GDN] ===== 캡처 완료 (전체 페이지, ${injectedCount}/${slots.length}개 슬롯 인젝션) =====`);
@@ -612,6 +620,8 @@ export class GdnCapture extends BaseChannel {
       preferViewportOnly?: boolean;
       /** 보고서용: 광고가 작게 보이는 fullPage 대신 광고 중심 뷰포트 캡처 */
       preferTargetViewport?: boolean;
+      /** Mobile 지면 품질 기준 보정 */
+      mobileViewport?: boolean;
     },
   ): Promise<{
     buffer: Buffer;
@@ -711,8 +721,11 @@ export class GdnCapture extends BaseChannel {
     return await page.evaluate<boolean>(`
       (() => {
         const anchored = document.querySelector('[data-admate-scroll-anchor="1"]');
-        const candidates = anchored
-          ? [anchored]
+        const anchoredTarget = anchored
+          ? anchored.querySelector('[data-injected="admate-wrapper"], img[data-injected="admate"]') || anchored
+          : null;
+        const candidates = anchoredTarget
+          ? [anchoredTarget]
           : Array.from(
               document.querySelectorAll('[data-injected="admate-wrapper"], img[data-injected="admate"]')
             );
@@ -744,7 +757,18 @@ export class GdnCapture extends BaseChannel {
 
         const absoluteTop = (window.scrollY || 0) + rect.top;
         const viewportH = window.innerHeight || 1080;
-        const targetY = Math.max(0, Math.round(absoluteTop - viewportH * 0.35));
+        const viewportW = window.innerWidth || 1920;
+        const docH = Math.max(
+          document.body.scrollHeight || 0,
+          document.documentElement.scrollHeight || 0,
+          document.body.offsetHeight || 0,
+          document.documentElement.offsetHeight || 0
+        );
+        const maxScrollY = Math.max(0, docH - viewportH);
+        const topPadding = viewportW <= 520
+          ? Math.max(88, viewportH * 0.22)
+          : Math.max(140, viewportH * 0.32);
+        const targetY = Math.max(0, Math.min(maxScrollY, Math.round(absoluteTop - topPadding)));
 
         window.scrollTo({ top: targetY, behavior: 'instant' });
         document.documentElement.scrollTop = targetY;
@@ -1177,40 +1201,89 @@ export class GdnCapture extends BaseChannel {
   private async measureCaptureQuality(
     page: IPageHandle,
     creativeDims?: { width: number; height: number },
+    options: { mobileViewport?: boolean } = {},
   ): Promise<CaptureDiagnostics["captureQuality"]> {
     const quality = await page.evaluate<{
       found: boolean;
       viewportCoverage: number;
       visibleRatio: number;
+      viewportWidthRatio: number;
+      viewportHeightRatio: number;
+      nearViewportEdge: boolean;
+      nearPageEnd: boolean;
+      stickyOrFixed: boolean;
+      footerLike: boolean;
       renderedAspect?: number;
     }>(`
       (() => {
+        const anchor = document.querySelector('[data-admate-scroll-anchor="1"]');
+        const anchorTarget = anchor
+          ? anchor.querySelector('[data-injected="admate-wrapper"], img[data-injected="admate"]') || anchor
+          : null;
+        const injected = Array.from(
+          document.querySelectorAll('[data-injected="admate-wrapper"], img[data-injected="admate"]')
+        );
         const target =
-          document.querySelector('[data-admate-scroll-anchor="1"]') ||
-          document.querySelector('[data-injected="admate-wrapper"]') ||
-          document.querySelector('img[data-injected="admate"]');
+          anchorTarget ||
+          injected.sort((a, b) => {
+            const ar = a.getBoundingClientRect();
+            const br = b.getBoundingClientRect();
+            return (br.width * br.height) - (ar.width * ar.height);
+          })[0];
         if (!target) {
-          return { found: false, viewportCoverage: 0, visibleRatio: 0 };
+          return {
+            found: false,
+            viewportCoverage: 0,
+            visibleRatio: 0,
+            viewportWidthRatio: 0,
+            viewportHeightRatio: 0,
+            nearViewportEdge: false,
+            nearPageEnd: false,
+            stickyOrFixed: false,
+            footerLike: false,
+          };
         }
 
         const rect = target.getBoundingClientRect();
         const viewportW = window.innerWidth || 1;
         const viewportH = window.innerHeight || 1;
+        const docH = Math.max(
+          document.body.scrollHeight || 0,
+          document.documentElement.scrollHeight || 0,
+          document.body.offsetHeight || 0,
+          document.documentElement.offsetHeight || 0
+        );
         const width = Math.max(0, rect.width);
         const height = Math.max(0, rect.height);
         const visibleW = Math.max(0, Math.min(rect.right, viewportW) - Math.max(rect.left, 0));
         const visibleH = Math.max(0, Math.min(rect.bottom, viewportH) - Math.max(rect.top, 0));
         const area = width * height;
+        const style = window.getComputedStyle(target);
+        const anchorStyle = anchor ? window.getComputedStyle(anchor) : null;
+        const absoluteTop = (window.scrollY || 0) + rect.top;
+        const absoluteBottom = absoluteTop + height;
+        const footerLike = Boolean(target.closest('footer, [class*="footer"], [id*="footer"]'));
         return {
           found: true,
           viewportCoverage: area / Math.max(1, viewportW * viewportH),
           visibleRatio: area > 0 ? (visibleW * visibleH) / area : 0,
+          viewportWidthRatio: width / viewportW,
+          viewportHeightRatio: height / viewportH,
+          nearViewportEdge: rect.top < 18 || rect.bottom > viewportH - 18,
+          nearPageEnd: docH > viewportH && absoluteBottom > docH - viewportH * 0.35,
+          stickyOrFixed:
+            style.position === 'fixed' ||
+            style.position === 'sticky' ||
+            anchorStyle?.position === 'fixed' ||
+            anchorStyle?.position === 'sticky',
+          footerLike,
           renderedAspect: height > 0 ? width / height : undefined,
         };
       })()
     `);
 
     const flags: string[] = [];
+    const mobileViewport = Boolean(options.mobileViewport);
     const creativeAspect =
       creativeDims && creativeDims.width > 0 && creativeDims.height > 0
         ? creativeDims.width / creativeDims.height
@@ -1222,8 +1295,23 @@ export class GdnCapture extends BaseChannel {
     if (quality.viewportCoverage > 0 && quality.viewportCoverage < 0.025) {
       flags.push("ad_small_in_report_view");
     }
+    if (
+      mobileViewport &&
+      quality.found &&
+      (quality.viewportCoverage < 0.055 ||
+        quality.viewportWidthRatio < 0.45 ||
+        quality.viewportHeightRatio < 0.09)
+    ) {
+      flags.push("mobile_ad_too_small");
+    }
     if (quality.found && quality.visibleRatio < 0.92) {
       flags.push("ad_partially_out_of_view");
+    }
+    if (quality.found && quality.nearViewportEdge) {
+      flags.push("ad_near_viewport_edge");
+    }
+    if (mobileViewport && quality.found && (quality.footerLike || quality.stickyOrFixed || quality.nearPageEnd)) {
+      flags.push("footer_or_sticky_ad_position");
     }
     if (
       creativeAspect &&
@@ -1236,13 +1324,19 @@ export class GdnCapture extends BaseChannel {
     let score = 100;
     if (flags.includes("injected_ad_not_measured")) score -= 70;
     if (flags.includes("ad_small_in_report_view")) score -= 25;
+    if (flags.includes("mobile_ad_too_small")) score -= 20;
     if (flags.includes("ad_partially_out_of_view")) score -= 35;
+    if (flags.includes("ad_near_viewport_edge")) score -= 25;
+    if (flags.includes("footer_or_sticky_ad_position")) score -= 20;
     if (flags.includes("creative_slot_aspect_mismatch")) score -= 20;
 
     return {
       score: Math.max(0, score),
       needsReview: flags.length > 0,
       viewportCoverage: Math.round(quality.viewportCoverage * 10000) / 10000,
+      visibleRatio: Math.round(quality.visibleRatio * 10000) / 10000,
+      viewportWidthRatio: Math.round(quality.viewportWidthRatio * 10000) / 10000,
+      viewportHeightRatio: Math.round(quality.viewportHeightRatio * 10000) / 10000,
       creativeAspect: creativeAspect ? Math.round(creativeAspect * 1000) / 1000 : undefined,
       renderedAspect: quality.renderedAspect
         ? Math.round(quality.renderedAspect * 1000) / 1000
@@ -1284,6 +1378,73 @@ export class GdnCapture extends BaseChannel {
     const sizeScore = ((widthRatio + heightRatio) / 2) * 60;
 
     return Math.round((aspectScore + sizeScore) * 10) / 10;
+  }
+
+  private prioritizeMobileReportSlots(
+    slots: DetectedSlot[],
+    viewport: { width: number; height: number },
+  ): void {
+    const notFooterLike = slots.filter((slot) => !slot.isFixed && !this.isFooterLikeSlot(slot));
+    if (notFooterLike.length > 0 && notFooterLike.length < slots.length) {
+      const removed = slots.length - notFooterLike.length;
+      console.log(`[GDN] 모바일 푸터/스티키성 슬롯 후순위 제외: ${removed}개`);
+      slots.length = 0;
+      notFooterLike.forEach((slot) => slots.push(slot));
+    }
+
+    const minReportWidth = Math.min(260, Math.max(160, viewport.width * 0.62));
+    const reportSlots = slots.filter(
+      (slot) =>
+        !slot.isFixed &&
+        slot.width >= minReportWidth &&
+        slot.width <= viewport.width + 90 &&
+        slot.height >= 90 &&
+        slot.height <= 430,
+    );
+    const mpuLike = reportSlots.filter((slot) => slot.height >= 180 && slot.width >= 240);
+    const preferred = mpuLike.length > 0 ? mpuLike : reportSlots;
+    if (preferred.length > 0 && preferred.length < slots.length) {
+      const removed = slots.length - preferred.length;
+      console.log(`[GDN] 모바일 리포트형 광고 슬롯 우선 필터: ${removed}개 제외`);
+      slots.length = 0;
+      preferred.forEach((slot) => slots.push(slot));
+    }
+
+    slots.sort((a, b) => {
+      const scoreA = this.calcMobileReportSlotScore(a, viewport);
+      const scoreB = this.calcMobileReportSlotScore(b, viewport);
+      if (scoreB !== scoreA) return scoreB - scoreA;
+      return b.confidence - a.confidence;
+    });
+  }
+
+  private calcMobileReportSlotScore(
+    slot: DetectedSlot,
+    viewport: { width: number; height: number },
+  ): number {
+    let score = slot.confidence;
+    const area = slot.width * slot.height;
+    const widthFit = Math.min(slot.width, viewport.width) / Math.max(slot.width, viewport.width);
+    score += widthFit * 45;
+    if (slot.height >= 180 && slot.height <= 340) score += 55;
+    else if (slot.height >= 90 && slot.height < 180) score += 12;
+    if (area >= 260 * 180) score += 35;
+    if (slot.isFixed) score -= 120;
+    if (this.isFooterLikeSlot(slot)) score -= 100;
+    if (slot.type === "gdn-iframe" || slot.type === "gdn-ins") score += 24;
+    if (slot.type === "size-match") score -= 8;
+    return score;
+  }
+
+  private isFooterLikeSlot(slot: DetectedSlot): boolean {
+    const sel = (slot.selector || "").toLowerCase();
+    return (
+      sel.includes("footer") ||
+      sel.includes("family") ||
+      sel.includes("bottom") ||
+      sel.includes("sticky") ||
+      sel.includes("floating")
+    );
   }
 
   /**

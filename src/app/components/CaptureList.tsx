@@ -120,6 +120,9 @@ function getQualityReviewLabel(metadata: Record<string, unknown> | null): string
     | { flags?: unknown; score?: unknown }
     | undefined;
   const flags = Array.isArray(quality?.flags) ? quality.flags : [];
+  if (flags.includes("footer_or_sticky_ad_position")) return "푸터/스티키 위치 확인";
+  if (flags.includes("ad_near_viewport_edge")) return "광고 위치 확인";
+  if (flags.includes("mobile_ad_too_small")) return "모바일 광고 크기 확인";
   if (flags.includes("creative_slot_aspect_mismatch")) return "소재 비율 확인";
   if (flags.includes("ad_small_in_report_view")) return "광고 크기 확인";
   if (flags.includes("ad_partially_out_of_view")) return "광고 위치 확인";
