@@ -118,6 +118,7 @@ export class GdnCapture extends BaseChannel {
 
     const gdnViewportMode =
       request.options?.gdnViewportMode === "mobile" ? "mobile" : "pc";
+    const batchFastMode = Boolean(request.options?.gdnBatchFastMode);
     if (gdnViewportMode === "mobile") {
       await page.setViewport(MOBILE_AOS_VIEWPORT);
       await page.setUserAgent(UA_MOBILE_AOS);
@@ -135,6 +136,9 @@ export class GdnCapture extends BaseChannel {
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36",
       );
       console.log("[GDN] 🖥 PC 지면: 데스크톱 뷰포트/UA");
+    }
+    if (batchFastMode) {
+      console.log("[GDN] ⚡ 배치 fast mode: 대기 시간/페이지 복원 범위 축소");
     }
 
     // 1) 소재 이미지 → base64 data URL 변환
@@ -163,7 +167,7 @@ export class GdnCapture extends BaseChannel {
       timeout: gotoTimeoutMs,
     });
     if (gotoRelaxed) {
-      await new Promise((r) => setTimeout(r, 3500));
+      await new Promise((r) => setTimeout(r, batchFastMode ? 1600 : 3500));
     } else if (mobileSurface) {
       await new Promise((r) => setTimeout(r, 4500));
     }
@@ -173,10 +177,15 @@ export class GdnCapture extends BaseChannel {
     await page.evaluate<void>(`
       (async () => {
         try {
-          await document.fonts.ready;
+          const fastMode = ${batchFastMode ? "true" : "false"};
+          await Promise.race([
+            document.fonts.ready,
+            new Promise((resolve) => setTimeout(resolve, fastMode ? 800 : 3000)),
+          ]);
           // 최대 3초 대기하며 Noto Sans KR 폰트 로딩 확인
           const start = Date.now();
-          while (Date.now() - start < 3000) {
+          const maxWaitMs = fastMode ? 800 : 3000;
+          while (Date.now() - start < maxWaitMs) {
             if (document.fonts.check('16px "Noto Sans KR"')) {
               console.log('[GDN] ✅ 한글 폰트 로드 완료 (' + (Date.now() - start) + 'ms)');
               break;
@@ -201,7 +210,7 @@ export class GdnCapture extends BaseChannel {
     }
     // 모바일: DOM이 가볍고 메모리 한계가 빡빡해 lazy는 항상 경량(뉴스지면 OOM 방지)
     const lazyLoadMode =
-      gdnViewportMode === "mobile" ? "light" : getGdnLazyLoadMode(host);
+      gdnViewportMode === "mobile" || batchFastMode ? "light" : getGdnLazyLoadMode(host);
 
     // 2.5) 🔑 Lazy Loading 이미지 강제 로드
     // — full: data-src 일괄 복원 + 뷰포트 5배 스크롤
@@ -212,7 +221,7 @@ export class GdnCapture extends BaseChannel {
     const lazyCfg = JSON.stringify({
       skipDataSrc: lazyLoadMode === "light",
       maxScrollVh: lazyLoadMode === "light" ? 2 : 5,
-      scrollWaitMs: lazyLoadMode === "light" ? 150 : 200,
+      scrollWaitMs: batchFastMode ? 100 : lazyLoadMode === "light" ? 150 : 200,
       attrs: ["data-src", "data-lazy-src", "data-original", "data-lazy"],
     });
     await page.evaluate<void>(`
@@ -278,7 +287,9 @@ export class GdnCapture extends BaseChannel {
     console.log("[GDN] ✅ Lazy Loading 이미지 강제 로드 완료");
 
     // 3) 광고 로드 + 이미지 렌더링 대기 (모바일 GAM은 늦게 붙는 경우가 많음)
-    await new Promise((r) => setTimeout(r, mobileSurface ? 4200 : 3000));
+    await new Promise((r) =>
+      setTimeout(r, batchFastMode ? 1200 : mobileSurface ? 4200 : 3000),
+    );
 
     // 3.1) Access Denied/차단 페이지는 성공 처리하지 않고 즉시 실패로 반환
     const blocked = await this.detectAccessDenied(page);
@@ -516,7 +527,7 @@ export class GdnCapture extends BaseChannel {
     }
 
     // 6) 렌더링 안정화 대기
-    await new Promise((r) => setTimeout(r, 2000));
+    await new Promise((r) => setTimeout(r, batchFastMode ? 800 : 2000));
 
     // 7) 인젝션 결과 확인 + 스크롤 최상단 복원
     const injectedCheck = await page.evaluate<{ found: boolean; count: number; inViewport: boolean }>(`
@@ -549,7 +560,7 @@ export class GdnCapture extends BaseChannel {
     await this.ensureAdDisclosureBadge(page);
 
     // 🔑 스크롤 복원 후 충분한 렌더링 안정화 (블로터 등 동적 사이트 대응)
-    await new Promise((r) => setTimeout(r, 2000));
+    await new Promise((r) => setTimeout(r, batchFastMode ? 800 : 2000));
 
     // 최종 스크롤 위치 확인
     const scrollCheck = await page.evaluate<{ scrollY: number; bodyH: number }>(`

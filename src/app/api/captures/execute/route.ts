@@ -185,6 +185,7 @@ export async function POST(request: NextRequest) {
                   instreamOpts: captureMetadata.instreamOpts,
                   infeedOpts: captureMetadata.infeedOpts,
                   publisherGotoRelaxed: multiBatch && resolvedChannel === "gdn",
+                  gdnBatchFastMode: multiBatch && resolvedChannel === "gdn",
                   gdnViewportMode:
                     resolvedChannel === "gdn"
                       ? captureMetadata.gdnViewportMode === "mobile"

@@ -472,6 +472,7 @@ async function executeBatchCaptures(captureIds: string[]): Promise<void> {
             instreamOpts: captureMetadata.instreamOpts,
             infeedOpts: captureMetadata.infeedOpts,
             publisherGotoRelaxed: multiBatch && capture.channel === "gdn",
+            gdnBatchFastMode: multiBatch && capture.channel === "gdn",
             gdnViewportMode:
               capture.channel === "gdn"
                 ? captureMetadata.gdnViewportMode === "mobile"
