@@ -14,6 +14,11 @@ import { resolveBatchPerCaptureTimeoutMs } from "@/lib/capture/batch-serverless"
 import { PuppeteerEngine } from "@/lib/capture/engine/puppeteer-engine";
 import { isGdnExcludedHost } from "@/lib/capture/channels/gdn/host-strategies";
 import type { ChannelType, VisionDaCaptureRow } from "@/lib/supabase/types";
+import {
+  makeCaptureStoragePath,
+  removeCaptureStorageFolder,
+  uploadStorageObject,
+} from "@/lib/storage/capture-storage";
 
 export const maxDuration = 300; // 5분
 export const dynamic = "force-dynamic";
@@ -478,39 +483,29 @@ async function executeBatchCaptures(captureIds: string[]): Promise<void> {
 
         // 6) Storage 업로드
         const timestamp = Date.now();
-        const basePath = `captures/${captureId}`;
-
-        const placementPath = `${basePath}/placement_${timestamp}.png`;
-        const { error: uploadError } = await supabase.storage
-          .from("capture-images")
-          .upload(placementPath, result.placementScreenshot, {
+        const placementUpload = await uploadStorageObject(
+          supabase,
+          makeCaptureStoragePath(captureId, "placement", timestamp),
+          result.placementScreenshot,
+          {
             contentType: "image/png",
-            upsert: true,
-          });
-
-        if (uploadError) {
-          throw new Error(`게재면 이미지 업로드 실패: ${uploadError.message}`);
-        }
-
-        const { data: placementUrlData } = supabase.storage
-          .from("capture-images")
-          .getPublicUrl(placementPath);
+            label: "게재면 이미지",
+          }
+        );
 
         let landingPublicUrl: string | null = null;
         if (result.landingScreenshot) {
-          const landingPath = `${basePath}/landing_${timestamp}.png`;
-          await supabase.storage
-            .from("capture-images")
-            .upload(landingPath, result.landingScreenshot, {
+          const landingUpload = await uploadStorageObject(
+            supabase,
+            makeCaptureStoragePath(captureId, "landing", timestamp),
+            result.landingScreenshot,
+            {
               contentType: "image/png",
-              upsert: true,
-            });
+              label: "랜딩 이미지",
+            }
+          );
 
-          const { data: landingUrlData } = supabase.storage
-            .from("capture-images")
-            .getPublicUrl(landingPath);
-
-          landingPublicUrl = landingUrlData.publicUrl;
+          landingPublicUrl = landingUpload.publicUrl;
         }
 
         // 7) DB → completed
@@ -522,8 +517,8 @@ async function executeBatchCaptures(captureIds: string[]): Promise<void> {
           .from("vision_da_captures")
           .update({
             status: "completed",
-            placement_image_url: placementUrlData.publicUrl,
-            screenshot_storage_path: placementPath,
+            placement_image_url: placementUpload.publicUrl,
+            screenshot_storage_path: placementUpload.path,
             landing_image_url: landingPublicUrl,
             landing_final_url: result.landingUrl ?? null,
             metadata: {
@@ -866,16 +861,7 @@ export async function DELETE(request: NextRequest) {
     // 1) Storage 이미지 삭제
     for (const captureId of targetIds) {
       try {
-        const { data: files } = await supabase.storage
-          .from("capture-images")
-          .list(`captures/${captureId}`);
-
-        if (files && files.length > 0) {
-          const paths = files.map((f: any) => `captures/${captureId}/${f.name}`);
-          await supabase.storage
-            .from("capture-images")
-            .remove(paths);
-        }
+        await removeCaptureStorageFolder(supabase, captureId);
       } catch (storageErr) {
         // Storage 삭제 실패해도 DB 삭제는 진행
         console.warn(`[API] Storage 삭제 실패 (${captureId}):`, storageErr);
