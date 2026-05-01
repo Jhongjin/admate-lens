@@ -126,6 +126,12 @@ function parseBrowserbaseTimeoutSeconds(value: string | undefined, fallback = 12
   return Math.max(60, Math.min(21_600, Math.round(n)));
 }
 
+function normalizeBrowserbaseTimeoutSeconds(value: number | undefined, fallback = 120): number {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.max(60, Math.min(21_600, Math.round(n)));
+}
+
 /**
  * 🛡️ Stealth 회피 스크립트 (puppeteer-extra-plugin-stealth 핵심 로직 직접 구현)
  *
@@ -737,8 +743,9 @@ export class PuppeteerEngine implements IBrowserEngine {
     }
 
     const timeoutSeconds =
-      this.options.browserbase?.timeoutSeconds ??
-      parseBrowserbaseTimeoutSeconds(process.env.BROWSERBASE_SESSION_TIMEOUT_SECONDS);
+      this.options.browserbase?.timeoutSeconds !== undefined
+        ? normalizeBrowserbaseTimeoutSeconds(this.options.browserbase.timeoutSeconds)
+        : parseBrowserbaseTimeoutSeconds(process.env.BROWSERBASE_SESSION_TIMEOUT_SECONDS);
     const region = this.options.browserbase?.region ?? process.env.BROWSERBASE_REGION?.trim();
     const body: Record<string, unknown> = {
       projectId,
