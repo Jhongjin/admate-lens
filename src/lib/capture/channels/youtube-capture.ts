@@ -3579,8 +3579,14 @@ export class YouTubeCapture extends BaseChannel {
           return ch;
       }
     });
+    const normalizeAdTitle = (value?: string): string => {
+      const title = (value || "").trim();
+      if (!title) return "";
+      if (/^(광고\s*제목|ad\s*title)$/i.test(title)) return "";
+      return title;
+    };
     const adTitlePlain =
-      instreamOpts.adTitle?.trim() ||
+      normalizeAdTitle(instreamOpts.adTitle) ||
       deriveAdvertiserName(displayUrlText) ||
       "스폰서";
     let currentLineCost = 0;
@@ -4076,7 +4082,13 @@ export class YouTubeCapture extends BaseChannel {
               .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
               .join(' ');
           };
-          const adTitleText = String(uiOpts.adTitle || '').trim() || deriveTitle(displayHost) || '스폰서';
+          const normalizeAdTitle = (value) => {
+            const title = String(value || '').trim();
+            if (!title) return '';
+            if (/^(광고\\s*제목|ad\\s*title)$/i.test(title)) return '';
+            return title;
+          };
+          const adTitleText = normalizeAdTitle(uiOpts.adTitle) || deriveTitle(displayHost) || '스폰서';
           const ctaLabel = String(uiOpts.ctaText || '').trim() || '사이트 방문';
 
           const companionWrapStyles = [
