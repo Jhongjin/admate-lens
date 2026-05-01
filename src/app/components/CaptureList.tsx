@@ -108,8 +108,22 @@ function getResultCategoryLabel(metadata: Record<string, unknown> | null): strin
   const code = typeof metadata?.resultCategory === "string" ? metadata.resultCategory : null;
   if (!code) return null;
   if (code === "ad_capture_ok") return "광고 캡처 정상";
+  if (code === "ad_capture_review_needed") return "검수 필요";
   if (code === "ad_area_not_found") return "광고 캡처 영역 없음";
   if (code === "ad_out_of_viewport") return "광고영역 하단(상단 미포함)";
+  return null;
+}
+
+function getQualityReviewLabel(metadata: Record<string, unknown> | null): string | null {
+  const diagnostics = metadata?.diagnostics as Record<string, unknown> | undefined;
+  const quality = diagnostics?.captureQuality as
+    | { flags?: unknown; score?: unknown }
+    | undefined;
+  const flags = Array.isArray(quality?.flags) ? quality.flags : [];
+  if (flags.includes("creative_slot_aspect_mismatch")) return "소재 비율 확인";
+  if (flags.includes("ad_small_in_report_view")) return "광고 크기 확인";
+  if (flags.includes("ad_partially_out_of_view")) return "광고 위치 확인";
+  if (flags.includes("injected_ad_not_measured")) return "광고 측정 확인";
   return null;
 }
 
@@ -453,6 +467,9 @@ export default function CaptureList({ refreshTrigger }: CaptureListProps) {
                     {capture.status === "completed" && capture.metadata && typeof capture.metadata === "object" && (
                       <p className="text-[11px] text-[var(--color-text-muted)] mt-1">
                         {getResultCategoryLabel(capture.metadata)}
+                        {getQualityReviewLabel(capture.metadata)
+                          ? ` · ${getQualityReviewLabel(capture.metadata)}`
+                          : ""}
                       </p>
                     )}
                     {capture.status === "failed" && capture.metadata && typeof capture.metadata === "object" && (

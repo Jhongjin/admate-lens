@@ -468,12 +468,15 @@ function isHostIsolatableRuntimeError(err: unknown): boolean {
   );
 }
 
-function classifySuccessCategory(diagnostics: any): "ad_capture_ok" | "ad_area_not_found" | "ad_out_of_viewport" {
+function classifySuccessCategory(
+  diagnostics: any
+): "ad_capture_ok" | "ad_area_not_found" | "ad_out_of_viewport" | "ad_capture_review_needed" {
   const slotsDetected = Number(diagnostics?.slotsDetected ?? 0);
   const slotsInjected = Number(diagnostics?.slotsInjected ?? 0);
   const screenshotMode = diagnostics?.screenshotMode;
   const injectedInViewport = diagnostics?.injectedInViewport;
   const fallbackCenteredOnInjected = diagnostics?.fallbackCenteredOnInjected === true;
+  const needsReview = diagnostics?.captureQuality?.needsReview === true;
 
   if (slotsDetected <= 0 || slotsInjected <= 0) {
     return "ad_area_not_found";
@@ -485,6 +488,10 @@ function classifySuccessCategory(diagnostics: any): "ad_capture_ok" | "ad_area_n
     !fallbackCenteredOnInjected
   ) {
     return "ad_out_of_viewport";
+  }
+
+  if (needsReview) {
+    return "ad_capture_review_needed";
   }
 
   return "ad_capture_ok";

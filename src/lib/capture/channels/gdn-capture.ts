@@ -46,6 +46,14 @@ export interface CaptureDiagnostics {
   injectedElementCount?: number;
   injectedInViewport?: boolean;
   fallbackCenteredOnInjected?: boolean;
+  captureQuality?: {
+    score: number;
+    needsReview: boolean;
+    viewportCoverage: number;
+    creativeAspect?: number;
+    renderedAspect?: number;
+    flags: string[];
+  };
 }
 
 const COMMON_GDN_SIZES = [
@@ -383,9 +391,10 @@ export class GdnCapture extends BaseChannel {
         console.log(
           `[GDN] ⚠️ 대형 소재 감지(${creativeDims.width}x${creativeDims.height}) — 표준 광고 슬롯 우선 모드로 전환`
         );
+        const creativeAspect = creativeDims.width / creativeDims.height;
         slots.sort((a, b) => {
-          const scoreA = this.calcCommonGdnScore(a);
-          const scoreB = this.calcCommonGdnScore(b);
+          const scoreA = this.calcCommonGdnScore(a, creativeAspect);
+          const scoreB = this.calcCommonGdnScore(b, creativeAspect);
           if (scoreB !== scoreA) return scoreB - scoreA;
           return b.confidence - a.confidence;
         });
@@ -577,10 +586,15 @@ export class GdnCapture extends BaseChannel {
       bodyHeight: scrollCheck.bodyH,
       host,
       preferViewportOnly: gdnViewportMode === "mobile",
+      preferTargetViewport: injectedCount > 0,
     });
     this.diagnostics.screenshotMode = screenshotResult.mode;
     this.diagnostics.fullPageCaptureError = screenshotResult.errorMessage;
     this.diagnostics.fallbackCenteredOnInjected = screenshotResult.centeredOnInjected ?? false;
+    this.diagnostics.captureQuality = await this.measureCaptureQuality(
+      page,
+      creativeDims,
+    );
 
     console.log(`[GDN] ===== 캡처 완료 (전체 페이지, ${injectedCount}/${slots.length}개 슬롯 인젝션) =====`);
 
@@ -596,6 +610,8 @@ export class GdnCapture extends BaseChannel {
       host?: string;
       /** Mobile 지면: 긴 fullPage 대신 뷰포트 캡처(메모리·모바일 레이아웃 정합) */
       preferViewportOnly?: boolean;
+      /** 보고서용: 광고가 작게 보이는 fullPage 대신 광고 중심 뷰포트 캡처 */
+      preferTargetViewport?: boolean;
     },
   ): Promise<{
     buffer: Buffer;
@@ -612,7 +628,7 @@ export class GdnCapture extends BaseChannel {
         mobileViewport: Boolean(context?.preferViewportOnly),
       }) === "force_centered_viewport";
 
-    if (forceCenteredViewport) {
+    if (forceCenteredViewport || context?.preferTargetViewport) {
       console.log(`[GDN] 📌 호스트 정책 캡처 적용: ${host} (타겟 중심 viewport)`);
       const centeredOnInjected = await this.centerToInjected(page, true, host);
       if (centeredOnInjected) {
@@ -1158,6 +1174,83 @@ export class GdnCapture extends BaseChannel {
     `);
   }
 
+  private async measureCaptureQuality(
+    page: IPageHandle,
+    creativeDims?: { width: number; height: number },
+  ): Promise<CaptureDiagnostics["captureQuality"]> {
+    const quality = await page.evaluate<{
+      found: boolean;
+      viewportCoverage: number;
+      visibleRatio: number;
+      renderedAspect?: number;
+    }>(`
+      (() => {
+        const target =
+          document.querySelector('[data-admate-scroll-anchor="1"]') ||
+          document.querySelector('[data-injected="admate-wrapper"]') ||
+          document.querySelector('img[data-injected="admate"]');
+        if (!target) {
+          return { found: false, viewportCoverage: 0, visibleRatio: 0 };
+        }
+
+        const rect = target.getBoundingClientRect();
+        const viewportW = window.innerWidth || 1;
+        const viewportH = window.innerHeight || 1;
+        const width = Math.max(0, rect.width);
+        const height = Math.max(0, rect.height);
+        const visibleW = Math.max(0, Math.min(rect.right, viewportW) - Math.max(rect.left, 0));
+        const visibleH = Math.max(0, Math.min(rect.bottom, viewportH) - Math.max(rect.top, 0));
+        const area = width * height;
+        return {
+          found: true,
+          viewportCoverage: area / Math.max(1, viewportW * viewportH),
+          visibleRatio: area > 0 ? (visibleW * visibleH) / area : 0,
+          renderedAspect: height > 0 ? width / height : undefined,
+        };
+      })()
+    `);
+
+    const flags: string[] = [];
+    const creativeAspect =
+      creativeDims && creativeDims.width > 0 && creativeDims.height > 0
+        ? creativeDims.width / creativeDims.height
+        : undefined;
+
+    if (!quality.found) {
+      flags.push("injected_ad_not_measured");
+    }
+    if (quality.viewportCoverage > 0 && quality.viewportCoverage < 0.025) {
+      flags.push("ad_small_in_report_view");
+    }
+    if (quality.found && quality.visibleRatio < 0.92) {
+      flags.push("ad_partially_out_of_view");
+    }
+    if (
+      creativeAspect &&
+      quality.renderedAspect &&
+      Math.abs(Math.log(creativeAspect) - Math.log(quality.renderedAspect)) > 0.65
+    ) {
+      flags.push("creative_slot_aspect_mismatch");
+    }
+
+    let score = 100;
+    if (flags.includes("injected_ad_not_measured")) score -= 70;
+    if (flags.includes("ad_small_in_report_view")) score -= 25;
+    if (flags.includes("ad_partially_out_of_view")) score -= 35;
+    if (flags.includes("creative_slot_aspect_mismatch")) score -= 20;
+
+    return {
+      score: Math.max(0, score),
+      needsReview: flags.length > 0,
+      viewportCoverage: Math.round(quality.viewportCoverage * 10000) / 10000,
+      creativeAspect: creativeAspect ? Math.round(creativeAspect * 1000) / 1000 : undefined,
+      renderedAspect: quality.renderedAspect
+        ? Math.round(quality.renderedAspect * 1000) / 1000
+        : undefined,
+      flags,
+    };
+  }
+
   /**
    * 📐 배너 사이즈 매칭 점수 계산
    * 
@@ -1240,13 +1333,18 @@ export class GdnCapture extends BaseChannel {
     );
   }
 
-  private calcCommonGdnScore(slot: DetectedSlot): number {
+  private calcCommonGdnScore(slot: DetectedSlot, creativeAspect?: number): number {
     let best = -999;
     for (const s of COMMON_GDN_SIZES) {
       const wDiff = Math.abs(slot.width - s.w);
       const hDiff = Math.abs(slot.height - s.h);
       if (wDiff <= s.tolerance && hDiff <= s.tolerance) {
-        const score = 200 - (wDiff + hDiff);
+        let score = 200 - (wDiff + hDiff);
+        if (creativeAspect && slot.width > 0 && slot.height > 0) {
+          const slotAspect = slot.width / slot.height;
+          const aspectDelta = Math.abs(Math.log(creativeAspect) - Math.log(slotAspect));
+          score -= Math.min(160, aspectDelta * 90);
+        }
         if (score > best) best = score;
       }
     }
