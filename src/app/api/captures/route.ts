@@ -15,6 +15,12 @@ import { PuppeteerEngine } from "@/lib/capture/engine/puppeteer-engine";
 import { isGdnExcludedHost } from "@/lib/capture/channels/gdn/host-strategies";
 import type { ChannelType, VisionDaCaptureRow } from "@/lib/supabase/types";
 import {
+  isExecutableYouTubeAdType,
+  isLegacyYouTubeAdType,
+  isPublicYouTubeAdType,
+  type PublicYouTubeAdType,
+} from "@/lib/capture/youtube-ad-types";
+import {
   makeCaptureStoragePath,
   removeCaptureStorageFolder,
   uploadStorageObject,
@@ -76,21 +82,7 @@ export async function POST(request: NextRequest) {
       adSizeMode?: "auto" | "manual";
       targetAdSizes?: string[];
       creativeObjectFit?: "contain" | "cover";
-      youtubeAdType?:
-        | "preroll"
-        | "bumper"
-        | "display"
-        | "overlay"
-        | "mobile-preroll-aos"
-        | "mobile-preroll-ios"
-        | "mobile-bumper-aos"
-        | "mobile-bumper-ios"
-        | "shorts-feed"
-        | "masthead-home"
-        | "infeed-home"
-        | "mobile-infeed-home"
-        | "infeed-search"
-        | "infeed-watch-next";
+      youtubeAdType?: string;
       infeedOpts?: {
         videoUrl?: string;
         searchQuery?: string;
@@ -134,29 +126,51 @@ export async function POST(request: NextRequest) {
     const normalizedUrls = urls
       .map((u) => (u.trim() ? normalizeHttpUrl(u) : ""))
       .filter((url) => isValidHttpUrl(url));
+    let resolvedYoutubeAdType: PublicYouTubeAdType | undefined;
+    if (channel === "youtube") {
+      const rawYoutubeAdType =
+        typeof youtubeAdType === "string" && youtubeAdType.trim()
+          ? youtubeAdType.trim()
+          : "preroll";
+      if (isLegacyYouTubeAdType(rawYoutubeAdType) || rawYoutubeAdType === "infeed-home") {
+        return NextResponse.json(
+          {
+            error:
+              "현재 공개 상품 구성에서 지원하지 않는 YouTube 광고 유형입니다. Display/Overlay와 PC 홈 인피드는 legacy/internal 타입으로 분리되었습니다.",
+          },
+          { status: 400 }
+        );
+      }
+      if (!isPublicYouTubeAdType(rawYoutubeAdType)) {
+        return NextResponse.json(
+          { error: `지원하지 않는 YouTube 광고 유형입니다: ${rawYoutubeAdType}` },
+          { status: 400 }
+        );
+      }
+      resolvedYoutubeAdType = rawYoutubeAdType;
+    }
     const isPreroll =
       channel === "youtube" &&
-      (youtubeAdType === "preroll" ||
-        youtubeAdType === "bumper" ||
-        youtubeAdType === "mobile-preroll-aos" ||
-        youtubeAdType === "mobile-preroll-ios" ||
-        youtubeAdType === "mobile-bumper-aos" ||
-        youtubeAdType === "mobile-bumper-ios");
+      (resolvedYoutubeAdType === "preroll" ||
+        resolvedYoutubeAdType === "bumper" ||
+        resolvedYoutubeAdType === "mobile-preroll-aos" ||
+        resolvedYoutubeAdType === "mobile-preroll-ios" ||
+        resolvedYoutubeAdType === "mobile-bumper-aos" ||
+        resolvedYoutubeAdType === "mobile-bumper-ios");
     const isBumper =
       channel === "youtube" &&
-      (youtubeAdType === "bumper" ||
-        youtubeAdType === "mobile-bumper-aos" ||
-        youtubeAdType === "mobile-bumper-ios");
+      (resolvedYoutubeAdType === "bumper" ||
+        resolvedYoutubeAdType === "mobile-bumper-aos" ||
+        resolvedYoutubeAdType === "mobile-bumper-ios");
     const hasValidVideoSource = isPreroll && isValidHttpUrl(instreamOpts?.videoUrl);
     const isInfeedYt =
       channel === "youtube" &&
-      (youtubeAdType === "infeed-home" ||
-        youtubeAdType === "mobile-infeed-home" ||
-        youtubeAdType === "infeed-search" ||
-        youtubeAdType === "infeed-watch-next");
-    const isShortsYt = channel === "youtube" && youtubeAdType === "shorts-feed";
-    const isMastheadYt = channel === "youtube" && youtubeAdType === "masthead-home";
-    /** 인피드·디스플레이·오버레이 등 프리롤이 아닌 YouTube 유형 */
+      (resolvedYoutubeAdType === "mobile-infeed-home" ||
+        resolvedYoutubeAdType === "infeed-search" ||
+        resolvedYoutubeAdType === "infeed-watch-next");
+    const isShortsYt = channel === "youtube" && resolvedYoutubeAdType === "shorts-feed";
+    const isMastheadYt = channel === "youtube" && resolvedYoutubeAdType === "masthead-home";
+    /** 인피드·Shorts·Masthead 등 프리롤이 아닌 YouTube 유형 */
     const hasValidCreativeSource = !isPreroll && isValidHttpUrl(creativeUrl);
     const hasValidInfeedThumbSource =
       isInfeedYt &&
@@ -240,7 +254,7 @@ export async function POST(request: NextRequest) {
         adSizeMode,
         targetAdSizes,
         creativeObjectFit: normalizedCreativeObjectFit,
-        youtubeAdType,
+        youtubeAdType: resolvedYoutubeAdType,
         instreamOpts: instreamOptsNormalized ?? instreamOpts,
         infeedOpts: infeedOptsNormalized ?? infeedOpts,
         gdnViewportMode:
@@ -433,6 +447,15 @@ async function executeBatchCaptures(captureIds: string[]): Promise<void> {
 
         // 4) 채널 생성 (공유 엔진)
         const channel = createChannel(capture.channel as ChannelType, sharedEngine);
+        const storedYoutubeAdType =
+          (typeof captureMetadata.youtubeAdType === "string" &&
+            captureMetadata.youtubeAdType) ||
+          (typeof captureMetadata["youtube_ad_type"] === "string" &&
+            captureMetadata["youtube_ad_type"]) ||
+          "preroll";
+        if (capture.channel === "youtube" && !isExecutableYouTubeAdType(storedYoutubeAdType)) {
+          throw new Error(`지원하지 않는 YouTube 광고 유형입니다: ${storedYoutubeAdType}`);
+        }
 
         // 5) 캡처 실행
         const result = await executeWithRetry(
@@ -450,12 +473,7 @@ async function executeBatchCaptures(captureIds: string[]): Promise<void> {
                 targetAdSizes: captureMetadata.targetAdSizes ?? [],
                 creativeObjectFit:
                   captureMetadata.creativeObjectFit === "cover" ? "cover" : "contain",
-                youtubeAdType:
-                  (typeof captureMetadata.youtubeAdType === "string" &&
-                    captureMetadata.youtubeAdType) ||
-                  (typeof captureMetadata["youtube_ad_type"] === "string" &&
-                    captureMetadata["youtube_ad_type"]) ||
-                  "preroll",
+                youtubeAdType: capture.channel === "youtube" ? storedYoutubeAdType : undefined,
                 instreamOpts: captureMetadata.instreamOpts,
                 infeedOpts: captureMetadata.infeedOpts,
                 publisherGotoRelaxed: multiBatch && capture.channel === "gdn",

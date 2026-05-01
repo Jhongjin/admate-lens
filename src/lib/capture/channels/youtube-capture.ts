@@ -23,23 +23,13 @@ import { runInfeedInjectInPage, type InfeedSurface } from "./youtube-infeed-inpa
 import { generateMobileSyntheticInfeedHomeHtml } from "./mobile-synthetic-infeed";
 import { generateYouTubeShortsSyntheticHtml } from "./youtube-shorts-synthetic";
 import { generateYouTubeMastheadSyntheticHtml } from "./youtube-masthead-synthetic";
+import {
+  isExecutableYouTubeAdType,
+  type ExecutableYouTubeAdType,
+} from "../youtube-ad-types";
 
 /** YouTube 광고 유형 */
-export type YouTubeAdType =
-  | "preroll"
-  | "bumper"
-  | "display"
-  | "overlay"
-  | "mobile-preroll-aos"
-  | "mobile-preroll-ios"
-  | "mobile-bumper-aos"
-  | "mobile-bumper-ios"
-  | "shorts-feed"
-  | "masthead-home"
-  | "infeed-home"
-  | "mobile-infeed-home"
-  | "infeed-search"
-  | "infeed-watch-next";
+export type YouTubeAdType = ExecutableYouTubeAdType;
 
 function isInfeedAdType(t: YouTubeAdType): t is "infeed-home" | "mobile-infeed-home" | "infeed-search" | "infeed-watch-next" {
   return t === "infeed-home" || t === "mobile-infeed-home" || t === "infeed-search" || t === "infeed-watch-next";
@@ -362,7 +352,13 @@ export class YouTubeCapture extends BaseChannel {
   }
 
   async captureAdPlacement(page: IPageHandle, request: CaptureRequest): Promise<Buffer> {
-    const adType = (request.options?.youtubeAdType as YouTubeAdType) || "preroll";
+    const rawAdType = request.options?.youtubeAdType;
+    const adType = typeof rawAdType === "string" && rawAdType.trim()
+      ? rawAdType.trim()
+      : "preroll";
+    if (!isExecutableYouTubeAdType(adType)) {
+      throw new Error(`지원하지 않는 YouTube 광고 유형입니다: ${String(rawAdType ?? "")}`);
+    }
     if (adType === "shorts-feed") {
       return this.captureShortsFeedPlacement(page, request);
     }
@@ -764,8 +760,11 @@ export class YouTubeCapture extends BaseChannel {
 
     switch (adType) {
       case "preroll":
+      case "bumper":
       case "mobile-preroll-aos":
-      case "mobile-preroll-ios": {
+      case "mobile-preroll-ios":
+      case "mobile-bumper-aos":
+      case "mobile-bumper-ios": {
         const prerollUiOpts = {
           videoUrl: instreamOpts.videoUrl || "",
           adTitle: instreamOpts.adTitle || "",
@@ -801,12 +800,6 @@ export class YouTubeCapture extends BaseChannel {
         }
         break;
       }
-      case "display":
-        injectionSuccess = await this.injectDisplayAd(page, creativeDataUrl);
-        break;
-      case "overlay":
-        injectionSuccess = await this.injectOverlayAd(page, creativeDataUrl, playerInfo);
-        break;
     }
 
     this.diagnostics.injectionSuccess = injectionSuccess;

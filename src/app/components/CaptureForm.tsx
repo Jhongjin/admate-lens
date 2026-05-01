@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useRef, useEffect, useMemo } from "react";
+import type { ExecutableYouTubeAdType } from "@/lib/capture/youtube-ad-types";
 
 const MEDIA_SELECT_OPTIONS: Array<{ value: MediaMenu; label: string; enabled: boolean }> = [
   { value: "gdn", label: "Google Ads", enabled: true },
@@ -232,21 +233,7 @@ type AdSizeMode = "auto" | "manual";
 type CreativeObjectFitMode = "contain" | "cover";
 
 /** YouTube 광고 유형 */
-type YouTubeAdType =
-  | "preroll"
-  | "bumper"
-  | "display"
-  | "overlay"
-  | "mobile-preroll-aos"
-  | "mobile-preroll-ios"
-  | "mobile-bumper-aos"
-  | "mobile-bumper-ios"
-  | "shorts-feed"
-  | "masthead-home"
-  | "infeed-home"
-  | "mobile-infeed-home"
-  | "infeed-search"
-  | "infeed-watch-next";
+type YouTubeAdType = ExecutableYouTubeAdType;
 
 type InjectionMode = "single" | "custom";
 interface InjectionModeOption {
@@ -278,6 +265,7 @@ type ProductMenu =
   | "infeed"
   | "demandgen"
   | "network-ads";
+type YouTubeProductMenu = Exclude<ProductMenu, "demandgen" | "network-ads">;
 type DetailOptionPreset =
   | "pc-skip"
   | "pc-non-skip"
@@ -315,6 +303,10 @@ const YOUTUBE_PRODUCT_OPTIONS: ProductMenuOption[] = [
   { value: "shorts", label: "Shorts" },
   { value: "masthead", label: "Masthead" },
   { value: "infeed", label: "In-feed" },
+];
+
+const GOOGLE_ADS_PRODUCT_OPTIONS: ProductMenuOption[] = [
+  { value: "network-ads", label: "Network Ads" },
   { value: "demandgen", label: "Demand Gen · 구현 예정", disabled: true },
 ];
 
@@ -330,16 +322,12 @@ const YOUTUBE_DETAIL_OPTIONS: DetailMenuOption[] = [
   { value: "ios-bumper", label: "iOS 범퍼 · 6초" },
   { value: "shorts-feed", label: "Shorts 피드" },
   { value: "masthead-home", label: "Masthead 홈" },
-  { value: "infeed-home", label: "PC In-feed 홈" },
-  { value: "mo-infeed-home", label: "MO In-feed 홈" },
-  { value: "infeed-search", label: "In-feed 검색" },
+  { value: "mo-infeed-home", label: "In-feed 모바일 홈" },
+  { value: "infeed-search", label: "In-feed 검색 결과" },
   { value: "infeed-watch-next", label: "In-feed 관련동영상" },
 ];
 
-const YOUTUBE_DETAIL_OPTIONS_BY_PRODUCT: Record<
-  Exclude<ProductMenu, "network-ads">,
-  DetailMenuOption[]
-> = {
+const YOUTUBE_DETAIL_OPTIONS_BY_PRODUCT: Record<YouTubeProductMenu, DetailMenuOption[]> = {
   instream: YOUTUBE_DETAIL_OPTIONS.filter((option) =>
     [
       "pc-skip",
@@ -357,19 +345,16 @@ const YOUTUBE_DETAIL_OPTIONS_BY_PRODUCT: Record<
   masthead: YOUTUBE_DETAIL_OPTIONS.filter((option) => option.value === "masthead-home"),
   infeed: YOUTUBE_DETAIL_OPTIONS.filter((option) =>
     [
-      "infeed-home",
       "mo-infeed-home",
       "infeed-search",
       "infeed-watch-next",
     ].includes(option.value),
   ),
-  demandgen: [
-    { value: "yt-other", label: "Single Image · 구현 예정", disabled: true },
-    { value: "yt-other", label: "Carousel · 구현 예정", disabled: true },
-    { value: "yt-other", label: "Product Feed · 구현 예정", disabled: true },
-    { value: "yt-other", label: "Shorts Image · 구현 예정", disabled: true },
-  ],
 };
+
+function isYouTubeProductMenu(value: ProductMenu): value is YouTubeProductMenu {
+  return value === "instream" || value === "shorts" || value === "masthead" || value === "infeed";
+}
 
 const GDN_DETAIL_OPTIONS: DetailMenuOption[] = [
   { value: "gdn-pc", label: "PC 지면" },
@@ -952,17 +937,17 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
     "ios-bumper": "iOS 범퍼 · 6초",
     "shorts-feed": "Shorts 피드",
     "masthead-home": "Masthead 홈",
-    "infeed-home": "PC 인피드 홈",
-    "mo-infeed-home": "MO 인피드 홈",
-    "infeed-search": "인피드 검색",
-    "infeed-watch-next": "인피드 관련동영상",
+    "infeed-home": "PC 홈 피드 · 내부 프리뷰",
+    "mo-infeed-home": "In-feed 모바일 홈",
+    "infeed-search": "In-feed 검색 결과",
+    "infeed-watch-next": "In-feed 관련동영상",
     "yt-other": "YouTube 레거시/준비중",
     "gdn-pc": "PC 지면",
     "gdn-mobile": "MO 지면",
   };
 
   const availableYoutubeDetailOptions =
-    selectedMediaMenu === "youtube" && selectedProduct !== "network-ads"
+    selectedMediaMenu === "youtube" && isYouTubeProductMenu(selectedProduct)
       ? YOUTUBE_DETAIL_OPTIONS_BY_PRODUCT[selectedProduct]
       : [];
   const productLabel: Record<ProductMenu, string> = {
@@ -976,7 +961,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
 
   const infeedTypeLabel =
     form.youtubeAdType === "infeed-home"
-      ? "인피드 · PC 홈"
+      ? "인피드 · PC 홈(내부)"
       : form.youtubeAdType === "mobile-infeed-home"
         ? "인피드 · 모바일 홈"
       : form.youtubeAdType === "infeed-search"
@@ -986,7 +971,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
           : "인피드";
   const infeedSurfaceHint =
     form.youtubeAdType === "infeed-home"
-      ? "홈 지면은 빈 게스트 피드를 피하기 위해 인기(/feed/trending) 그리드 기준으로 캡처합니다."
+      ? "PC 홈 피드는 내부 검증용 프리뷰이며 공개 상품 선택에서는 제외됩니다."
       : form.youtubeAdType === "mobile-infeed-home"
         ? "모바일 홈 지면은 합성 피드로 안정적인 모바일 카드 화면을 렌더링합니다."
       : form.youtubeAdType === "infeed-search"
@@ -1325,7 +1310,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                   setForm((prev) => ({
                     ...prev,
                     channel: "youtube",
-                    youtubeAdType: "infeed-home",
+                    youtubeAdType: "mobile-infeed-home",
                   }));
                 } else {
                   setForm((prev) => ({ ...prev, channel: "gdn", gdnViewportMode: "pc" }));
@@ -1345,7 +1330,17 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                   ))}
                 </>
               ) : (
-                <option value="network-ads">Network Ads</option>
+                <>
+                  {GOOGLE_ADS_PRODUCT_OPTIONS.map((option) => (
+                    <option
+                      key={option.value}
+                      value={option.value}
+                      disabled={option.disabled}
+                    >
+                      {option.label}
+                    </option>
+                  ))}
+                </>
               )}
             </select>
           </div>
