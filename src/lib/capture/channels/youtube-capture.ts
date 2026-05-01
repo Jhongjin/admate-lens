@@ -3738,7 +3738,7 @@ export class YouTubeCapture extends BaseChannel {
   /**
    * 📺 디스플레이 / 인스트림 컴패니언 광고 인젝션
    * - sidebar-display: 300×250 비율 이미지 + 하단 푸터 (순수 디스플레이 슬롯)
-   * - companion-300x60: 높이 60px 배너 + 추천 영상·칩과 동일 가로 정렬, 하단 플레이스홀더 박스
+   * - companion-300x60: 높이 60px 배너 + 추천 영상 컬럼에 맞춘 compact sponsor row
    */
   private async injectDisplayAd(
     page: IPageHandle,
@@ -3800,7 +3800,10 @@ export class YouTubeCapture extends BaseChannel {
         alignW = Math.round(alignW);
 
         const isCompanion = variant === 'companion-300x60';
-        const adWidth = isCompanion ? alignW : Math.min(alignW, 336);
+        const adWidth = isCompanion ? Math.min(Math.max(alignW, 300), 360) : Math.min(alignW, 336);
+        sidebar
+          .querySelectorAll('[data-injected="admate-youtube-sidebar-ad-wrap"]')
+          .forEach((node) => node.remove());
 
         const wrap = document.createElement('div');
         wrap.setAttribute('data-injected', 'admate-youtube-sidebar-ad-wrap');
@@ -3814,13 +3817,18 @@ export class YouTubeCapture extends BaseChannel {
             'width: ' + adWidth + 'px',
             'max-width: 100%',
             'box-sizing: border-box',
-            'margin: 0 0 24px 0',
+            'margin: 0 0 12px 0',
             'display: flex',
             'flex-direction: column',
-            'border-radius: 12px',
-            'border: 1px solid var(--yt-spec-10-percent-layer, #e5e5e5)',
+            'background: #fff',
+            'border-radius: 8px',
+            'border: 1px solid rgba(0,0,0,0.10)',
             'overflow: hidden',
-            'cursor: pointer'
+            'cursor: pointer',
+            'position: relative',
+            'z-index: 2',
+            'pointer-events: auto',
+            'box-shadow: none'
           ];
           wrap.style.cssText = companionWrapStyles.join(' !important;') + ' !important';
           
@@ -3828,10 +3836,10 @@ export class YouTubeCapture extends BaseChannel {
           let bottomBarHTML = '';
           if (uiOpts.enableCtaText === false) {
             bottomBarHTML =
-              '<div style="padding: 10px 16px; display: flex; align-items: center; justify-content: space-between; background: var(--yt-spec-base-background, #fff); border-radius: 0 0 12px 12px;">' +
-                '<span style="font-family: Roboto, Arial, sans-serif; font-size: 1.2rem; font-weight: 500; color: var(--yt-spec-text-primary, #0f0f0f); opacity: 0.8;">스폰서</span>' +
-                '<button style="background: none; border: none; padding: 0; margin: 0; cursor: pointer; color: var(--yt-spec-text-primary, #0f0f0f);">' +
-                  '<svg height="24" viewBox="0 0 24 24" width="24" focusable="false" style="display: block; width: 24px; height: 24px; fill: currentColor;"><path d="M12 4a2 2 0 100 4 2 2 0 000-4Zm0 6a2 2 0 100 4 2 2 0 000-4Zm0 6a2 2 0 100 4 2 2 0 000-4Z"></path></svg>' +
+              '<div style="min-height: 40px; padding: 8px 10px; display: flex; align-items: center; justify-content: space-between; background: #fff;">' +
+                '<span style="font-family: Roboto, Arial, sans-serif; font-size: 12px; line-height: 16px; font-weight: 500; color: #606060;">스폰서</span>' +
+                '<button style="background: none; border: none; padding: 4px; margin: 0 -4px 0 0; cursor: pointer; color: #0f0f0f;">' +
+                  '<svg height="20" viewBox="0 0 24 24" width="20" focusable="false" style="display: block; width: 20px; height: 20px; fill: currentColor;"><path d="M12 4a2 2 0 100 4 2 2 0 000-4Zm0 6a2 2 0 100 4 2 2 0 000-4Zm0 6a2 2 0 100 4 2 2 0 000-4Z"></path></svg>' +
                 '</button>' +
               '</div>';
           } else {
@@ -3839,35 +3847,35 @@ export class YouTubeCapture extends BaseChannel {
               ? '<img src="' + uiOpts.avatarImageUrl + '" style="width: 100%; height: 100%; object-fit: cover;" />'
               : '';
             const ctaHtml = uiOpts.ctaText
-              ? '<a style="display: inline-flex; align-items: center; justify-content: center; padding: 0 16px; height: 36px; border-radius: 18px; background: var(--yt-spec-badge-chip-background, rgba(0,0,0,0.05)); color: var(--yt-spec-text-primary, #0f0f0f); font-family: Roboto, Arial, sans-serif; font-size: 1.4rem; font-weight: 500; text-decoration: none;">' + uiOpts.ctaText + '</a>'
+              ? '<a style="display: inline-flex; align-items: center; justify-content: center; padding: 0 12px; height: 30px; border-radius: 15px; background: #f2f2f2; color: #0f0f0f; font-family: Roboto, Arial, sans-serif; font-size: 13px; font-weight: 500; text-decoration: none; white-space: nowrap;">' + uiOpts.ctaText + '</a>'
               : '';
             const adTitleText = uiOpts.adTitle || 'AD TITLE';
             bottomBarHTML =
-              '<div style="padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; gap: 8px; background: var(--yt-spec-base-background, #fff); border-radius: 0 0 12px 12px;">' +
-                '<div style="display: flex; align-items: center; gap: 12px; flex: 1; min-width: 0;">' +
-                  '<div style="width: 40px; height: 40px; border-radius: 50%; overflow: hidden; flex-shrink: 0; background: #f0f0f0;">' +
+              '<div style="min-height: 52px; padding: 8px 10px; display: flex; align-items: center; justify-content: space-between; gap: 8px; background: #fff;">' +
+                '<div style="display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0;">' +
+                  '<div style="width: 28px; height: 28px; border-radius: 50%; overflow: hidden; flex-shrink: 0; background: #f0f0f0;">' +
                     avatarHtml +
                   '</div>' +
                   '<div style="display: flex; flex-direction: column; justify-content: center; min-width: 0;">' +
-                    '<span style="font-family: Roboto, Arial, sans-serif; font-size: 1.4rem; font-weight: 500; line-height: 2rem; color: var(--yt-spec-text-primary, #0f0f0f); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">' + adTitleText + '</span>' +
-                    '<div style="display: flex; align-items: center; gap: 4px; margin-top: 2px;">' +
-                      '<span style="font-family: Roboto, Arial, sans-serif; font-size: 1.2rem; font-weight: 700; color: var(--yt-spec-text-primary, #0f0f0f); white-space: nowrap;">스폰서</span>' +
-                      '<span style="font-family: Roboto, Arial, sans-serif; font-size: 1.2rem; color: var(--yt-spec-text-secondary, #606060); white-space: nowrap; margin: 0 2px;">·</span>' +
-                      '<span style="font-family: Roboto, Arial, sans-serif; font-size: 1.2rem; color: var(--yt-spec-text-secondary, #606060); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">' + cleanUrl + '</span>' +
+                    '<span style="font-family: Roboto, Arial, sans-serif; font-size: 13px; font-weight: 500; line-height: 18px; color: #0f0f0f; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">' + adTitleText + '</span>' +
+                    '<div style="display: flex; align-items: center; gap: 4px; margin-top: 1px;">' +
+                      '<span style="font-family: Roboto, Arial, sans-serif; font-size: 11px; line-height: 15px; font-weight: 700; color: #0f0f0f; white-space: nowrap;">스폰서</span>' +
+                      '<span style="font-family: Roboto, Arial, sans-serif; font-size: 11px; line-height: 15px; color: #606060; white-space: nowrap; margin: 0 1px;">·</span>' +
+                      '<span style="font-family: Roboto, Arial, sans-serif; font-size: 11px; line-height: 15px; color: #606060; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">' + cleanUrl + '</span>' +
                     '</div>' +
                   '</div>' +
                 '</div>' +
-                '<div style="display: flex; align-items: center; gap: 8px; flex-shrink: 0;">' +
+                '<div style="display: flex; align-items: center; gap: 6px; flex-shrink: 0;">' +
                   ctaHtml +
-                  '<button style="background: none; border: none; padding: 8px; margin-right: -8px; cursor: pointer; color: var(--yt-spec-text-primary, #0f0f0f);">' +
-                    '<svg height="24" viewBox="0 0 24 24" width="24" focusable="false" style="display: block; width: 24px; height: 24px; fill: currentColor;"><path d="M12 4a2 2 0 100 4 2 2 0 000-4Zm0 6a2 2 0 100 4 2 2 0 000-4Zm0 6a2 2 0 100 4 2 2 0 000-4Z"></path></svg>' +
+                  '<button style="background: none; border: none; padding: 4px; margin-right: -4px; cursor: pointer; color: #0f0f0f;">' +
+                    '<svg height="20" viewBox="0 0 24 24" width="20" focusable="false" style="display: block; width: 20px; height: 20px; fill: currentColor;"><path d="M12 4a2 2 0 100 4 2 2 0 000-4Zm0 6a2 2 0 100 4 2 2 0 000-4Zm0 6a2 2 0 100 4 2 2 0 000-4Z"></path></svg>' +
                   '</button>' +
                 '</div>' +
               '</div>';
           }
 
           wrap.innerHTML =
-            '<div style="width: 100%; height: auto; aspect-ratio: 1060 / 175; overflow: hidden; background: #e5e5e5; display: flex; align-items: stretch; border-radius: 12px 12px 0 0;">' +
+            '<div style="width: 100%; height: 60px; overflow: hidden; background: #f5f5f5; display: flex; align-items: center; border-radius: 8px 8px 0 0;">' +
               '<img src="' + imgUrl + '" style="width: 100%; height: 100%; object-fit: cover; display: block;" />' +
             '</div>' +
             bottomBarHTML;
@@ -3946,7 +3954,13 @@ export class YouTubeCapture extends BaseChannel {
           'iron-selector#chips'
         );
 
-        if (chipContainer) {
+        if (isCompanion) {
+          sidebar.insertBefore(wrap, sidebar.firstChild);
+          console.log(
+            '[YouTube Inject] ✅ 사이드바 광고 (최상단) 삽입 성공',
+            '(컴패니언 compact, alignW=' + alignW + ', adW=' + adWidth + ')'
+          );
+        } else if (chipContainer) {
           chipContainer.parentNode.insertBefore(wrap, chipContainer.nextSibling);
           console.log(
             '[YouTube Inject] ✅ 사이드바 광고 (칩 아래) 삽입 성공',
