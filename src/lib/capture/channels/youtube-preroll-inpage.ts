@@ -98,6 +98,23 @@ export function runPrerollInjectInPage(...args: unknown[]): boolean {
       ph = Math.round((pw * 9) / 16);
     }
 
+    // Bot-detection fallback can be rendered as an HTMLDialogElement top-layer.
+    // Top-layer elements sit above every z-index, so close/remove them after
+    // measuring the player and before drawing the real preroll UI.
+    document
+      .querySelectorAll("#admate-bot-cover-dialog")
+      .forEach((el) => {
+        try {
+          if (typeof el.close === "function") el.close();
+        } catch {}
+        el.remove();
+      });
+    document
+      .querySelectorAll(
+        "#yt-thumb-overlay, #yt-thumb-overlay-fixed, #admate-dialog-backdrop-style, #admate-preroll-overlay, #admate-skip-btn"
+      )
+      .forEach((el) => el.remove());
+
     const playerRadius = isMobile ? "0px" : "12px";
     const overlay = document.createElement("div");
     overlay.id = "admate-preroll-overlay";

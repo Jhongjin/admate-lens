@@ -88,6 +88,7 @@ export interface YouTubeDiagnostics {
     sponsorText: boolean;
     skipButton: boolean;
     expectedSkipButton: boolean;
+    blockingCover: boolean;
     isMobile: boolean;
   };
   /** 인스트림 PC: 원본 watch 페이지 본문/추천 영역이 비면 합성 컨텍스트로 보강 */
@@ -841,6 +842,7 @@ export class YouTubeCapture extends BaseChannel {
               sponsorText: !!document.querySelector("#admate-preroll-sponsor, [data-injected='admate-ytp-ad-badge'], #admate-mobile-preroll-cta-bar"),
               skipButton: !!document.querySelector("#admate-skip-btn"),
               expectedSkipButton: ${JSON.stringify(expectedSkipButton)},
+              blockingCover: !!document.querySelector("#admate-bot-cover-dialog, #yt-thumb-overlay, #yt-thumb-overlay-fixed"),
               isMobile: ${JSON.stringify(isMobilePlatform)}
             }))()
           `);
@@ -848,13 +850,16 @@ export class YouTubeCapture extends BaseChannel {
             this.diagnostics.instreamUiChecks = instreamUiChecks;
           }
           console.log(
-            `[YouTube] 인스트림 UI 검증: overlay=${instreamUiChecks?.overlay ? "✅" : "❌"} sponsorCard=${instreamUiChecks?.sponsorCard ? "✅" : "❌"} skipButton=${instreamUiChecks?.skipButton ? "✅" : "❌"} expectedSkip=${expectedSkipButton ? "yes" : "no"}`
+            `[YouTube] 인스트림 UI 검증: overlay=${instreamUiChecks?.overlay ? "✅" : "❌"} sponsorCard=${instreamUiChecks?.sponsorCard ? "✅" : "❌"} skipButton=${instreamUiChecks?.skipButton ? "✅" : "❌"} expectedSkip=${expectedSkipButton ? "yes" : "no"} blockingCover=${instreamUiChecks?.blockingCover ? "⚠️" : "clear"}`
           );
           if (expectedSkipButton && !instreamUiChecks?.skipButton) {
             console.warn("[YouTube] ⚠️ 스킵 가능 인스트림인데 건너뛰기 버튼 마커가 없습니다.");
           }
           if (!expectedSkipButton && instreamUiChecks?.skipButton) {
             console.warn("[YouTube] ⚠️ 논스킵/범퍼인데 건너뛰기 버튼이 표시되었습니다.");
+          }
+          if (instreamUiChecks?.blockingCover) {
+            console.warn("[YouTube] ⚠️ 프리롤 위를 가리는 bot-cover/top-layer 잔여물이 있습니다.");
           }
         }
         break;
