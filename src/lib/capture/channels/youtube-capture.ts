@@ -3603,6 +3603,21 @@ export class YouTubeCapture extends BaseChannel {
             ".player-container"
           ];
 
+          const fallbackBox = () => {
+            const viewportW = window.innerWidth;
+            const gap = 24;
+            const rightPadding = viewportW >= 1600 ? 72 : 48;
+            const sidebarW = Math.max(340, Math.min(402, Math.round(viewportW * 0.22)));
+            const left = Math.max(24, Math.round(Math.min(86, viewportW * 0.04)));
+            const top = Math.max(50, Math.round(Math.min(82, window.innerHeight * 0.09)));
+            const safeRight = sidebarRect
+              ? Math.min(viewportW - 24, sidebarRect.left - gap)
+              : viewportW - rightPadding - sidebarW - gap;
+            const width = Math.floor(Math.max(640, Math.min(1360, safeRight - left)));
+            if (width < 480) return undefined;
+            return { left, top, width, height: Math.round((width * 9) / 16) };
+          };
+
           const normalize = (r) => {
             if (!r) return null;
             const left = Math.max(24, Math.round(r.left || 86));
@@ -3610,8 +3625,10 @@ export class YouTubeCapture extends BaseChannel {
             const safeRight = sidebarRect
               ? Math.min(window.innerWidth - 24, sidebarRect.left - 24)
               : window.innerWidth - 24;
+            const availableWidth = Math.floor(safeRight - left);
             let width = Math.floor(Math.min(r.width || 0, safeRight - left));
             if (width < 480) return null;
+            if (availableWidth >= 720 && width < availableWidth * 0.82) return null;
             let height = Math.round(r.height || 0);
             const ratio = width / Math.max(height, 1);
             if (height < 220 || height > window.innerHeight * 0.82 || ratio > 1.95 || ratio < 1.45) {
@@ -3626,14 +3643,7 @@ export class YouTubeCapture extends BaseChannel {
             if (box) return box;
           }
 
-          const left = Math.max(24, Math.round(Math.min(86, window.innerWidth * 0.06)));
-          const top = Math.max(50, Math.round(Math.min(72, window.innerHeight * 0.08)));
-          const safeRight = sidebarRect
-            ? Math.min(window.innerWidth - 24, sidebarRect.left - 24)
-            : window.innerWidth - 24;
-          const width = Math.floor(Math.min(Math.max(640, window.innerWidth * 0.64), safeRight - left));
-          if (width < 480) return undefined;
-          return { left, top, width, height: Math.round((width * 9) / 16) };
+          return fallbackBox();
         })()
       `);
 
@@ -3709,13 +3719,25 @@ export class YouTubeCapture extends BaseChannel {
           d.textContent = String(s || "");
           return d.innerHTML;
         };
-        const left = Math.max(24, Math.round(playerInfo.left || 86));
-        const top = Math.max(50, Math.round(playerInfo.top || 56));
-        const width = Math.max(640, Math.round(playerInfo.width || Math.min(window.innerWidth * 0.64, 1100)));
+        const viewportW = window.innerWidth;
+        const nativeGap = 24;
+        const rightPadding = viewportW >= 1600 ? 72 : 48;
+        const fallbackLeft = Math.max(48, Math.round(Math.min(86, viewportW * 0.04)));
+        let sidebarWidth = Math.max(340, Math.min(402, Math.round(viewportW * 0.22)));
+        const left = Math.max(24, Math.round(playerInfo.left || fallbackLeft));
+        const top = Math.max(50, Math.round(playerInfo.top || 80));
+        const maxLayoutWidth = Math.max(
+          640,
+          Math.floor(viewportW - left - nativeGap - sidebarWidth - rightPadding)
+        );
+        const width = Math.max(
+          640,
+          Math.min(Math.round(playerInfo.width || maxLayoutWidth), maxLayoutWidth, 1360)
+        );
         const height = Math.max(360, Math.round(playerInfo.height || (width * 9) / 16));
         const belowTop = top + height + 16;
-        const sidebarLeft = Math.min(left + width + 24, window.innerWidth - 392);
-        const sidebarWidth = Math.max(320, Math.min(392, window.innerWidth - sidebarLeft - 24));
+        const sidebarLeft = left + width + nativeGap;
+        sidebarWidth = Math.max(320, Math.min(sidebarWidth, viewportW - sidebarLeft - 24));
 
         let style = document.getElementById("admate-watch-context-style");
         if (!style) {
@@ -3788,7 +3810,7 @@ export class YouTubeCapture extends BaseChannel {
             "background:#fff",
             "display:flex",
             "flex-direction:column",
-            "gap:12px",
+            "gap:8px",
             "pointer-events:none"
           ].join("!important;") + "!important";
           const seeds = [
@@ -3797,7 +3819,11 @@ export class YouTubeCapture extends BaseChannel {
             { id: "dQw4w9WgXcQ", title: "오늘 가장 많이 본 인기 동영상", channel: "Music", meta: "조회수 124만회 · 1년 전" },
             { id: "M7lc1UVf-VE", title: "크리에이터가 설명하는 새로운 영상 흐름", channel: "Creator Insider", meta: "조회수 38만회 · 2주 전" },
             { id: "ScMzIvxBSi4", title: "짧게 보는 주요 이슈와 트렌드", channel: "News", meta: "조회수 12만회 · 1일 전" },
-            { id: "ysz5S6PUM-U", title: "추천 콘텐츠 플레이리스트", channel: "Playlist", meta: "조회수 52만회 · 8개월 전" }
+            { id: "ysz5S6PUM-U", title: "추천 콘텐츠 플레이리스트", channel: "Playlist", meta: "조회수 52만회 · 8개월 전" },
+            { id: "9bZkp7q19f0", title: "지금 다시 보는 인기 뮤직비디오", channel: "Official Channel", meta: "조회수 2.1억회 · 9년 전" },
+            { id: "L_jWHffIx5E", title: "라이브 하이라이트와 인터뷰 모음", channel: "Live Archive", meta: "조회수 84만회 · 6개월 전" },
+            { id: "fJ9rUzIMcZQ", title: "긴 영상으로 보는 오늘의 이슈", channel: "Documentary", meta: "조회수 68만회 · 4개월 전" },
+            { id: "hTWKbfoikeg", title: "추천 채널에서 많이 본 영상", channel: "Recommended", meta: "조회수 130만회 · 2년 전" }
           ];
           sidebar.innerHTML =
             '<div style="display:flex;gap:8px;overflow:hidden;margin-bottom:2px;">' +

@@ -113,16 +113,26 @@ export function runPrerollInjectInPage(...args: unknown[]): boolean {
         }
       }
 
+      const fallbackLeft = Math.max(24, Math.round(Math.min(86, window.innerWidth * 0.04)));
+      const fallbackTop = Math.max(50, Math.round(Math.min(82, window.innerHeight * 0.09)));
       if (!usedMeasuredPlayer) {
-        px = Math.max(24, Math.round(Math.min(86, window.innerWidth * 0.06)));
-        py = Math.max(50, Math.round(Math.min(72, window.innerHeight * 0.08)));
+        px = fallbackLeft;
+        py = fallbackTop;
       }
 
       const safeRight = sidebarRect
         ? Math.min(window.innerWidth - 24, sidebarRect.left - 24)
-        : window.innerWidth - 24;
+        : window.innerWidth -
+          (window.innerWidth >= 1600 ? 72 : 48) -
+          Math.max(340, Math.min(402, Math.round(window.innerWidth * 0.22))) -
+          24;
       const maxPlayerWidth = Math.floor(safeRight - px);
-      if (maxPlayerWidth > 480 && pw > maxPlayerWidth) {
+      const measuredTooNarrow = maxPlayerWidth >= 720 && pw < maxPlayerWidth * 0.82;
+      if (maxPlayerWidth > 480 && (pw > maxPlayerWidth || measuredTooNarrow)) {
+        if (measuredTooNarrow) {
+          px = fallbackLeft;
+          py = fallbackTop;
+        }
         pw = maxPlayerWidth;
       }
 
@@ -131,6 +141,7 @@ export function runPrerollInjectInPage(...args: unknown[]): boolean {
       const overlapsSidebar = sidebarRect ? px + pw > sidebarRect.left - 16 : false;
       if (
         !usedMeasuredPlayer ||
+        measuredTooNarrow ||
         overlapsSidebar ||
         aspectRatio > 1.95 ||
         aspectRatio < 1.45 ||
