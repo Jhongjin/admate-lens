@@ -90,6 +90,13 @@ export interface YouTubeDiagnostics {
     expectedSkipButton: boolean;
     isMobile: boolean;
   };
+  /** 인스트림 PC: 원본 watch 페이지 본문/추천 영역이 비면 합성 컨텍스트로 보강 */
+  watchContextChecks?: {
+    hadTitle: boolean;
+    hadSidebar: boolean;
+    injectedBelow: boolean;
+    injectedSidebar: boolean;
+  };
 }
 
 /**
@@ -553,12 +560,17 @@ export class YouTubeCapture extends BaseChannel {
 
     // 1.5) 🖼️ 비디오 ID 추출 + 썸네일 준비
     // 프리롤은 "광고주 영상(instreamVideoUrl)"을 기준으로 해야 함.
+    const publisherVideoId = extractVideoId(request.publisherUrl);
     const videoId =
       isPrerollFamily
         ? prerollAdVideoId ||
           (instreamOpts.videoUrl ? extractVideoId(instreamOpts.videoUrl) : null) ||
-          extractVideoId(request.publisherUrl)
-        : extractVideoId(request.publisherUrl);
+          publisherVideoId
+        : publisherVideoId;
+    const publisherWatchMeta =
+      isPrerollFamily && publisherVideoId
+        ? await this.fetchYoutubeOembedMeta(publisherVideoId)
+        : { title: "", author: "" };
     let thumbnailDataUrl: string | null = null;
     if (videoId) {
       const thumbResult = await imageUrlToDataUrl(getThumbnailUrl(videoId));
@@ -763,6 +775,21 @@ export class YouTubeCapture extends BaseChannel {
 
     // 6.5) 🧹 인젝션 전 방해 요소 제거 (구독 팝업, 봇 감지, 동의 팝업 등)
     await this.suppressWatchPageInjectionBlockers(page);
+    if (isPrerollFamily && !isMobilePlatform) {
+      const watchContextChecks = await this.ensureDesktopWatchContext(page, playerInfo, {
+        title: publisherWatchMeta.title,
+        author: publisherWatchMeta.author,
+        videoId: publisherVideoId || "",
+      });
+      if (this.diagnostics) {
+        this.diagnostics.watchContextChecks = watchContextChecks;
+      }
+      if (watchContextChecks.injectedBelow || watchContextChecks.injectedSidebar) {
+        console.log(
+          `[YouTube] watch 컨텍스트 보강: below=${watchContextChecks.injectedBelow ? "✅" : "native"} sidebar=${watchContextChecks.injectedSidebar ? "✅" : "native"}`
+        );
+      }
+    }
 
     // 7) 광고 유형별 인젝션
     let injectionSuccess = false;
@@ -3538,6 +3565,172 @@ export class YouTubeCapture extends BaseChannel {
   }
 
   /**
+   * 데스크톱 /watch 페이지가 서버 환경에서 플레이어만 렌더링되고
+   * 제목/추천 영역이 비는 경우가 있어, 필요한 경우에만 YouTube형 컨텍스트를 보강한다.
+   */
+  private async ensureDesktopWatchContext(
+    page: IPageHandle,
+    playerInfo: { found: boolean; width: number; height: number; top: number; left: number },
+    meta: { title?: string; author?: string; videoId?: string }
+  ): Promise<NonNullable<YouTubeDiagnostics["watchContextChecks"]>> {
+    const payload = {
+      playerInfo,
+      title: meta.title || "YouTube 동영상",
+      author: meta.author || "YouTube",
+      videoId: meta.videoId || "",
+    };
+
+    return page.evaluate<NonNullable<YouTubeDiagnostics["watchContextChecks"]>>(`
+      ((payload) => {
+        const playerInfo = payload.playerInfo || {};
+        const titleFallback = payload.title || "YouTube 동영상";
+        const authorFallback = payload.author || "YouTube";
+        const videoId = payload.videoId || "";
+
+        const isVisible = (el) => {
+          if (!el) return false;
+          const r = el.getBoundingClientRect();
+          const st = window.getComputedStyle(el);
+          return r.width > 16 && r.height > 8 && st.display !== "none" && st.visibility !== "hidden" && Number(st.opacity || "1") > 0;
+        };
+        const hasText = (el) => ((el && el.textContent) || "").trim().length > 4;
+        const hadTitle = Array.from(
+          document.querySelectorAll("h1.ytd-watch-metadata, #title h1, #above-the-fold h1, ytd-watch-metadata h1")
+        ).some((el) => isVisible(el) && hasText(el));
+        const hadSidebar = Array.from(
+          document.querySelectorAll("#secondary ytd-compact-video-renderer, #related ytd-compact-video-renderer, ytd-watch-next-secondary-results-renderer ytd-compact-video-renderer")
+        ).some((el) => isVisible(el));
+
+        if (hadTitle && hadSidebar) {
+          return { hadTitle, hadSidebar, injectedBelow: false, injectedSidebar: false };
+        }
+
+        const esc = (s) => {
+          const d = document.createElement("div");
+          d.textContent = String(s || "");
+          return d.innerHTML;
+        };
+        const left = Math.max(24, Math.round(playerInfo.left || 86));
+        const top = Math.max(50, Math.round(playerInfo.top || 56));
+        const width = Math.max(640, Math.round(playerInfo.width || Math.min(window.innerWidth * 0.64, 1100)));
+        const height = Math.max(360, Math.round(playerInfo.height || (width * 9) / 16));
+        const belowTop = top + height + 16;
+        const sidebarLeft = Math.min(left + width + 24, window.innerWidth - 392);
+        const sidebarWidth = Math.max(320, Math.min(392, window.innerWidth - sidebarLeft - 24));
+
+        let style = document.getElementById("admate-watch-context-style");
+        if (!style) {
+          style = document.createElement("style");
+          style.id = "admate-watch-context-style";
+          document.head.appendChild(style);
+        }
+        style.textContent = [
+          "html,body{background:#fff!important;}",
+          "#admate-watch-context-below,#admate-watch-context-sidebar{font-family:Roboto,Arial,'Noto Sans KR',sans-serif!important;color:#0f0f0f!important;}",
+          "#admate-watch-context-below * ,#admate-watch-context-sidebar *{box-sizing:border-box!important;letter-spacing:0!important;}",
+          "#admate-watch-context-sidebar img{display:block!important;}"
+        ].join("\\n");
+
+        let injectedBelow = false;
+        if (!hadTitle) {
+          document.querySelectorAll("#admate-watch-context-below").forEach((el) => el.remove());
+          const below = document.createElement("section");
+          below.id = "admate-watch-context-below";
+          below.setAttribute("data-injected", "admate-watch-context");
+          below.style.cssText = [
+            "position:fixed",
+            "left:" + left + "px",
+            "top:" + belowTop + "px",
+            "width:" + width + "px",
+            "z-index:2147482000",
+            "background:#fff",
+            "padding:0 0 18px 0",
+            "pointer-events:none"
+          ].join("!important;") + "!important";
+          below.innerHTML =
+            '<h1 style="margin:0 0 10px 0;font-size:20px;line-height:28px;font-weight:600;color:#0f0f0f;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' +
+              esc(titleFallback) +
+            '</h1>' +
+            '<div style="display:flex;align-items:center;justify-content:space-between;gap:16px;">' +
+              '<div style="display:flex;align-items:center;min-width:0;gap:12px;">' +
+                '<div style="width:40px;height:40px;border-radius:50%;background:#f1f1f1;display:flex;align-items:center;justify-content:center;font-weight:700;color:#606060;flex-shrink:0;">' + esc(authorFallback.charAt(0) || "Y") + '</div>' +
+                '<div style="min-width:0;">' +
+                  '<div style="font-size:14px;line-height:20px;font-weight:600;color:#0f0f0f;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + esc(authorFallback) + '</div>' +
+                  '<div style="font-size:12px;line-height:18px;color:#606060;">구독자 81.0만명</div>' +
+                '</div>' +
+                '<div style="height:36px;padding:0 16px;border-radius:18px;background:#0f0f0f;color:#fff;display:flex;align-items:center;font-size:14px;font-weight:500;">구독</div>' +
+              '</div>' +
+              '<div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">' +
+                '<div style="height:36px;padding:0 14px;border-radius:18px;background:#f2f2f2;display:flex;align-items:center;font-size:14px;font-weight:500;">좋아요</div>' +
+                '<div style="height:36px;padding:0 14px;border-radius:18px;background:#f2f2f2;display:flex;align-items:center;font-size:14px;font-weight:500;">공유</div>' +
+                '<div style="height:36px;padding:0 14px;border-radius:18px;background:#f2f2f2;display:flex;align-items:center;font-size:14px;font-weight:500;">저장</div>' +
+              '</div>' +
+            '</div>' +
+            '<div style="margin-top:12px;border-radius:12px;background:#f2f2f2;padding:12px 14px;font-size:13px;line-height:19px;color:#0f0f0f;">' +
+              '<strong>조회수 20억회</strong> 5년 전 &nbsp; #' + esc((titleFallback.split(" ")[0] || "YouTube").replace(/[^0-9A-Za-z가-힣_-]/g, "")) +
+              '<br/>이 동영상에 대한 설명과 댓글 영역입니다. 광고 캡처 증거용으로 원본 YouTube 시청 페이지의 본문 컨텍스트를 유지합니다.' +
+            '</div>';
+          document.body.appendChild(below);
+          injectedBelow = true;
+        }
+
+        let injectedSidebar = false;
+        if (!hadSidebar) {
+          document.querySelectorAll("#admate-watch-context-sidebar").forEach((el) => el.remove());
+          const sidebar = document.createElement("aside");
+          sidebar.id = "admate-watch-context-sidebar";
+          sidebar.setAttribute("data-injected", "admate-watch-context");
+          sidebar.style.cssText = [
+            "position:fixed",
+            "left:" + sidebarLeft + "px",
+            "top:" + top + "px",
+            "width:" + sidebarWidth + "px",
+            "z-index:2147482000",
+            "background:#fff",
+            "display:flex",
+            "flex-direction:column",
+            "gap:12px",
+            "pointer-events:none"
+          ].join("!important;") + "!important";
+          const seeds = [
+            { id: videoId || "jNQXAC9IVRw", title: titleFallback, channel: authorFallback, meta: "조회수 20억회 · 5년 전" },
+            { id: "aqz-KE-bpKQ", title: "AI 시대를 이해하는 핵심 장면 모음", channel: "YouTube Korea", meta: "조회수 91만회 · 3개월 전" },
+            { id: "dQw4w9WgXcQ", title: "오늘 가장 많이 본 인기 동영상", channel: "Music", meta: "조회수 124만회 · 1년 전" },
+            { id: "M7lc1UVf-VE", title: "크리에이터가 설명하는 새로운 영상 흐름", channel: "Creator Insider", meta: "조회수 38만회 · 2주 전" },
+            { id: "ScMzIvxBSi4", title: "짧게 보는 주요 이슈와 트렌드", channel: "News", meta: "조회수 12만회 · 1일 전" },
+            { id: "ysz5S6PUM-U", title: "추천 콘텐츠 플레이리스트", channel: "Playlist", meta: "조회수 52만회 · 8개월 전" }
+          ];
+          sidebar.innerHTML =
+            '<div style="display:flex;gap:8px;overflow:hidden;margin-bottom:2px;">' +
+              ['전체','관련 콘텐츠','최근 업로드'].map((chip, i) =>
+                '<span style="height:32px;padding:0 12px;border-radius:8px;display:inline-flex;align-items:center;white-space:nowrap;font-size:14px;font-weight:500;background:' + (i === 0 ? '#0f0f0f;color:#fff' : '#f2f2f2;color:#0f0f0f') + ';">' + chip + '</span>'
+              ).join("") +
+            '</div>' +
+            seeds.map((it) => {
+              const thumb = 'https://i.ytimg.com/vi/' + encodeURIComponent(it.id) + '/mqdefault.jpg';
+              return '<div style="display:flex;gap:8px;width:100%;min-height:94px;">' +
+                '<div style="width:168px;height:94px;border-radius:8px;background:#e5e5e5;overflow:hidden;flex-shrink:0;position:relative;">' +
+                  '<img src="' + thumb + '" style="width:100%;height:100%;object-fit:cover;" />' +
+                  '<span style="position:absolute;right:4px;bottom:4px;background:rgba(0,0,0,.8);color:#fff;border-radius:4px;padding:1px 4px;font-size:12px;line-height:16px;">12:05</span>' +
+                '</div>' +
+                '<div style="min-width:0;flex:1;padding-right:4px;">' +
+                  '<div style="font-size:14px;line-height:20px;font-weight:600;color:#0f0f0f;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">' + esc(it.title) + '</div>' +
+                  '<div style="margin-top:4px;font-size:12px;line-height:18px;color:#606060;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + esc(it.channel) + '</div>' +
+                  '<div style="font-size:12px;line-height:18px;color:#606060;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + esc(it.meta) + '</div>' +
+                '</div>' +
+              '</div>';
+            }).join("");
+          document.body.appendChild(sidebar);
+          injectedSidebar = true;
+        }
+
+        document.body.style.minHeight = Math.max(document.body.scrollHeight || 0, belowTop + 260) + "px";
+        return { hadTitle, hadSidebar, injectedBelow, injectedSidebar };
+      })(${JSON.stringify(payload)})
+    `);
+  }
+
+  /**
    * 📺 디스플레이 / 인스트림 컴패니언 광고 인젝션
    * - sidebar-display: 300×250 비율 이미지 + 하단 푸터 (순수 디스플레이 슬롯)
    * - companion-300x60: 높이 60px 배너 + 추천 영상·칩과 동일 가로 정렬, 하단 플레이스홀더 박스
@@ -3559,6 +3752,7 @@ export class YouTubeCapture extends BaseChannel {
 
         // 사이드바 영역 찾기 (다양한 셀렉터)
         const sidebarSelectors = [
+          '#admate-watch-context-sidebar',
           '#secondary-inner',
           '#secondary',
           'ytd-watch-next-secondary-results-renderer',
