@@ -1,8 +1,8 @@
 {
-  "name": "admate-vision",
+  "name": "admate-lens",
   "version": "0.1.0",
   "private": true,
-  "description": "AdMate Ad Vision — 디지털 광고 게재면 캡처 자동화",
+  "description": "AdMate Lens — 광고 게재면 캡처 자동화",
   "scripts": {
     "dev": "next dev --turbopack",
     "build": "next build",

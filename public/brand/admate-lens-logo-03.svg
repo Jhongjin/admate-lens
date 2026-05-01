@@ -1,0 +1,11 @@
+<svg width="360" height="88" viewBox="0 0 360 88" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="AdMate Lens logo option 3">
+  <rect x="8" y="12" width="64" height="64" rx="20" fill="#111827"/>
+  <path d="M27 33H53C56.3 33 59 35.7 59 39V54C59 57.3 56.3 60 53 60H27C23.7 60 21 57.3 21 54V39C21 35.7 23.7 33 27 33Z" fill="#F8FAFC"/>
+  <path d="M32 33L35 27H45L48 33" stroke="#F8FAFC" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="40" cy="47" r="9" fill="#111827"/>
+  <circle cx="40" cy="47" r="4" fill="#F59E0B"/>
+  <path d="M50 22L55 17L60 22" stroke="#9FE5C1" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="90" y="42" fill="#111827" font-family="Inter, Arial, sans-serif" font-size="27" font-weight="800" letter-spacing="0">AdMate</text>
+  <text x="201" y="42" fill="#9E5700" font-family="Inter, Arial, sans-serif" font-size="27" font-weight="800" letter-spacing="0">Lens</text>
+  <text x="92" y="63" fill="#6B7280" font-family="Inter, Arial, sans-serif" font-size="13" font-weight="600" letter-spacing="0.2">Evidence capture system</text>
+</svg>

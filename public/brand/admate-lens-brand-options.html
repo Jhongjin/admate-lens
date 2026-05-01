@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AdMate Lens Brand Options</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f7f7f7;
+        --card: #ffffff;
+        --border: #e5e5e5;
+        --text: #0d0d0d;
+        --muted: #6b7280;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font-family:
+          Inter,
+          Arial,
+          "Noto Sans KR",
+          system-ui,
+          sans-serif;
+      }
+
+      main {
+        width: min(1120px, calc(100% - 48px));
+        margin: 0 auto;
+        padding: 48px 0;
+      }
+
+      header {
+        margin-bottom: 20px;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: 28px;
+        line-height: 1.2;
+      }
+
+      p {
+        margin: 8px 0 0;
+        color: var(--muted);
+        font-size: 14px;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 16px;
+      }
+
+      .card {
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        background: var(--card);
+        padding: 18px;
+      }
+
+      .card.selected {
+        border-color: #5e6ad2;
+        box-shadow: 0 0 0 3px #ecedf9;
+      }
+
+      .label {
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 800;
+        text-transform: uppercase;
+      }
+
+      .logo {
+        display: block;
+        width: 100%;
+        height: auto;
+        margin-top: 14px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: #ffffff;
+      }
+
+      .favicon-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-top: 14px;
+      }
+
+      .favicon {
+        width: 48px;
+        height: 48px;
+      }
+
+      @media (max-width: 860px) {
+        .grid {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>AdMate Lens Logo & Favicon Options</h1>
+        <p>Option 2 is currently wired as the default site favicon and sidebar mark.</p>
+      </header>
+
+      <section class="grid" aria-label="AdMate Lens brand options">
+        <article class="card">
+          <div class="label">Option 01 · Lens Eye</div>
+          <img class="logo" src="./admate-lens-logo-01.svg" alt="AdMate Lens logo option 1" />
+          <div class="favicon-row">
+            <img class="favicon" src="./admate-lens-favicon-01.svg" alt="AdMate Lens favicon option 1" />
+            <p>Native ad proof, watch surface, and pixel review focus.</p>
+          </div>
+        </article>
+
+        <article class="card selected">
+          <div class="label">Option 02 · Capture Frame</div>
+          <img class="logo" src="./admate-lens-logo-02.svg" alt="AdMate Lens logo option 2" />
+          <div class="favicon-row">
+            <img class="favicon" src="./admate-lens-favicon-02.svg" alt="AdMate Lens favicon option 2" />
+            <p>Precise crop, placement bounds, and review workflow focus.</p>
+          </div>
+        </article>
+
+        <article class="card">
+          <div class="label">Option 03 · Proof Camera</div>
+          <img class="logo" src="./admate-lens-logo-03.svg" alt="AdMate Lens logo option 3" />
+          <div class="favicon-row">
+            <img class="favicon" src="./admate-lens-favicon-03.svg" alt="AdMate Lens favicon option 3" />
+            <p>Evidence capture, report asset, and client delivery focus.</p>
+          </div>
+        </article>
+
+        <article class="card">
+          <div class="label">Option 04 · Aperture Grid</div>
+          <img class="logo" src="./admate-lens-logo-04.svg" alt="AdMate Lens logo option 4" />
+          <div class="favicon-row">
+            <img class="favicon" src="./admate-lens-favicon-04.svg" alt="AdMate Lens favicon option 4" />
+            <p>Structured review, pixel grid, and capture precision focus.</p>
+          </div>
+        </article>
+
+        <article class="card">
+          <div class="label">Option 05 · Agent Orbit</div>
+          <img class="logo" src="./admate-lens-logo-05.svg" alt="AdMate Lens logo option 5" />
+          <div class="favicon-row">
+            <img class="favicon" src="./admate-lens-favicon-05.svg" alt="AdMate Lens favicon option 5" />
+            <p>Agent Core connection, automation, and platform ecosystem focus.</p>
+          </div>
+        </article>
+
+        <article class="card">
+          <div class="label">Option 06 · Verified Proof</div>
+          <img class="logo" src="./admate-lens-logo-06.svg" alt="AdMate Lens logo option 6" />
+          <div class="favicon-row">
+            <img class="favicon" src="./admate-lens-favicon-06.svg" alt="AdMate Lens favicon option 6" />
+            <p>Client-ready proof, completed review, and report delivery focus.</p>
+          </div>
+        </article>
+      </section>
+    </main>
+  </body>
+</html>

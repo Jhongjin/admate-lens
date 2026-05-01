@@ -1,0 +1,8 @@
+<svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="AdMate Lens favicon option 2">
+  <rect x="5" y="5" width="54" height="54" rx="15" fill="#FFFFFF"/>
+  <rect x="5" y="5" width="54" height="54" rx="15" stroke="#111827" stroke-width="3"/>
+  <path d="M19 24V18H25M45 24V18H39M19 40V46H25M45 40V46H39" stroke="#111827" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="24" y="24" width="16" height="16" rx="5" fill="#ECEDF9" stroke="#5E6AD2" stroke-width="3"/>
+  <circle cx="32" cy="32" r="4" fill="#177D4E"/>
+  <path d="M42 14L50 14L50 22" stroke="#5E6AD2" stroke-width="4" stroke-linecap="round"/>
+</svg>

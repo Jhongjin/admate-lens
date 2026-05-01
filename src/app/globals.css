@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 /* ========================================
-   AdMate Capture Pro — Openclaw Console Foundation
+   AdMate Lens — Openclaw Console Foundation
    ======================================== */
 
 @theme inline {
@@ -215,6 +215,12 @@ body {
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0;
+}
+
+.ops-logo img {
+  width: 100%;
+  height: 100%;
+  display: block;
 }
 
 .ops-nav {

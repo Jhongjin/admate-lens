@@ -1,4 +1,4 @@
-# AdMate Vision (Ad Vision DA) API 문서
+# AdMate Lens API 문서
 
 **캡처 요청 및 조회 자동화 API 명세**
 

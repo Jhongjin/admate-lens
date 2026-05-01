@@ -17,8 +17,16 @@ const notoSansKR = Noto_Sans_KR({
 });
 
 export const metadata: Metadata = {
-  title: "AdMate Ad Vision",
-  description: "디지털 광고 게재면 캡처 자동화 시스템",
+  title: "AdMate Lens",
+  description: "광고 게재 화면과 보고서 증빙을 자동 생성하는 캡처 자동화 솔루션",
+  icons: {
+    icon: [
+      {
+        url: "/brand/admate-lens-favicon-02.svg",
+        type: "image/svg+xml",
+      },
+    ],
+  },
 };
 
 export default function RootLayout({

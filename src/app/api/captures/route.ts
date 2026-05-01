@@ -871,6 +871,26 @@ function isHostIsolatableRuntimeError(err: unknown): boolean {
 function classifySuccessCategory(
   diagnostics: any
 ): "ad_capture_ok" | "ad_area_not_found" | "ad_out_of_viewport" | "ad_capture_review_needed" {
+  if (typeof diagnostics?.adType === "string") {
+    const ui = diagnostics?.instreamUiChecks;
+    const expectedSkipButton = ui?.expectedSkipButton === true;
+    const uiLooksComplete =
+      !ui ||
+      (ui.overlay === true &&
+        ui.sponsorCard === true &&
+        ui.sponsorText === true &&
+        ui.blockingCover !== true &&
+        (!expectedSkipButton || ui.skipButton === true));
+
+    if (diagnostics.injectionSuccess === true && uiLooksComplete) {
+      return "ad_capture_ok";
+    }
+    if (diagnostics.injectionSuccess === true) {
+      return "ad_capture_review_needed";
+    }
+    return "ad_area_not_found";
+  }
+
   const slotsDetected = Number(diagnostics?.slotsDetected ?? 0);
   const slotsInjected = Number(diagnostics?.slotsInjected ?? 0);
   const screenshotMode = diagnostics?.screenshotMode;

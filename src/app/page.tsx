@@ -92,13 +92,15 @@ export default function Home() {
       <aside className="ops-sidebar studio-sidebar" aria-label="운영 메뉴">
         <div className="ops-sidebar-inner">
           <div className="ops-sidebar-brand">
-            <div className="ops-logo">AC</div>
+            <div className="ops-logo" aria-hidden="true">
+              <img src="/brand/admate-lens-favicon-02.svg" alt="" />
+            </div>
             <div>
               <h1 className="text-sm font-bold leading-tight text-[var(--color-text-primary)]">
-                AdMate Capture Pro
+                AdMate Lens
               </h1>
               <p className="text-xs leading-tight text-[var(--color-text-muted)]">
-                Evidence Studio
+                Capture Automation
               </p>
             </div>
           </div>
@@ -137,7 +139,7 @@ export default function Home() {
           <div className="ops-topbar-inner">
             <div>
               <p className="text-[13px] font-semibold text-[var(--color-text-primary)]">
-                Capture Studio
+                AdMate Lens
               </p>
             </div>
 
@@ -154,7 +156,7 @@ export default function Home() {
         <main className="ops-content studio-content">
           <section className="studio-hero">
             <div>
-              <p className="ops-kicker">Ad Evidence Operations Studio</p>
+              <p className="ops-kicker">AdMate Lens Operations Studio</p>
               <h2 className="studio-title">
                 광고 게재 증빙을 만들고, 검수하고, 다시 실행하는 작업실
               </h2>
