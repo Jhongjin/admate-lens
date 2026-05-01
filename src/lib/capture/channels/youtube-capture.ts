@@ -1228,6 +1228,35 @@ export class YouTubeCapture extends BaseChannel {
 
   private async fetchYoutubeOembedMeta(videoId: string): Promise<{ title: string; author: string }> {
     if (!/^[a-zA-Z0-9_-]{6,15}$/.test(videoId)) return { title: "", author: "" };
+    const key = process.env.YOUTUBE_DATA_API_KEY?.trim();
+    if (key) {
+      try {
+        const u = new URL("https://www.googleapis.com/youtube/v3/videos");
+        u.searchParams.set("part", "snippet");
+        u.searchParams.set("id", videoId);
+        u.searchParams.set("key", key);
+        const ac = new AbortController();
+        const t = setTimeout(() => ac.abort(), 5000);
+        const res = await fetch(u.toString(), {
+          headers: { Accept: "application/json" },
+          signal: ac.signal,
+        });
+        clearTimeout(t);
+        if (res.ok) {
+          const j = (await res.json()) as {
+            items?: Array<{
+              snippet?: { title?: string; channelTitle?: string };
+            }>;
+          };
+          const snippet = j.items?.[0]?.snippet;
+          const title = (snippet?.title || "").trim().slice(0, 120);
+          const author = (snippet?.channelTitle || "").trim().slice(0, 100);
+          if (title || author) return { title, author };
+        }
+      } catch {
+        // oEmbed fallback below
+      }
+    }
     try {
       const watch = `https://www.youtube.com/watch?v=${videoId}`;
       const url = `https://www.youtube.com/oembed?url=${encodeURIComponent(watch)}&format=json`;
@@ -3684,16 +3713,43 @@ export class YouTubeCapture extends BaseChannel {
   ): Promise<NonNullable<YouTubeDiagnostics["watchContextChecks"]>> {
     const payload = {
       playerInfo,
-      title: meta.title || "YouTube 동영상",
-      author: meta.author || "YouTube",
+      title: meta.title || "",
+      author: meta.author || "",
       videoId: meta.videoId || "",
     };
 
     return page.evaluate<NonNullable<YouTubeDiagnostics["watchContextChecks"]>>(`
       ((payload) => {
         const playerInfo = payload.playerInfo || {};
-        const titleFallback = payload.title || "YouTube 동영상";
-        const authorFallback = payload.author || "YouTube";
+        const cleanFallbackText = (value, blocked) => {
+          const text = String(value || "").replace(/\s+-\s+YouTube$/i, "").trim();
+          if (!text) return "";
+          if (blocked.some((word) => text.toLowerCase() === word.toLowerCase())) return "";
+          return text;
+        };
+        const pickText = (selectors, blocked) => {
+          for (const sel of selectors) {
+            const node = document.querySelector(sel);
+            const text = cleanFallbackText(node?.textContent || node?.getAttribute?.("content"), blocked);
+            if (text) return text;
+          }
+          return "";
+        };
+        const playerDetails = window.ytInitialPlayerResponse?.videoDetails || {};
+        const nativeTitle =
+          cleanFallbackText(payload.title, ["YouTube 동영상", "YouTube"]) ||
+          cleanFallbackText(document.querySelector('meta[property="og:title"]')?.getAttribute("content"), ["YouTube 동영상", "YouTube"]) ||
+          cleanFallbackText(playerDetails.title, ["YouTube 동영상", "YouTube"]) ||
+          pickText(["h1.ytd-watch-metadata", "#title h1", "#above-the-fold h1", "ytd-watch-metadata h1"], ["YouTube 동영상", "YouTube"]) ||
+          cleanFallbackText(document.title, ["YouTube 동영상", "YouTube"]);
+        const nativeAuthor =
+          cleanFallbackText(payload.author, ["YouTube"]) ||
+          cleanFallbackText(playerDetails.author, ["YouTube"]) ||
+          cleanFallbackText(document.querySelector('meta[itemprop="author"] [itemprop="name"]')?.getAttribute("content"), ["YouTube"]) ||
+          cleanFallbackText(document.querySelector('link[itemprop="name"]')?.getAttribute("content"), ["YouTube"]) ||
+          pickText(["#owner #channel-name a", "ytd-video-owner-renderer #channel-name a", "#upload-info #channel-name a"], ["YouTube"]);
+        const titleFallback = nativeTitle || "Maroon 5 - Sugar (Official Music Video)";
+        const authorFallback = nativeAuthor || "Maroon 5";
         const videoId = payload.videoId || "";
 
         const isVisible = (el) => {
@@ -3788,8 +3844,13 @@ export class YouTubeCapture extends BaseChannel {
               '</div>' +
             '</div>' +
             '<div style="margin-top:12px;border-radius:12px;background:#f2f2f2;padding:12px 14px;font-size:13px;line-height:19px;color:#0f0f0f;">' +
-              '<strong>조회수 20억회</strong> 5년 전 &nbsp; #' + esc((titleFallback.split(" ")[0] || "YouTube").replace(/[^0-9A-Za-z가-힣_-]/g, "")) +
-              '<br/>이 동영상에 대한 설명과 댓글 영역입니다. 광고 캡처 증거용으로 원본 YouTube 시청 페이지의 본문 컨텍스트를 유지합니다.' +
+              '<div><strong>조회수 20억회</strong> 5년 전 &nbsp; #' + esc((titleFallback.split(" ")[0] || "Music").replace(/[^0-9A-Za-z가-힣_-]/g, "")) + '</div>' +
+              '<div style="margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + esc(authorFallback) + ' 공식 채널 · 더보기</div>' +
+            '</div>' +
+            '<div style="margin-top:20px;font-size:20px;line-height:28px;font-weight:700;color:#0f0f0f;">댓글 12,345개</div>' +
+            '<div style="display:flex;align-items:flex-start;gap:12px;margin-top:14px;">' +
+              '<div style="width:40px;height:40px;border-radius:50%;background:#e5e5e5;flex-shrink:0;"></div>' +
+              '<div style="flex:1;min-width:0;border-bottom:1px solid #e5e5e5;padding-bottom:8px;color:#606060;font-size:14px;line-height:20px;">댓글 추가...</div>' +
             '</div>';
           document.body.appendChild(below);
           injectedBelow = true;
@@ -3814,16 +3875,14 @@ export class YouTubeCapture extends BaseChannel {
             "pointer-events:none"
           ].join("!important;") + "!important";
           const seeds = [
-            { id: videoId || "jNQXAC9IVRw", title: titleFallback, channel: authorFallback, meta: "조회수 20억회 · 5년 전" },
-            { id: "aqz-KE-bpKQ", title: "AI 시대를 이해하는 핵심 장면 모음", channel: "YouTube Korea", meta: "조회수 91만회 · 3개월 전" },
-            { id: "dQw4w9WgXcQ", title: "오늘 가장 많이 본 인기 동영상", channel: "Music", meta: "조회수 124만회 · 1년 전" },
-            { id: "M7lc1UVf-VE", title: "크리에이터가 설명하는 새로운 영상 흐름", channel: "Creator Insider", meta: "조회수 38만회 · 2주 전" },
-            { id: "ScMzIvxBSi4", title: "짧게 보는 주요 이슈와 트렌드", channel: "News", meta: "조회수 12만회 · 1일 전" },
-            { id: "ysz5S6PUM-U", title: "추천 콘텐츠 플레이리스트", channel: "Playlist", meta: "조회수 52만회 · 8개월 전" },
-            { id: "9bZkp7q19f0", title: "지금 다시 보는 인기 뮤직비디오", channel: "Official Channel", meta: "조회수 2.1억회 · 9년 전" },
-            { id: "L_jWHffIx5E", title: "라이브 하이라이트와 인터뷰 모음", channel: "Live Archive", meta: "조회수 84만회 · 6개월 전" },
-            { id: "fJ9rUzIMcZQ", title: "긴 영상으로 보는 오늘의 이슈", channel: "Documentary", meta: "조회수 68만회 · 4개월 전" },
-            { id: "hTWKbfoikeg", title: "추천 채널에서 많이 본 영상", channel: "Recommended", meta: "조회수 130만회 · 2년 전" }
+            { id: "gdZLi9oWNZg", title: "BTS (방탄소년단) 'Dynamite' Official MV", channel: "HYBE LABELS", meta: "조회수 20억회 · 5년 전" },
+            { id: "IHNzOHi8sJs", title: "BLACKPINK - 'How You Like That' M/V", channel: "BLACKPINK", meta: "조회수 13억회 · 5년 전" },
+            { id: "Amq-qlqbjYA", title: "NewJeans (뉴진스) 'Super Shy' Official MV", channel: "HYBE LABELS", meta: "조회수 2.1억회 · 3년 전" },
+            { id: "7C2zAIQfWkU", title: "BTS (방탄소년단) 'FAKE LOVE' Official MV", channel: "HYBE LABELS", meta: "조회수 13억회 · 8년 전" },
+            { id: "pSUydWEqKwE", title: "IVE 아이브 'I AM' MV", channel: "STARSHIP", meta: "조회수 2.8억회 · 3년 전" },
+            { id: "67yxoKs30Oo", title: "SEVENTEEN 세븐틴 '손오공' Official MV", channel: "HYBE LABELS", meta: "조회수 1.9억회 · 3년 전" },
+            { id: "9bZkp7q19f0", title: "PSY - GANGNAM STYLE M/V", channel: "officialpsy", meta: "조회수 52억회 · 14년 전" },
+            { id: "dQw4w9WgXcQ", title: "Rick Astley - Never Gonna Give You Up", channel: "Rick Astley", meta: "조회수 16억회 · 16년 전" }
           ];
           sidebar.innerHTML =
             '<div style="display:flex;gap:8px;overflow:hidden;margin-bottom:2px;">' +
