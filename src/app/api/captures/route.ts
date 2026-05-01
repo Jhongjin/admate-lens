@@ -10,8 +10,14 @@ import { NextResponse, type NextRequest } from "next/server";
 import { after } from "next/server";
 import { createServerClient } from "@/lib/supabase/client";
 import { createChannel } from "@/lib/capture";
-import { resolveBatchPerCaptureTimeoutMs } from "@/lib/capture/batch-serverless";
-import { PuppeteerEngine } from "@/lib/capture/engine/puppeteer-engine";
+import {
+  resolveBatchPerCaptureTimeoutMs,
+  SERVERLESS_BATCH_BUDGET_MS,
+} from "@/lib/capture/batch-serverless";
+import {
+  isBrowserbaseConfigured,
+  PuppeteerEngine,
+} from "@/lib/capture/engine/puppeteer-engine";
 import { isGdnExcludedHost } from "@/lib/capture/channels/gdn/host-strategies";
 import type { ChannelType, VisionDaCaptureRow } from "@/lib/supabase/types";
 import {
@@ -336,6 +342,9 @@ async function executeBatchCaptures(captureIds: string[]): Promise<void> {
   const multiBatch = captureIds.length > 1;
 
   console.log(`[BatchCapture] 🎬 배치 시작: ${captureIds.length}건`);
+  if (isBrowserbaseFallbackConfiguredForAnyChannel()) {
+    console.log("[BatchCapture] Browserbase fallback 대기 상태: configured");
+  }
 
   try {
     for (const captureId of captureIds) {
@@ -446,7 +455,7 @@ async function executeBatchCaptures(captureIds: string[]): Promise<void> {
         }
 
         // 4) 채널 생성 (공유 엔진)
-        const channel = createChannel(capture.channel as ChannelType, sharedEngine);
+        let channel = createChannel(capture.channel as ChannelType, sharedEngine);
         const storedYoutubeAdType =
           (typeof captureMetadata.youtubeAdType === "string" &&
             captureMetadata.youtubeAdType) ||
@@ -456,38 +465,118 @@ async function executeBatchCaptures(captureIds: string[]): Promise<void> {
         if (capture.channel === "youtube" && !isExecutableYouTubeAdType(storedYoutubeAdType)) {
           throw new Error(`지원하지 않는 YouTube 광고 유형입니다: ${storedYoutubeAdType}`);
         }
+        const captureRequest = {
+          publisherUrl: capture.source_url ?? "",
+          creativeUrl: capture.creative_url,
+          captureLanding: capture.capture_landing,
+          clickUrl: capture.click_url ?? undefined,
+          options: {
+            injectionMode: captureMetadata.injectionMode ?? "single",
+            slotCount: captureMetadata.slotCount ?? 1,
+            creativeDimensions: captureMetadata.creativeDimensions ?? undefined,
+            adSizeMode: captureMetadata.adSizeMode ?? "auto",
+            targetAdSizes: captureMetadata.targetAdSizes ?? [],
+            creativeObjectFit:
+              captureMetadata.creativeObjectFit === "cover" ? "cover" : "contain",
+            youtubeAdType: capture.channel === "youtube" ? storedYoutubeAdType : undefined,
+            instreamOpts: captureMetadata.instreamOpts,
+            infeedOpts: captureMetadata.infeedOpts,
+            publisherGotoRelaxed: multiBatch && capture.channel === "gdn",
+            gdnViewportMode:
+              capture.channel === "gdn"
+                ? captureMetadata.gdnViewportMode === "mobile"
+                  ? "mobile"
+                  : "pc"
+                : undefined,
+          },
+        };
 
         // 5) 캡처 실행
-        const result = await executeWithRetry(
-          () =>
-            channel.execute({
-              publisherUrl: capture.source_url ?? "",
-              creativeUrl: capture.creative_url,
-              captureLanding: capture.capture_landing,
-              clickUrl: capture.click_url ?? undefined,
-              options: {
-                injectionMode: captureMetadata.injectionMode ?? "single",
-                slotCount: captureMetadata.slotCount ?? 1,
-                creativeDimensions: captureMetadata.creativeDimensions ?? undefined,
-                adSizeMode: captureMetadata.adSizeMode ?? "auto",
-                targetAdSizes: captureMetadata.targetAdSizes ?? [],
-                creativeObjectFit:
-                  captureMetadata.creativeObjectFit === "cover" ? "cover" : "contain",
-                youtubeAdType: capture.channel === "youtube" ? storedYoutubeAdType : undefined,
-                instreamOpts: captureMetadata.instreamOpts,
-                infeedOpts: captureMetadata.infeedOpts,
-                publisherGotoRelaxed: multiBatch && capture.channel === "gdn",
-                gdnViewportMode:
-                  capture.channel === "gdn"
-                    ? captureMetadata.gdnViewportMode === "mobile"
-                      ? "mobile"
-                      : "pc"
-                    : undefined,
-              },
-            }),
-          1,
-          perCaptureTimeoutMs
-        );
+        let runtimeProvider = "vercel-chromium";
+        let fallbackRuntime: Record<string, unknown> | null = null;
+        let result: Awaited<ReturnType<typeof channel.execute>>;
+        try {
+          result = await executeWithRetry(
+            () => channel.execute(captureRequest),
+            1,
+            perCaptureTimeoutMs
+          );
+        } catch (primaryError) {
+          const fallbackTimeoutMs = resolveBrowserbaseFallbackTimeoutMs(
+            perCaptureTimeoutMs,
+            multiBatch,
+            startTime
+          );
+          if (
+            !shouldAttemptBrowserbaseFallback(
+              capture.channel,
+              primaryError,
+              fallbackTimeoutMs
+            )
+          ) {
+            throw primaryError;
+          }
+
+          console.warn(
+            `[BatchCapture] Browserbase fallback 시도: ${captureId} (${classifyFailureReason(primaryError).code})`
+          );
+          if (engineLaunched) {
+            try {
+              await sharedEngine.close();
+            } catch {
+              /* ignore */
+            }
+            engineLaunched = false;
+          }
+
+          const browserbaseEngine = new PuppeteerEngine({
+            provider: "browserbase",
+            browserbase: {
+              timeoutSeconds: Math.ceil((fallbackTimeoutMs ?? 60_000) / 1000),
+            },
+          });
+          try {
+            await browserbaseEngine.launch();
+            channel = createChannel(capture.channel as ChannelType, browserbaseEngine);
+            result = await executeWithRetry(
+              () =>
+                channel.execute({
+                  ...captureRequest,
+                  options: {
+                    ...captureRequest.options,
+                    runtimeProvider: "browserbase",
+                    fallbackFrom: "vercel-chromium",
+                  },
+                }),
+              1,
+              fallbackTimeoutMs ?? 60_000
+            );
+            runtimeProvider = "browserbase";
+            const primaryFailure = classifyFailureReason(primaryError);
+            fallbackRuntime = {
+              used: true,
+              from: "vercel-chromium",
+              provider: "browserbase",
+              primaryFailureCategory: primaryFailure.category,
+              primaryFailureCode: primaryFailure.code,
+            };
+          } catch (fallbackError) {
+            const err = new Error(
+              `Browserbase fallback 실패: ${
+                fallbackError instanceof Error ? fallbackError.message : String(fallbackError)
+              }`
+            );
+            (err as any).fallbackRuntime = {
+              attempted: true,
+              provider: "browserbase",
+              primaryFailure: classifyFailureReason(primaryError),
+              fallbackFailure: classifyFailureReason(fallbackError),
+            };
+            throw err;
+          } finally {
+            await browserbaseEngine.close().catch(() => {});
+          }
+        }
 
         if (multiBatch && engineLaunched) {
           try {
@@ -546,9 +635,11 @@ async function executeBatchCaptures(captureIds: string[]): Promise<void> {
               resultCategory: successCategory,
               diagnostics,
               runtime: {
+                provider: runtimeProvider,
                 capturedAt: result.capturedAt,
                 durationMs,
                 diagnostics,
+                fallback: fallbackRuntime ?? undefined,
               },
             },
             updated_at: new Date().toISOString(),
@@ -560,6 +651,10 @@ async function executeBatchCaptures(captureIds: string[]): Promise<void> {
       } catch (captureError) {
         const errorMessage = captureError instanceof Error ? captureError.message : "알 수 없는 오류";
         const failureInfo = classifyFailureReason(captureError);
+        const fallbackRuntime =
+          typeof captureError === "object" && captureError !== null
+            ? ((captureError as any).fallbackRuntime as Record<string, unknown> | undefined)
+            : undefined;
         const host = getHostname(sourceUrlForFailure);
 
         await supabase
@@ -572,6 +667,7 @@ async function executeBatchCaptures(captureIds: string[]): Promise<void> {
               failureCategory: failureInfo.category,
               failureCode: failureInfo.code,
               shouldRemoveFromPresetList: failureInfo.hardBlocked,
+              fallback: fallbackRuntime,
               failedAt: new Date().toISOString(),
             },
             updated_at: new Date().toISOString(),
@@ -660,6 +756,63 @@ function isBrowserSessionClosedError(err: unknown): boolean {
     message.includes("session closed") ||
     message.includes("most likely the page has been closed") ||
     message.includes("protocol error (page.capturescreenshot)")
+  );
+}
+
+function isDisabledEnvFlag(value: string | undefined): boolean {
+  const v = value?.trim().toLowerCase();
+  return v === "0" || v === "false" || v === "off" || v === "no";
+}
+
+function getBrowserbaseFallbackChannels(): Set<string> {
+  const raw = (process.env.BROWSERBASE_FALLBACK_CHANNELS ?? "gdn,youtube").trim().toLowerCase();
+  if (raw === "*" || raw === "all") return new Set(["gdn", "youtube"]);
+  return new Set(
+    raw
+      .split(",")
+      .map((channel) => channel.trim())
+      .filter(Boolean)
+  );
+}
+
+function isBrowserbaseFallbackConfiguredForAnyChannel(): boolean {
+  return (
+    isBrowserbaseConfigured() &&
+    !isDisabledEnvFlag(process.env.BROWSERBASE_FALLBACK_ENABLED) &&
+    getBrowserbaseFallbackChannels().size > 0
+  );
+}
+
+function resolveBrowserbaseFallbackTimeoutMs(
+  perCaptureTimeoutMs: number,
+  multiBatch: boolean,
+  batchStartMs: number
+): number | null {
+  const configured = Number(process.env.BROWSERBASE_FALLBACK_TIMEOUT_MS);
+  const desired = Number.isFinite(configured) && configured > 0 ? configured : 90_000;
+  const base = Math.min(perCaptureTimeoutMs, desired);
+  if (!multiBatch) return Math.max(45_000, base);
+
+  const remaining = SERVERLESS_BATCH_BUDGET_MS - (Date.now() - batchStartMs);
+  if (remaining < 45_000) return null;
+  return Math.max(30_000, Math.min(base, remaining - 8_000));
+}
+
+function shouldAttemptBrowserbaseFallback(
+  channel: string,
+  err: unknown,
+  fallbackTimeoutMs: number | null
+): boolean {
+  if (fallbackTimeoutMs === null) return false;
+  if (!isBrowserbaseFallbackConfiguredForAnyChannel()) return false;
+  const allowedChannels = getBrowserbaseFallbackChannels();
+  if (!allowedChannels.has(channel.toLowerCase())) return false;
+
+  const failure = classifyFailureReason(err);
+  return (
+    failure.category === "blocked" ||
+    failure.category === "runtime" ||
+    failure.category === "timeout"
   );
 }
 

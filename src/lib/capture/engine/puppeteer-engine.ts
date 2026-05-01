@@ -31,6 +31,21 @@ import type {
 type PuppeteerBrowser = import("puppeteer-core").Browser;
 type PuppeteerPage = import("puppeteer-core").Page;
 
+type PuppeteerEngineProvider = "chromium" | "browserbase";
+
+interface PuppeteerEngineOptions {
+  provider?: PuppeteerEngineProvider;
+  browserbase?: {
+    timeoutSeconds?: number;
+    region?: "us-west-2" | "us-east-1" | "eu-central-1" | "ap-southeast-1";
+  };
+}
+
+interface BrowserbaseSessionResponse {
+  id: string;
+  connectUrl: string;
+}
+
 const DEFAULT_VIEWPORT: IViewport = {
   width: 1920,
   height: 1080,
@@ -97,6 +112,19 @@ const BROWSER_ARGS = [
   "--disable-domain-reliability",
   "--disable-sync",
 ];
+
+export function isBrowserbaseConfigured(): boolean {
+  return Boolean(
+    process.env.BROWSERBASE_API_KEY?.trim() &&
+      process.env.BROWSERBASE_PROJECT_ID?.trim(),
+  );
+}
+
+function parseBrowserbaseTimeoutSeconds(value: string | undefined, fallback = 120): number {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.max(60, Math.min(21_600, Math.round(n)));
+}
 
 /**
  * 🛡️ Stealth 회피 스크립트 (puppeteer-extra-plugin-stealth 핵심 로직 직접 구현)
@@ -610,6 +638,9 @@ class PuppeteerPageHandle implements IPageHandle {
 
 export class PuppeteerEngine implements IBrowserEngine {
   private browser: PuppeteerBrowser | null = null;
+  private browserbaseFirstPageUsed = false;
+
+  constructor(private options: PuppeteerEngineOptions = {}) {}
 
   /** /tmp의 기존 Chromium 프로세스를 정리 (ETXTBSY 방지) */
   private async cleanupStaleChromium(): Promise<void> {
@@ -626,6 +657,10 @@ export class PuppeteerEngine implements IBrowserEngine {
 
   async launch(): Promise<void> {
     const puppeteer = await import("puppeteer-core");
+    if (this.options.provider === "browserbase") {
+      await this.launchBrowserbase(puppeteer.default);
+      return;
+    }
     const isLocal = process.env.IS_LOCAL === "true";
 
     if (isLocal) {
@@ -693,9 +728,73 @@ export class PuppeteerEngine implements IBrowserEngine {
     }
   }
 
+  private async launchBrowserbase(puppeteer: typeof import("puppeteer-core").default): Promise<void> {
+    const apiKey = process.env.BROWSERBASE_API_KEY?.trim();
+    const projectId = process.env.BROWSERBASE_PROJECT_ID?.trim();
+
+    if (!apiKey || !projectId) {
+      throw new Error("Browserbase fallback is not configured.");
+    }
+
+    const timeoutSeconds =
+      this.options.browserbase?.timeoutSeconds ??
+      parseBrowserbaseTimeoutSeconds(process.env.BROWSERBASE_SESSION_TIMEOUT_SECONDS);
+    const region = this.options.browserbase?.region ?? process.env.BROWSERBASE_REGION?.trim();
+    const body: Record<string, unknown> = {
+      projectId,
+      timeout: timeoutSeconds,
+      userMetadata: {
+        app: "admate-capture-pro",
+        purpose: "capture-fallback",
+      },
+    };
+
+    if (
+      region === "us-west-2" ||
+      region === "us-east-1" ||
+      region === "eu-central-1" ||
+      region === "ap-southeast-1"
+    ) {
+      body.region = region;
+    }
+
+    const response = await fetch("https://api.browserbase.com/v1/sessions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-BB-API-Key": apiKey,
+      },
+      body: JSON.stringify(body),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Browserbase session create failed (HTTP ${response.status}).`);
+    }
+
+    const session = (await response.json()) as Partial<BrowserbaseSessionResponse>;
+    if (!session.connectUrl) {
+      throw new Error("Browserbase session did not return a connect URL.");
+    }
+
+    this.browser = await puppeteer.connect({
+      browserWSEndpoint: session.connectUrl,
+      defaultViewport: VERCEL_VIEWPORT,
+      protocolTimeout: 300000,
+    });
+    this.browserbaseFirstPageUsed = false;
+    console.log(`[PuppeteerEngine] Browserbase 원격 세션 연결 완료 (timeout=${timeoutSeconds}s)`);
+  }
+
   async newPage(): Promise<IPageHandle> {
     if (!this.browser) throw new Error("Browser not launched. Call launch() first.");
-    const page = await this.browser.newPage();
+    let page: PuppeteerPage;
+    if (this.options.provider === "browserbase" && !this.browserbaseFirstPageUsed) {
+      const pages = await this.browser.pages();
+      page = pages[0] ?? await this.browser.newPage();
+      this.browserbaseFirstPageUsed = true;
+    } else {
+      page = await this.browser.newPage();
+    }
 
     // 🔑 0) CDP 프로토콜로 webdriver 플래그 근본 제거 + User-Agent Client Hints 설정
     const client = (page as any)._client?.();
