@@ -476,7 +476,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
     youtubeAdType: "preroll",
     instreamVideoUrl: "",
     instreamPublisherVideoUrl: "",
-    instreamCaptureSecond: "3",
+    instreamCaptureSecond: "5",
     instreamAdTitle: "",
     instreamEnableCtaText: true,
     instreamCtaText: "",
@@ -1194,7 +1194,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
         captureLanding: false,
         instreamVideoUrl: "",
         instreamPublisherVideoUrl: "",
-        instreamCaptureSecond: "3",
+        instreamCaptureSecond: "5",
         instreamAdTitle: "",
         instreamEnableCtaText: true,
         instreamCtaText: "",
@@ -1374,6 +1374,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                     channel: "youtube",
                     youtubeAdType: "preroll",
                     instreamSkipMode: "skippable",
+                    instreamCaptureSecond: "5",
                   }));
                   return;
                 }
@@ -1402,6 +1403,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                     channel: "youtube",
                     youtubeAdType: "mobile-preroll-aos",
                     instreamSkipMode: "skippable",
+                    instreamCaptureSecond: "5",
                   }));
                   return;
                 }
@@ -1430,6 +1432,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                     channel: "youtube",
                     youtubeAdType: "mobile-preroll-ios",
                     instreamSkipMode: "skippable",
+                    instreamCaptureSecond: "5",
                   }));
                   return;
                 }

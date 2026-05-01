@@ -206,7 +206,7 @@ export function runPrerollInjectInPage(...args: unknown[]): boolean {
       adLowerStack.style.cssText = [
         "position: absolute",
         "left: 16px",
-        "bottom: 16px",
+        "bottom: 54px",
         "z-index: 20",
         "display: flex",
         "flex-direction: column",
@@ -219,14 +219,19 @@ export function runPrerollInjectInPage(...args: unknown[]): boolean {
       ].join(" !important;") + " !important";
 
       const ctaCard = document.createElement("div");
+      ctaCard.id = "admate-preroll-sponsored-card";
+      ctaCard.setAttribute("data-injected", "admate-youtube-preroll");
       ctaCard.style.cssText = [
         "position: relative",
         "display: flex",
         "align-items: center",
-        "background: rgba(0,0,0,0.65)",
+        "background: rgba(0,0,0,0.78)",
+        "border: 1px solid rgba(255,255,255,0.12)",
         "border-radius: 8px",
         "padding: 8px 12px",
-        "max-width: 100%",
+        "max-width: min(520px, calc(100vw - 560px))",
+        "min-width: 300px",
+        "box-shadow: 0 4px 18px rgba(0,0,0,0.32)",
         "z-index: 10",
         "overflow: hidden",
         "cursor: pointer",
@@ -251,20 +256,23 @@ export function runPrerollInjectInPage(...args: unknown[]): boolean {
       const ctaTextDiv = document.createElement("div");
       ctaTextDiv.style.cssText = "flex:1;min-width:0;margin-right:12px";
       ctaTextDiv.innerHTML = [
-        '<div style="font-size:14px;font-weight:500;color:#fff;font-family:&quot;YouTube Noto&quot;,Roboto,Arial,Helvetica,sans-serif;white-space:nowrap;line-height:20px;letter-spacing:normal;word-break:keep-all">' +
+        '<div style="font-size:14px;font-weight:600;color:#fff;font-family:&quot;YouTube Noto&quot;,Roboto,Arial,Helvetica,sans-serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:20px;letter-spacing:normal;word-break:keep-all">' +
           titleText +
           "</div>",
         '<div style="font-size:12px;color:rgba(255,255,255,0.7);font-family:&quot;YouTube Noto&quot;,Roboto,Arial,Helvetica,sans-serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px;line-height:16px;letter-spacing:normal">' +
-          domainText +
+          "스폰서 · " +
+          sponsorDomainText +
           "</div>",
       ].join("");
       ctaCard.appendChild(ctaTextDiv);
 
-      const ctaBtn = document.createElement("div");
-      ctaBtn.style.cssText =
-        "background:#f1f1f1;color:rgb(15,15,15);font-size:14px;font-weight:500;line-height:36px;letter-spacing:normal;font-family:Roboto,Arial,sans-serif;padding:0 16px;border-radius:18px;height:36px;white-space:nowrap;cursor:pointer;flex-shrink:0;display:inline-flex;align-items:center";
-      ctaBtn.textContent = ctaBtnText;
-      ctaCard.appendChild(ctaBtn);
+      if (enableCtaText) {
+        const ctaBtn = document.createElement("div");
+        ctaBtn.style.cssText =
+          "background:#f1f1f1;color:rgb(15,15,15);font-size:14px;font-weight:500;line-height:36px;letter-spacing:normal;font-family:Roboto,Arial,sans-serif;padding:0 16px;border-radius:18px;height:36px;white-space:nowrap;cursor:pointer;flex-shrink:0;display:inline-flex;align-items:center";
+        ctaBtn.textContent = ctaBtnText;
+        ctaCard.appendChild(ctaBtn);
+      }
 
       const sponsorText = document.createElement("div");
       sponsorText.id = "admate-preroll-sponsor";
@@ -292,9 +300,7 @@ export function runPrerollInjectInPage(...args: unknown[]): boolean {
           sponsorDomainText +
           "</span>",
       ].join("");
-      if (enableCtaText) {
-        adLowerStack.appendChild(ctaCard);
-      }
+      adLowerStack.appendChild(ctaCard);
       adLowerStack.appendChild(sponsorText);
       overlay.appendChild(adLowerStack);
 
@@ -452,12 +458,10 @@ export function runPrerollInjectInPage(...args: unknown[]): boolean {
         skipBtn.appendChild(skipIcon);
         overlay.appendChild(skipBtn);
       } else {
-        const skipTop = py + ph - 90;
         skipBtn.style.cssText = [
-          "position: fixed",
-          "top: " + skipTop + "px",
-          "left: " + (px + pw - 24) + "px",
-          "transform: translateX(-100%)",
+          "position: absolute",
+          "right: 16px",
+          "bottom: 54px",
           "box-sizing: border-box",
           "background: rgba(28,28,28,0.8)",
           "color: #fff",
@@ -470,7 +474,7 @@ export function runPrerollInjectInPage(...args: unknown[]): boolean {
           "align-items: center",
           "flex-direction: row",
           "gap: 12px",
-          "z-index: 2147483647",
+          "z-index: 30",
           "letter-spacing: 0",
           "backdrop-filter: blur(4px)",
         ].join(" !important;") + " !important";
@@ -483,7 +487,7 @@ export function runPrerollInjectInPage(...args: unknown[]): boolean {
           '<svg fill="none" height="24" viewBox="0 0 24 24" width="24" xmlns="http://www.w3.org/2000/svg" focusable="false" aria-hidden="true"><path d="M20 20C20.26 20 20.51 19.89 20.70 19.70C20.89 19.51 21 19.26 21 19V5C21 4.73 20.89 4.48 20.70 4.29C20.51 4.10 20.26 4 20 4C19.73 4 19.48 4.10 19.29 4.29C19.10 4.48 19 4.73 19 5V19C19 19.26 19.10 19.51 19.29 19.70C19.48 19.89 19.73 20 20 20ZM5.04 19.77L18 12L5.04 4.22C4.84 4.10 4.60 4.03 4.36 4.03C4.12 4.03 3.89 4.09 3.68 4.21C3.47 4.32 3.30 4.49 3.18 4.70C3.06 4.91 2.99 5.14 3 5.38V18.61C2.99 18.85 3.06 19.08 3.18 19.29C3.30 19.50 3.47 19.67 3.68 19.79C3.89 19.90 4.12 19.96 4.36 19.96C4.60 19.96 4.84 19.89 5.04 19.77Z" fill="white"/></svg>';
         skipBtn.appendChild(skipText);
         skipBtn.appendChild(skipIcon);
-        document.body.appendChild(skipBtn);
+        overlay.appendChild(skipBtn);
       }
     }
 

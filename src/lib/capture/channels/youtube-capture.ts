@@ -81,6 +81,15 @@ export interface YouTubeDiagnostics {
   infeedHomeSyntheticFeed?: boolean;
   /** 합성 피드 메타 출처: `youtube-data-api` | `youtube-data-api+search` | `youtube-data-api-search` | `invidious` | `youtube-web-scrape` | `oembed-fallback` */
   infeedHomeSyntheticSource?: string;
+  /** 인스트림/범퍼: 플레이어 내부 광고 UI 마커 검증 */
+  instreamUiChecks?: {
+    overlay: boolean;
+    sponsorCard: boolean;
+    sponsorText: boolean;
+    skipButton: boolean;
+    expectedSkipButton: boolean;
+    isMobile: boolean;
+  };
 }
 
 /**
@@ -797,6 +806,29 @@ export class YouTubeCapture extends BaseChannel {
           } else {
             console.log('[YouTube] 컴패니언 배너 삽입 생략 (opt-out)');
           }
+          const expectedSkipButton = prerollUiOpts.instreamSkipMode !== "non-skippable";
+          const instreamUiChecks = await page.evaluate<YouTubeDiagnostics["instreamUiChecks"]>(`
+            (() => ({
+              overlay: !!document.querySelector("#admate-preroll-overlay"),
+              sponsorCard: !!document.querySelector("#admate-preroll-sponsored-card, #admate-preroll-lower-stack, #admate-mobile-preroll-cta-bar"),
+              sponsorText: !!document.querySelector("#admate-preroll-sponsor, [data-injected='admate-ytp-ad-badge'], #admate-mobile-preroll-cta-bar"),
+              skipButton: !!document.querySelector("#admate-skip-btn"),
+              expectedSkipButton: ${JSON.stringify(expectedSkipButton)},
+              isMobile: ${JSON.stringify(isMobilePlatform)}
+            }))()
+          `);
+          if (this.diagnostics) {
+            this.diagnostics.instreamUiChecks = instreamUiChecks;
+          }
+          console.log(
+            `[YouTube] 인스트림 UI 검증: overlay=${instreamUiChecks?.overlay ? "✅" : "❌"} sponsorCard=${instreamUiChecks?.sponsorCard ? "✅" : "❌"} skipButton=${instreamUiChecks?.skipButton ? "✅" : "❌"} expectedSkip=${expectedSkipButton ? "yes" : "no"}`
+          );
+          if (expectedSkipButton && !instreamUiChecks?.skipButton) {
+            console.warn("[YouTube] ⚠️ 스킵 가능 인스트림인데 건너뛰기 버튼 마커가 없습니다.");
+          }
+          if (!expectedSkipButton && instreamUiChecks?.skipButton) {
+            console.warn("[YouTube] ⚠️ 논스킵/범퍼인데 건너뛰기 버튼이 표시되었습니다.");
+          }
         }
         break;
       }
@@ -807,8 +839,19 @@ export class YouTubeCapture extends BaseChannel {
     if (!injectionSuccess) {
       console.warn(`[YouTube] ⚠️ 기본 인젝션 실패 — 폴백: 프리롤 강제 오버레이`);
       await this.injectPrerollAd(page, prerollOverlayImageUrl, playerInfo, {
+        videoUrl: instreamOpts.videoUrl || "",
+        adTitle: instreamOpts.adTitle || "",
+        ctaText: instreamOpts.ctaText || "",
+        landingUrl: instreamOpts.landingUrl || request.clickUrl || "",
+        displayUrl: instreamOpts.displayUrl || "",
+        displayPath1: instreamOpts.displayPath1 || "",
+        displayPath2: instreamOpts.displayPath2 || "",
+        companionImageUrl: instreamCompanionDataUrl || instreamOpts.companionImageUrl || "",
         avatarImageUrl: instreamAvatarDataUrl,
         progressFillPercent: prerollProgressPercent,
+        enableCtaText: instreamOpts.enableCtaText,
+        isMobile: isMobilePlatform,
+        instreamSkipMode: instreamOpts.instreamSkipMode,
       });
     }
 
