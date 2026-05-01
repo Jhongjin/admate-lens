@@ -328,8 +328,8 @@ export async function POST(request: NextRequest) {
 }
 
 /**
- * 배치 캡처 실행 — 다건일 때는 사이트(캡처 1건)마다 Chromium을 종료해 세션을 분리하고,
- * 서버리스 남은 시간에 맞춰 건당 타임아웃을 줄입니다.
+ * 배치 캡처 실행 — 다건일 때도 페이지 단위로만 정리하고 Chromium은 재사용해
+ * 서버리스 남은 시간에 맞춰 최대한 많은 캡처를 처리합니다.
  * (after() 콜백 또는 /api/captures/execute에서 호출)
  */
 async function executeBatchCaptures(captureIds: string[]): Promise<void> {
@@ -566,16 +566,6 @@ async function executeBatchCaptures(captureIds: string[]): Promise<void> {
           } finally {
             await browserbaseEngine.close().catch(() => {});
           }
-        }
-
-        if (multiBatch && engineLaunched) {
-          try {
-            await sharedEngine.close();
-            console.log("[BatchCapture] 🔄 Chromium 종료 (다건·사이트별 세션 분리)");
-          } catch {
-            /* ignore */
-          }
-          engineLaunched = false;
         }
 
         // 6) Storage 업로드

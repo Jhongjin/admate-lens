@@ -5,7 +5,7 @@
  * table: vision_da_captures
  *
  * v2: 배치 실행 지원 — 여러 captureId를 하나의 브라우저로 순차 처리
- *     (spawn ETXTBSY 방지: Chromium 동시 실행 문제 해결)
+ *     (페이지는 매 건 닫고, Chromium은 성공 건 사이에서 재사용)
  */
 
 import { NextResponse, type NextRequest } from "next/server";
@@ -42,7 +42,7 @@ export async function POST(request: NextRequest) {
     const hostFailureCounts = new Map<string, number>();
     const multiBatch = captureIds.length > 1;
 
-    // 🔑 핵심: 순차 실행. 다건이면 사이트마다 Chromium을 끊어 세션 분리
+    // 🔑 핵심: 순차 실행. 다건도 성공 건 사이에서는 Chromium을 재사용
     const sharedEngine = new PuppeteerEngine();
     let engineLaunched = false;
 
@@ -196,16 +196,6 @@ export async function POST(request: NextRequest) {
             1,
             perCaptureTimeoutMs
           );
-
-          if (multiBatch && engineLaunched) {
-            try {
-              await sharedEngine.close();
-              console.log("[Execute] 🔄 Chromium 종료 (다건·사이트별 세션 분리)");
-            } catch {
-              /* ignore */
-            }
-            engineLaunched = false;
-          }
 
           // 6) Supabase Storage에 업로드
           const timestamp = Date.now();

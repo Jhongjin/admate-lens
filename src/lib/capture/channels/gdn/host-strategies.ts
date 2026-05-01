@@ -70,6 +70,11 @@ function isJoongangHost(host: string): boolean {
   return h === "www.joongang.co.kr" || h === "joongang.co.kr" || h === "m.joongang.co.kr";
 }
 
+function isBloterHost(host: string): boolean {
+  const h = host.toLowerCase();
+  return h === "www.bloter.net" || h === "bloter.net";
+}
+
 /** GAM/DFP DOM 힌트 — 조상 셀렉터에 #wrap 등이 있어도 iframe 경로에 google이 있으면 true */
 function hasGoogleInventoryHint(sel: string): boolean {
   const s = sel.toLowerCase();
@@ -118,6 +123,8 @@ export function getGdnLazyLoadMode(host: string): GdnLazyLoadMode {
   if (isMkHost(host)) return "light";
   // SBS는 광고 DOM이 무겁고 full lazy 복원이 길어져 목록 조회(오래된 processing 정리) 타이밍과 충돌하기 쉬움
   if (host === "news.sbs.co.kr") return "light";
+  // Bloter는 이미지/스크립트가 많아 full lazy 복원 시 배치 후반 타임아웃이 잦음
+  if (isBloterHost(host)) return "light";
   return "full";
 }
 
@@ -137,6 +144,7 @@ export function getGdnScreenshotPolicy(
   if (isZdnetHost(host)) return "force_centered_viewport";
   if (isDongaHost(host)) return "force_centered_viewport";
   if (isJoongangHost(host)) return "force_centered_viewport";
+  if (isBloterHost(host)) return "force_centered_viewport";
   if (mobile && isMkHost(host)) return "force_centered_viewport";
   if (mobile && isHeraldBizHost(host)) return "force_centered_viewport";
   return "default";
@@ -196,6 +204,12 @@ export function prioritizeGdnSlotsByHost(
   if (isYnaHost(host)) {
     slots.sort((a, b) => calcYnaSlotScore(b) - calcYnaSlotScore(a));
     console.log("[GDN] 🧭 연합뉴스 전용 슬롯 우선순위 적용");
+    return;
+  }
+
+  if (isBloterHost(host)) {
+    slots.sort((a, b) => calcBloterSlotScore(b) - calcBloterSlotScore(a));
+    console.log("[GDN] 🧭 Bloter 전용 슬롯 우선순위 적용");
     return;
   }
 
@@ -412,6 +426,22 @@ export function narrowGdnSlotsByHost(
       slots.length = 0;
       preferred.forEach((s) => slots.push(s));
       console.log(`[GDN] 🎯 연합뉴스 후보 축소: ${preferred.length}개 (모바일 MPU·GAM 위주)`);
+    }
+  }
+
+  if (isBloterHost(host)) {
+    const preferred = slots.filter((s) => {
+      const sel = (s.selector || "").toLowerCase();
+      const gam = hasGoogleInventoryHint(sel) || s.type === "gdn-iframe";
+      if (gam && s.height > 720) return false;
+      const mpu = s.width >= 250 && s.width <= 380 && s.height >= 220 && s.height <= 340;
+      const leaderboard = s.width >= 680 && s.width <= 1024 && s.height >= 80 && s.height <= 280;
+      return (gam || mpu || leaderboard) && s.width <= 1100 && s.height <= 520;
+    });
+    if (preferred.length > 0) {
+      slots.length = 0;
+      preferred.forEach((s) => slots.push(s));
+      console.log(`[GDN] 🎯 Bloter 후보 축소: ${preferred.length}개`);
     }
   }
 
@@ -669,6 +699,30 @@ function calcYnaSlotScore(slot: DetectedSlot): number {
 
   if (slot.height > 2000 || area > 400000) score -= 500;
   if (slot.height > 600 && slot.type === "gdn-iframe") score -= 350;
+
+  return score;
+}
+
+function calcBloterSlotScore(slot: DetectedSlot): number {
+  const sel = (slot.selector || "").toLowerCase();
+  let score = slot.confidence;
+  const area = slot.width * slot.height;
+  const gam = hasGoogleInventoryHint(sel);
+
+  if (slot.type === "gdn-iframe") score += 125;
+  if (sel.includes("google_ads")) score += 125;
+  if (sel.includes("div-gpt-ad")) score += 105;
+  if (sel.includes("adsbygoogle")) score += 95;
+  if (sel.includes("googlesyndication")) score += 90;
+  if (sel.includes("ad") || sel.includes("banner")) score += 30;
+
+  if (slot.width >= 250 && slot.width <= 380 && slot.height >= 220 && slot.height <= 340) score += 85;
+  if (slot.width >= 680 && slot.width <= 1024 && slot.height >= 90 && slot.height <= 280) score += 55;
+
+  if (slot.type === "size-match" && (sel.includes("> section") || sel.includes("> article"))) score -= 140;
+  if (!gam && area > 180000) score -= 160;
+  if (slot.type === "gdn-iframe" && slot.height > 720) score -= 240;
+  if (slot.height > 2000 || area > 480000) score -= 420;
 
   return score;
 }
