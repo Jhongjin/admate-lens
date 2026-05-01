@@ -3547,11 +3547,46 @@ export class YouTubeCapture extends BaseChannel {
     const displayUrlCard = truncateWithDots(displayUrlText, 28);
     const displayUrlSponsor = truncateWithDots(displayUrlText, 32);
 
-    let adTitle = instreamOpts.adTitle || '광고 제목';
+    const deriveAdvertiserName = (value: string): string => {
+      const host = value
+        .replace(/^https?:\/\//i, "")
+        .replace(/^www\./i, "")
+        .split("/")[0]
+        .trim();
+      if (!host) return "";
+      if (/^(youtu\.be|youtube\.com)$/i.test(host)) return "YouTube";
+      const base = host.split(".")[0] || "";
+      if (!base) return "";
+      return base
+        .split(/[-_]+/)
+        .filter(Boolean)
+        .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+        .join(" ");
+    };
+    const escapeForInlineHtml = (value: string): string => value.replace(/[&<>"']/g, (ch) => {
+      switch (ch) {
+        case "&":
+          return "&amp;";
+        case "<":
+          return "&lt;";
+        case ">":
+          return "&gt;";
+        case '"':
+          return "&quot;";
+        case "'":
+          return "&#39;";
+        default:
+          return ch;
+      }
+    });
+    const adTitlePlain =
+      instreamOpts.adTitle?.trim() ||
+      deriveAdvertiserName(displayUrlText) ||
+      "스폰서";
     let currentLineCost = 0;
     let breakIdx = -1;
-    for (let i = 0; i < adTitle.length; i++) {
-      const char = adTitle[i];
+    for (let i = 0; i < adTitlePlain.length; i++) {
+      const char = adTitlePlain[i];
       if (/[ㄱ-ㅎㅏ-ㅣ가-힣]/.test(char)) {
         currentLineCost += 2;
       } else if (char === ' ') {
@@ -3564,9 +3599,9 @@ export class YouTubeCapture extends BaseChannel {
         break;
       }
     }
-    if (breakIdx !== -1) {
-      adTitle = adTitle.slice(0, breakIdx) + '<br/>' + adTitle.slice(breakIdx);
-    }
+    const adTitle = breakIdx !== -1
+      ? escapeForInlineHtml(adTitlePlain.slice(0, breakIdx)) + '<br/>' + escapeForInlineHtml(adTitlePlain.slice(breakIdx))
+      : escapeForInlineHtml(adTitlePlain);
     const ctaText = instreamOpts.ctaText || '자세히 알아보기';
 
     const showSkipButton = instreamOpts.instreamSkipMode !== "non-skippable";
@@ -3913,9 +3948,10 @@ export class YouTubeCapture extends BaseChannel {
             { id: "9bZkp7q19f0", title: "PSY - GANGNAM STYLE M/V", channel: "officialpsy", meta: "조회수 52억회 · 14년 전" },
             { id: "dQw4w9WgXcQ", title: "Rick Astley - Never Gonna Give You Up", channel: "Rick Astley", meta: "조회수 16억회 · 16년 전" }
           ];
+          const providedBy = (authorFallback || "스폰서") + " 제공";
           sidebar.innerHTML =
-            '<div style="display:flex;gap:8px;overflow:hidden;margin-bottom:2px;">' +
-              ['전체','관련 콘텐츠','최근 업로드'].map((chip, i) =>
+            '<div style="display:flex;gap:8px;overflow:hidden;margin-bottom:8px;">' +
+              ['모두', providedBy, '관련 콘텐츠', '추천'].map((chip, i) =>
                 '<span style="height:32px;padding:0 12px;border-radius:8px;display:inline-flex;align-items:center;white-space:nowrap;font-size:14px;font-weight:500;background:' + (i === 0 ? '#0f0f0f;color:#fff' : '#f2f2f2;color:#0f0f0f') + ';">' + chip + '</span>'
               ).join("") +
             '</div>' +
@@ -4011,7 +4047,7 @@ export class YouTubeCapture extends BaseChannel {
         alignW = Math.round(alignW);
 
         const isCompanion = variant === 'companion-300x60';
-        const adWidth = isCompanion ? Math.min(Math.max(alignW, 300), 360) : Math.min(alignW, 336);
+        const adWidth = isCompanion ? Math.min(Math.max(alignW, 320), 420) : Math.min(alignW, 336);
         sidebar
           .querySelectorAll('[data-injected="admate-youtube-sidebar-ad-wrap"]')
           .forEach((node) => node.remove());
@@ -4021,8 +4057,27 @@ export class YouTubeCapture extends BaseChannel {
         
         if (isCompanion) {
           const uiOpts = ${JSON.stringify(options?.uiOpts || {})};
+          const esc = (s) => {
+            const d = document.createElement('div');
+            d.textContent = String(s || '');
+            return d.innerHTML;
+          };
           const rawUrl = uiOpts.displayUrl || uiOpts.landingUrl || '';
           const cleanUrl = rawUrl.replace(/^https?:\\/\\//i, '').replace(/^www\\./i, '').split('/')[0];
+          const displayHost = cleanUrl || 'youtube.com';
+          const deriveTitle = (host) => {
+            const normalizedHost = String(host || '').replace(/^www\\./i, '');
+            if (/^(youtu\\.be|youtube\\.com)$/i.test(normalizedHost)) return 'YouTube';
+            const base = normalizedHost.split('.')[0] || '';
+            if (!base) return '';
+            return base
+              .split(/[-_]+/)
+              .filter(Boolean)
+              .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+              .join(' ');
+          };
+          const adTitleText = String(uiOpts.adTitle || '').trim() || deriveTitle(displayHost) || '스폰서';
+          const ctaLabel = String(uiOpts.ctaText || '').trim() || '사이트 방문';
 
           const companionWrapStyles = [
             'width: ' + adWidth + 'px',
@@ -4047,8 +4102,8 @@ export class YouTubeCapture extends BaseChannel {
           let bottomBarHTML = '';
           if (uiOpts.enableCtaText === false) {
             bottomBarHTML =
-              '<div style="min-height: 40px; padding: 8px 10px; display: flex; align-items: center; justify-content: space-between; background: #fff;">' +
-                '<span style="font-family: Roboto, Arial, sans-serif; font-size: 12px; line-height: 16px; font-weight: 500; color: #606060;">스폰서</span>' +
+              '<div style="min-height: 48px; padding: 8px 10px; display: flex; align-items: center; justify-content: space-between; background: #fff;">' +
+                '<span style="font-family: Roboto, Arial, sans-serif; font-size: 12px; line-height: 16px; font-weight: 500; color: #606060;">스폰서 · ' + esc(displayHost) + '</span>' +
                 '<button style="background: none; border: none; padding: 4px; margin: 0 -4px 0 0; cursor: pointer; color: #0f0f0f;">' +
                   '<svg height="20" viewBox="0 0 24 24" width="20" focusable="false" style="display: block; width: 20px; height: 20px; fill: currentColor;"><path d="M12 4a2 2 0 100 4 2 2 0 000-4Zm0 6a2 2 0 100 4 2 2 0 000-4Zm0 6a2 2 0 100 4 2 2 0 000-4Z"></path></svg>' +
                 '</button>' +
@@ -4057,22 +4112,19 @@ export class YouTubeCapture extends BaseChannel {
             const avatarHtml = uiOpts.avatarImageUrl
               ? '<img src="' + uiOpts.avatarImageUrl + '" style="width: 100%; height: 100%; object-fit: cover;" />'
               : '';
-            const ctaHtml = uiOpts.ctaText
-              ? '<a style="display: inline-flex; align-items: center; justify-content: center; padding: 0 12px; height: 30px; border-radius: 15px; background: #f2f2f2; color: #0f0f0f; font-family: Roboto, Arial, sans-serif; font-size: 13px; font-weight: 500; text-decoration: none; white-space: nowrap;">' + uiOpts.ctaText + '</a>'
-              : '';
-            const adTitleText = uiOpts.adTitle || 'AD TITLE';
+            const ctaHtml = '<a style="display: inline-flex; align-items: center; justify-content: center; padding: 0 12px; height: 34px; border-radius: 17px; background: #f2f2f2; color: #0f0f0f; font-family: Roboto, Arial, sans-serif; font-size: 14px; font-weight: 500; text-decoration: none; white-space: nowrap;">' + esc(ctaLabel) + '</a>';
             bottomBarHTML =
-              '<div style="min-height: 52px; padding: 8px 10px; display: flex; align-items: center; justify-content: space-between; gap: 8px; background: #fff;">' +
-                '<div style="display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0;">' +
-                  '<div style="width: 28px; height: 28px; border-radius: 50%; overflow: hidden; flex-shrink: 0; background: #f0f0f0;">' +
+              '<div style="min-height: 72px; padding: 10px 10px 10px 12px; display: flex; align-items: center; justify-content: space-between; gap: 10px; background: #fff;">' +
+                '<div style="display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0;">' +
+                  '<div style="width: 36px; height: 36px; border-radius: 50%; overflow: hidden; flex-shrink: 0; background: #f0f0f0;">' +
                     avatarHtml +
                   '</div>' +
                   '<div style="display: flex; flex-direction: column; justify-content: center; min-width: 0;">' +
-                    '<span style="font-family: Roboto, Arial, sans-serif; font-size: 13px; font-weight: 500; line-height: 18px; color: #0f0f0f; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">' + adTitleText + '</span>' +
+                    '<span style="font-family: Roboto, Arial, sans-serif; font-size: 14px; font-weight: 500; line-height: 20px; color: #0f0f0f; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">' + esc(adTitleText) + '</span>' +
                     '<div style="display: flex; align-items: center; gap: 4px; margin-top: 1px;">' +
                       '<span style="font-family: Roboto, Arial, sans-serif; font-size: 11px; line-height: 15px; font-weight: 700; color: #0f0f0f; white-space: nowrap;">스폰서</span>' +
                       '<span style="font-family: Roboto, Arial, sans-serif; font-size: 11px; line-height: 15px; color: #606060; white-space: nowrap; margin: 0 1px;">·</span>' +
-                      '<span style="font-family: Roboto, Arial, sans-serif; font-size: 11px; line-height: 15px; color: #606060; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">' + cleanUrl + '</span>' +
+                      '<span style="font-family: Roboto, Arial, sans-serif; font-size: 12px; line-height: 16px; color: #606060; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">' + esc(displayHost) + '</span>' +
                     '</div>' +
                   '</div>' +
                 '</div>' +
@@ -4086,7 +4138,7 @@ export class YouTubeCapture extends BaseChannel {
           }
 
           wrap.innerHTML =
-            '<div style="width: 100%; height: 60px; overflow: hidden; background: #f5f5f5; display: flex; align-items: center; border-radius: 8px 8px 0 0;">' +
+            '<div style="width: 100%; height: 70px; overflow: hidden; background: #f5f5f5; display: flex; align-items: center; border-radius: 8px 8px 0 0;">' +
               '<img src="' + imgUrl + '" style="width: 100%; height: 100%; object-fit: cover; display: block;" />' +
             '</div>' +
             bottomBarHTML;
