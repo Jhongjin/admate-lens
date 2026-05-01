@@ -3762,11 +3762,25 @@ export class YouTubeCapture extends BaseChannel {
         const hadTitle = Array.from(
           document.querySelectorAll("h1.ytd-watch-metadata, #title h1, #above-the-fold h1, ytd-watch-metadata h1")
         ).some((el) => isVisible(el) && hasText(el));
-        const hadSidebar = Array.from(
-          document.querySelectorAll("#secondary ytd-compact-video-renderer, #related ytd-compact-video-renderer, ytd-watch-next-secondary-results-renderer ytd-compact-video-renderer")
-        ).some((el) => isVisible(el));
+        const nativeSidebarRoot = document.querySelector(
+          "#secondary, #related, ytd-watch-next-secondary-results-renderer"
+        );
+        const nativeSidebarText = ((nativeSidebarRoot && nativeSidebarRoot.textContent) || "").trim();
+        const nativeSidebarThumbs = nativeSidebarRoot
+          ? nativeSidebarRoot.querySelectorAll("ytd-thumbnail, a#thumbnail, img, yt-img-shadow").length
+          : 0;
+        const hadSidebar =
+          Array.from(
+            document.querySelectorAll(
+              "#secondary ytd-compact-video-renderer, #related ytd-compact-video-renderer, " +
+              "ytd-watch-next-secondary-results-renderer ytd-compact-video-renderer, " +
+              "#secondary a#thumbnail, #related a#thumbnail, #secondary ytd-thumbnail, #related ytd-thumbnail"
+            )
+          ).some((el) => isVisible(el)) ||
+          (!!nativeSidebarRoot && isVisible(nativeSidebarRoot) && nativeSidebarThumbs >= 2 && nativeSidebarText.length > 40);
 
         if (hadTitle && hadSidebar) {
+          document.body.classList.remove("admate-watch-context-sidebar-injected");
           return { hadTitle, hadSidebar, injectedBelow: false, injectedSidebar: false };
         }
 
@@ -3792,8 +3806,16 @@ export class YouTubeCapture extends BaseChannel {
         );
         const height = Math.max(360, Math.round(playerInfo.height || (width * 9) / 16));
         const belowTop = top + height + 16;
-        const sidebarLeft = left + width + nativeGap;
-        sidebarWidth = Math.max(320, Math.min(sidebarWidth, viewportW - sidebarLeft - 24));
+        const nativeSidebarRect =
+          nativeSidebarRoot && isVisible(nativeSidebarRoot)
+            ? nativeSidebarRoot.getBoundingClientRect()
+            : null;
+        const sidebarLeft = nativeSidebarRect && nativeSidebarRect.left > left + width
+          ? Math.round(nativeSidebarRect.left)
+          : left + width + nativeGap;
+        sidebarWidth = nativeSidebarRect && nativeSidebarRect.width > 240
+          ? Math.round(Math.min(Math.max(nativeSidebarRect.width, 320), 420))
+          : Math.max(320, Math.min(sidebarWidth, viewportW - sidebarLeft - 24));
 
         let style = document.getElementById("admate-watch-context-style");
         if (!style) {
@@ -3803,6 +3825,8 @@ export class YouTubeCapture extends BaseChannel {
         }
         style.textContent = [
           "html,body{background:#fff!important;}",
+          "body.admate-watch-context-sidebar-injected #secondary,body.admate-watch-context-sidebar-injected #related,body.admate-watch-context-sidebar-injected ytd-watch-next-secondary-results-renderer{visibility:hidden!important;}",
+          "body.admate-watch-context-sidebar-injected #admate-watch-context-sidebar{visibility:visible!important;}",
           "#admate-watch-context-below,#admate-watch-context-sidebar{font-family:Roboto,Arial,'Noto Sans KR',sans-serif!important;color:#0f0f0f!important;}",
           "#admate-watch-context-below * ,#admate-watch-context-sidebar *{box-sizing:border-box!important;letter-spacing:0!important;}",
           "#admate-watch-context-sidebar img{display:block!important;}"
@@ -3858,6 +3882,7 @@ export class YouTubeCapture extends BaseChannel {
 
         let injectedSidebar = false;
         if (!hadSidebar) {
+          document.body.classList.add("admate-watch-context-sidebar-injected");
           document.querySelectorAll("#admate-watch-context-sidebar").forEach((el) => el.remove());
           const sidebar = document.createElement("aside");
           sidebar.id = "admate-watch-context-sidebar";
@@ -3872,8 +3897,12 @@ export class YouTubeCapture extends BaseChannel {
             "display:flex",
             "flex-direction:column",
             "gap:8px",
+            "overflow:hidden",
+            "max-height:calc(100vh - " + top + "px)",
             "pointer-events:none"
           ].join("!important;") + "!important";
+          const thumbW = sidebarWidth < 360 ? 150 : 168;
+          const thumbH = Math.round((thumbW * 9) / 16);
           const seeds = [
             { id: "gdZLi9oWNZg", title: "BTS (방탄소년단) 'Dynamite' Official MV", channel: "HYBE LABELS", meta: "조회수 20억회 · 5년 전" },
             { id: "IHNzOHi8sJs", title: "BLACKPINK - 'How You Like That' M/V", channel: "BLACKPINK", meta: "조회수 13억회 · 5년 전" },
@@ -3892,8 +3921,8 @@ export class YouTubeCapture extends BaseChannel {
             '</div>' +
             seeds.map((it) => {
               const thumb = 'https://i.ytimg.com/vi/' + encodeURIComponent(it.id) + '/mqdefault.jpg';
-              return '<div style="display:flex;gap:8px;width:100%;min-height:94px;">' +
-                '<div style="width:168px;height:94px;border-radius:8px;background:#e5e5e5;overflow:hidden;flex-shrink:0;position:relative;">' +
+              return '<div style="display:flex;gap:8px;width:100%;min-height:' + thumbH + 'px;overflow:hidden;">' +
+                '<div style="width:' + thumbW + 'px;height:' + thumbH + 'px;border-radius:8px;background:#e5e5e5;overflow:hidden;flex-shrink:0;position:relative;">' +
                   '<img src="' + thumb + '" style="width:100%;height:100%;object-fit:cover;" />' +
                   '<span style="position:absolute;right:4px;bottom:4px;background:rgba(0,0,0,.8);color:#fff;border-radius:4px;padding:1px 4px;font-size:12px;line-height:16px;">12:05</span>' +
                 '</div>' +
@@ -3901,6 +3930,9 @@ export class YouTubeCapture extends BaseChannel {
                   '<div style="font-size:14px;line-height:20px;font-weight:600;color:#0f0f0f;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">' + esc(it.title) + '</div>' +
                   '<div style="margin-top:4px;font-size:12px;line-height:18px;color:#606060;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + esc(it.channel) + '</div>' +
                   '<div style="font-size:12px;line-height:18px;color:#606060;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + esc(it.meta) + '</div>' +
+                '</div>' +
+                '<div style="width:24px;height:24px;display:flex;align-items:flex-start;justify-content:center;color:#0f0f0f;flex-shrink:0;padding-top:1px;">' +
+                  '<svg height="20" viewBox="0 0 24 24" width="20" focusable="false" style="display:block;width:20px;height:20px;fill:currentColor;"><path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"></path></svg>' +
                 '</div>' +
               '</div>';
             }).join("");
