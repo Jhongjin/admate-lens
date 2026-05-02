@@ -3514,14 +3514,15 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
           )}
 
           {form.channel === "gdn" && (
-          /* ===== 광고 사이즈 선택 ===== */
-          <div
+            <>
+              {/* ===== 광고 사이즈 선택 ===== */}
+              <div
             className="mt-4 rounded-xl border p-4"
             style={{
               borderColor: "var(--color-border)",
               backgroundColor: "var(--color-bg-primary)",
             }}
-          >
+              >
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
                 <span className="form-section-code">SIZE</span>
@@ -3923,7 +3924,8 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                 )}
               </div>
             )}
-          </div>
+              </div>
+            </>
           )}
         </div>
         )}
