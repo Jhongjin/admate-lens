@@ -669,13 +669,77 @@ export class PuppeteerEngine implements IBrowserEngine {
     return (
       message.includes("browser was not found") ||
       message.includes("chromium executable was not extracted") ||
+      message.includes("decompression failed") ||
       message.includes("executable doesn't exist") ||
       message.includes("enoent") ||
       message.includes("eacces") ||
       message.includes("etxtbsy") ||
+      message.includes("text file busy") ||
       message.includes("spawn") ||
       message.includes("failed to launch the browser process")
     );
+  }
+
+  private shouldClearChromiumExtractionArtifacts(err: Error): boolean {
+    const message = err.message.toLowerCase();
+    return (
+      message.includes("browser was not found") ||
+      message.includes("chromium executable was not extracted") ||
+      message.includes("decompression failed") ||
+      message.includes("executable doesn't exist") ||
+      message.includes("enoent")
+    );
+  }
+
+  private async withChromiumExtractionLock<T>(task: () => Promise<T>): Promise<T> {
+    const fs = await import("fs");
+    const os = await import("os");
+    const path = await import("path");
+    const lockPath = path.join(os.tmpdir(), "admate-chromium-extract.lock");
+    const staleMs = 60_000;
+    const deadline = Date.now() + 30_000;
+    let handle: number | null = null;
+
+    while (Date.now() < deadline) {
+      try {
+        handle = fs.openSync(lockPath, "wx");
+        fs.writeFileSync(handle, `${process.pid}:${Date.now()}`);
+        break;
+      } catch (err) {
+        const code = (err as NodeJS.ErrnoException).code;
+        if (code !== "EEXIST") throw err;
+        try {
+          const stat = fs.statSync(lockPath);
+          if (Date.now() - stat.mtimeMs > staleMs) {
+            fs.rmSync(lockPath, { force: true });
+            continue;
+          }
+        } catch {
+          // If the lock disappeared between stat and rm, retry immediately.
+          continue;
+        }
+        await new Promise((r) => setTimeout(r, 250));
+      }
+    }
+
+    if (handle === null) {
+      throw new Error("Timed out waiting for Chromium extraction lock.");
+    }
+
+    try {
+      return await task();
+    } finally {
+      try {
+        fs.closeSync(handle);
+      } catch {
+        // ignore
+      }
+      try {
+        fs.rmSync(lockPath, { force: true });
+      } catch {
+        // ignore
+      }
+    }
   }
 
   private async cleanupChromiumExtractionArtifacts(execPath?: string): Promise<void> {
@@ -732,11 +796,14 @@ export class PuppeteerEngine implements IBrowserEngine {
       for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
         let execPath = "";
         try {
-          const fs = await import("fs");
-          execPath = await chromium.executablePath(SPARTICUZ_CHROMIUM_PACK_URL);
-          if (!execPath || !fs.existsSync(execPath)) {
-            throw new Error(`Chromium executable was not extracted: ${execPath || "(empty)"}`);
-          }
+          execPath = await this.withChromiumExtractionLock(async () => {
+            const fs = await import("fs");
+            const path = await chromium.executablePath(SPARTICUZ_CHROMIUM_PACK_URL);
+            if (!path || !fs.existsSync(path)) {
+              throw new Error(`Chromium executable was not extracted: ${path || "(empty)"}`);
+            }
+            return path;
+          });
 
           this.browser = await puppeteer.default.launch({
             args: [
@@ -762,10 +829,11 @@ export class PuppeteerEngine implements IBrowserEngine {
             console.warn(
               `[PuppeteerEngine] ⚠️ Chromium 시작 복구 재시도 (${attempt}/${MAX_RETRIES}, ${delay}ms)`
             );
-            if (isETXTBSY) {
-              await this.cleanupStaleChromium();
+            if (!isETXTBSY && this.shouldClearChromiumExtractionArtifacts(lastError)) {
+              await this.withChromiumExtractionLock(async () => {
+                await this.cleanupChromiumExtractionArtifacts(execPath);
+              });
             }
-            await this.cleanupChromiumExtractionArtifacts(execPath);
             await new Promise((r) => setTimeout(r, delay));
           } else {
             throw lastError;
