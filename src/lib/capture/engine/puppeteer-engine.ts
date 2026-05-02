@@ -113,6 +113,9 @@ const BROWSER_ARGS = [
   "--disable-sync",
 ];
 
+const SPARTICUZ_CHROMIUM_PACK_URL =
+  "https://github.com/Sparticuz/chromium/releases/download/v143.0.0/chromium-v143.0.0-pack.x64.tar";
+
 export function isBrowserbaseConfigured(): boolean {
   return Boolean(
     process.env.BROWSERBASE_API_KEY?.trim() &&
@@ -661,6 +664,46 @@ export class PuppeteerEngine implements IBrowserEngine {
     }
   }
 
+  private isRecoverableChromiumLaunchError(err: Error): boolean {
+    const message = err.message.toLowerCase();
+    return (
+      message.includes("browser was not found") ||
+      message.includes("chromium executable was not extracted") ||
+      message.includes("executable doesn't exist") ||
+      message.includes("enoent") ||
+      message.includes("eacces") ||
+      message.includes("etxtbsy") ||
+      message.includes("spawn") ||
+      message.includes("failed to launch the browser process")
+    );
+  }
+
+  private async cleanupChromiumExtractionArtifacts(execPath?: string): Promise<void> {
+    if (process.env.IS_LOCAL === "true") return;
+    try {
+      const fs = await import("fs");
+      const os = await import("os");
+      const path = await import("path");
+      const tmpDir = path.resolve(os.tmpdir());
+      const candidates = [
+        execPath,
+        path.join(tmpDir, "chromium"),
+        path.join(tmpDir, "chromium-pack"),
+      ].filter(Boolean) as string[];
+
+      for (const candidate of candidates) {
+        const resolved = path.resolve(candidate);
+        const isAllowedTmpTarget =
+          resolved === path.join(tmpDir, "chromium") ||
+          resolved === path.join(tmpDir, "chromium-pack");
+        if (!isAllowedTmpTarget) continue;
+        fs.rmSync(resolved, { recursive: true, force: true });
+      }
+    } catch {
+      // 재추출을 위한 best-effort 정리라 실패해도 다음 재시도에 맡긴다.
+    }
+  }
+
   async launch(): Promise<void> {
     const puppeteer = await import("puppeteer-core");
     if (this.options.provider === "browserbase") {
@@ -680,19 +723,21 @@ export class PuppeteerEngine implements IBrowserEngine {
         ignoreDefaultArgs: ["--enable-automation"],
       });
     } else {
-      await this.cleanupStaleChromium();
-
       const chromiumModule = await import("@sparticuz/chromium-min");
       const chromium = (chromiumModule as any).default || chromiumModule;
-      const execPath = await chromium.executablePath(
-        "https://github.com/Sparticuz/chromium/releases/download/v143.0.0/chromium-v143.0.0-pack.x64.tar"
-      );
 
       const MAX_RETRIES = 3;
       let lastError: Error | null = null;
 
       for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+        let execPath = "";
         try {
+          const fs = await import("fs");
+          execPath = await chromium.executablePath(SPARTICUZ_CHROMIUM_PACK_URL);
+          if (!execPath || !fs.existsSync(execPath)) {
+            throw new Error(`Chromium executable was not extracted: ${execPath || "(empty)"}`);
+          }
+
           this.browser = await puppeteer.default.launch({
             args: [
               ...chromium.args,
@@ -712,17 +757,15 @@ export class PuppeteerEngine implements IBrowserEngine {
           lastError = err instanceof Error ? err : new Error(String(err));
           const isETXTBSY = lastError.message.includes("ETXTBSY");
 
-          if (isETXTBSY && attempt < MAX_RETRIES) {
-            const delay = attempt * 2000;
-            console.warn(`[PuppeteerEngine] ⚠️ ETXTBSY 발생, ${delay}ms 후 재시도 (${attempt}/${MAX_RETRIES})`);
-            await this.cleanupStaleChromium();
-            try {
-              const fs = await import("fs");
-              if (fs.existsSync(execPath)) {
-                fs.unlinkSync(execPath);
-                console.log(`[PuppeteerEngine] 🗑️ 기존 바이너리 삭제: ${execPath}`);
-              }
-            } catch { /* 무시 */ }
+          if (this.isRecoverableChromiumLaunchError(lastError) && attempt < MAX_RETRIES) {
+            const delay = attempt * 1500;
+            console.warn(
+              `[PuppeteerEngine] ⚠️ Chromium 시작 복구 재시도 (${attempt}/${MAX_RETRIES}, ${delay}ms)`
+            );
+            if (isETXTBSY) {
+              await this.cleanupStaleChromium();
+            }
+            await this.cleanupChromiumExtractionArtifacts(execPath);
             await new Promise((r) => setTimeout(r, delay));
           } else {
             throw lastError;
