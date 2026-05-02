@@ -40,6 +40,9 @@ const CHANNEL_LABELS: Record<string, string> = {
   naver: "Naver",
 };
 
+const CAPTURE_DELETE_ENABLED =
+  process.env.NEXT_PUBLIC_ENABLE_CAPTURE_DELETE === "true";
+
 /** 날짜 포맷 */
 function formatDate(dateStr: string): string {
   const d = new Date(dateStr);
@@ -102,6 +105,27 @@ function getYoutubeAdTypeLabel(adType?: string): string | null {
   if (adType === "infeed-search") return "인피드 · 검색";
   if (adType === "infeed-watch-next") return "인피드 · 관련동영상";
   return null;
+}
+
+function getCaptureChannelLabel(capture: CaptureRecord): string {
+  const metadata = capture.metadata;
+  if (
+    metadata &&
+    typeof metadata === "object" &&
+    metadata.productFamily === "demand-gen"
+  ) {
+    return "Google Ads";
+  }
+  return CHANNEL_LABELS[capture.channel] || capture.channel;
+}
+
+function getProductMetaLabel(metadata: Record<string, unknown> | null): string | null {
+  if (!metadata) return null;
+  if (metadata.productFamily !== "demand-gen") return null;
+  const surface = metadata.productSurface;
+  if (surface === "youtube-shorts") return "Demand Gen · YouTube Shorts";
+  if (surface === "youtube-feed") return "Demand Gen · YouTube Feed";
+  return "Demand Gen";
 }
 
 function getResultCategoryLabel(metadata: Record<string, unknown> | null): string | null {
@@ -306,8 +330,10 @@ export default function CaptureList({ refreshTrigger }: CaptureListProps) {
           ))}
         </div>
 
+        <span className="badge badge-pending">삭제 비활성</span>
+
         {/* 전체 삭제 버튼 */}
-        {captures.length > 0 && (
+        {CAPTURE_DELETE_ENABLED && captures.length > 0 && (
           <button
             onClick={() => setDeleteConfirm({ type: "all" })}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium
@@ -434,7 +460,7 @@ export default function CaptureList({ refreshTrigger }: CaptureListProps) {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
                       <span className="text-xs font-semibold px-2 py-0.5 rounded bg-[var(--color-bg-tertiary)] text-[var(--color-text-secondary)]">
-                        {CHANNEL_LABELS[capture.channel] || capture.channel}
+                        {getCaptureChannelLabel(capture)}
                       </span>
                       <span className={`badge ${status.class}`}>
                         {isActive && <span className="spinner" style={{ width: 10, height: 10, borderWidth: 1.5 }} />}
@@ -456,7 +482,9 @@ export default function CaptureList({ refreshTrigger }: CaptureListProps) {
                       <p className="text-[11px] text-[var(--color-text-muted)] mt-1">
                         {(() => {
                           const yt = getYoutubeMeta(capture.metadata);
+                          const productLabel = getProductMetaLabel(capture.metadata);
                           const adLabel = getYoutubeAdTypeLabel(yt.adType);
+                          if (productLabel) return productLabel;
                           if (!adLabel && yt.captureSecond === undefined) return null;
                           return `${adLabel || "YouTube"}${yt.captureSecond !== undefined ? ` · ${yt.captureSecond}초` : ""}`;
                         })()}
@@ -484,21 +512,23 @@ export default function CaptureList({ refreshTrigger }: CaptureListProps) {
 
                   {/* 삭제 버튼 + 화살표 */}
                   <div className="flex items-center gap-1 flex-shrink-0">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setDeleteConfirm({ type: "single", id: capture.id });
-                      }}
-                      className="w-8 h-8 flex items-center justify-center rounded-lg
-                                 text-[var(--color-text-muted)] hover:text-[var(--color-error)]
-                                 hover:bg-[rgba(239,68,68,0.1)] transition-all opacity-0 group-hover:opacity-100"
-                      title="삭제"
-                    >
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <polyline points="3 6 5 6 21 6" />
-                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                      </svg>
-                    </button>
+                    {CAPTURE_DELETE_ENABLED && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setDeleteConfirm({ type: "single", id: capture.id });
+                        }}
+                        className="w-8 h-8 flex items-center justify-center rounded-lg
+                                   text-[var(--color-text-muted)] hover:text-[var(--color-error)]
+                                   hover:bg-[rgba(239,68,68,0.1)] transition-all opacity-0 group-hover:opacity-100"
+                        title="삭제"
+                      >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <polyline points="3 6 5 6 21 6" />
+                          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                        </svg>
+                      </button>
+                    )}
                     <div className="text-[var(--color-text-muted)]">
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <path d="M9 18l6-6-6-6" />
@@ -626,7 +656,7 @@ function CaptureDetailModal({
             {status.icon} {status.label}
           </span>
           <span className="text-xs font-semibold px-2 py-0.5 rounded bg-[var(--color-bg-tertiary)] text-[var(--color-text-secondary)]">
-            {CHANNEL_LABELS[capture.channel] || capture.channel}
+            {getCaptureChannelLabel(capture)}
           </span>
           <span className="text-xs text-[var(--color-text-muted)]">
             {formatDate(capture.created_at)}
@@ -756,9 +786,11 @@ function CaptureDetailModal({
             {capture.channel === "youtube" && capture.metadata && typeof capture.metadata === "object" && (
               <>
                 <div className="flex justify-between">
-                  <span className="text-[var(--color-text-muted)]">YouTube 유형</span>
+                  <span className="text-[var(--color-text-muted)]">상품 유형</span>
                   <span className="text-[var(--color-text-secondary)]">
                     {(() => {
+                      const productLabel = getProductMetaLabel(capture.metadata);
+                      if (productLabel) return productLabel;
                       const yt = getYoutubeMeta(capture.metadata);
                       return getYoutubeAdTypeLabel(yt.adType) ?? "-";
                     })()}
@@ -779,19 +811,21 @@ function CaptureDetailModal({
         </div>
 
         {/* 삭제 버튼 */}
-        <div className="border-t border-[var(--color-border)] mt-4 pt-4">
-          <button
-            onClick={() => onDelete(capture.id)}
-            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium
-                       text-[var(--color-error)] hover:bg-[rgba(239,68,68,0.08)] border border-[rgba(239,68,68,0.2)] transition-all"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="3 6 5 6 21 6" />
-              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-            </svg>
-            이 캡처 삭제
-          </button>
-        </div>
+        {CAPTURE_DELETE_ENABLED && (
+          <div className="border-t border-[var(--color-border)] mt-4 pt-4">
+            <button
+              onClick={() => onDelete(capture.id)}
+              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium
+                         text-[var(--color-error)] hover:bg-[rgba(239,68,68,0.08)] border border-[rgba(239,68,68,0.2)] transition-all"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="3 6 5 6 21 6" />
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+              </svg>
+              이 캡처 삭제
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

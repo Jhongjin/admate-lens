@@ -288,8 +288,8 @@ export function runPrerollInjectInPage(...args: unknown[]): boolean {
       adLowerStack.setAttribute("data-injected", "admate-youtube-preroll");
       adLowerStack.style.cssText = [
         "position: absolute",
-        "left: 16px",
-        "bottom: 54px",
+        "left: 22px",
+        "bottom: 58px",
         "z-index: 20",
         "display: flex",
         "flex-direction: column",
@@ -308,12 +308,12 @@ export function runPrerollInjectInPage(...args: unknown[]): boolean {
         "position: relative",
         "display: flex",
         "align-items: center",
-        "background: rgba(0,0,0,0.78)",
+        "background: rgba(0,0,0,0.72)",
         "border: 1px solid rgba(255,255,255,0.12)",
         "border-radius: 8px",
-        "padding: 8px 12px",
+        "padding: 9px 12px",
         "max-width: min(520px, calc(100vw - 560px))",
-        "min-width: 300px",
+        "min-width: 316px",
         "box-shadow: 0 4px 18px rgba(0,0,0,0.32)",
         "z-index: 10",
         "overflow: hidden",
@@ -326,12 +326,12 @@ export function runPrerollInjectInPage(...args: unknown[]): boolean {
         const ctaIcon = document.createElement("img");
         ctaIcon.src = avatarImgUrl;
         ctaIcon.style.cssText =
-          "width:38px !important;height:38px !important;border-radius:50% !important;object-fit:cover !important;flex-shrink:0 !important;margin-right:12px !important";
+          "width:40px !important;height:40px !important;border-radius:50% !important;object-fit:cover !important;flex-shrink:0 !important;margin-right:12px !important";
         ctaCard.appendChild(ctaIcon);
       } else {
         const ctaIconFallback = document.createElement("div");
         ctaIconFallback.style.cssText =
-          "width:38px !important;height:38px !important;border-radius:50% !important;background:#555 !important;display:flex;align-items:center;justify-content:center;flex-shrink:0 !important;margin-right:12px !important;color:#fff;font-size:20px;";
+          "width:40px !important;height:40px !important;border-radius:50% !important;background:#555 !important;display:flex;align-items:center;justify-content:center;flex-shrink:0 !important;margin-right:12px !important;color:#fff;font-size:20px;";
         ctaIconFallback.textContent = titleText.charAt(0) || "선";
         ctaCard.appendChild(ctaIconFallback);
       }
@@ -543,31 +543,32 @@ export function runPrerollInjectInPage(...args: unknown[]): boolean {
       } else {
         skipBtn.style.cssText = [
           "position: absolute",
-          "right: 16px",
-          "bottom: 54px",
+          "right: 18px",
+          "bottom: 52px",
           "box-sizing: border-box",
-          "background: rgba(28,28,28,0.8)",
+          "background: rgba(28,28,28,0.68)",
           "color: #fff",
-          "padding: 8px 16px",
-          "min-height: 36px",
-          "border-radius: 18px",
+          "height: 40px",
+          "min-height: 40px",
+          "padding: 0 10px 0 18px",
+          "border-radius: 20px",
           "border: none",
           "cursor: pointer",
           "display: flex",
           "align-items: center",
           "flex-direction: row",
-          "gap: 12px",
+          "gap: 8px",
           "z-index: 30",
           "letter-spacing: 0",
           "backdrop-filter: blur(4px)",
         ].join(" !important;") + " !important";
         skipText.textContent = "건너뛰기";
         skipText.style.cssText =
-          "color:#fff !important;font-size:15px !important;font-weight:500 !important;line-height:1 !important;font-family:'Noto Sans KR','Roboto',Arial,Helvetica,sans-serif !important;display:flex !important;align-items:center !important";
+          "color:#fff !important;font-size:14px !important;font-weight:500 !important;line-height:1 !important;font-family:'Noto Sans KR','Roboto',Arial,Helvetica,sans-serif !important;display:flex !important;align-items:center !important";
         skipIcon.style.cssText =
           "display:inline-flex !important;align-items:center !important;justify-content:center !important;line-height:0 !important;flex-shrink:0 !important";
         skipIcon.innerHTML =
-          '<svg fill="none" height="24" viewBox="0 0 24 24" width="24" xmlns="http://www.w3.org/2000/svg" focusable="false" aria-hidden="true"><path d="M20 20C20.26 20 20.51 19.89 20.70 19.70C20.89 19.51 21 19.26 21 19V5C21 4.73 20.89 4.48 20.70 4.29C20.51 4.10 20.26 4 20 4C19.73 4 19.48 4.10 19.29 4.29C19.10 4.48 19 4.73 19 5V19C19 19.26 19.10 19.51 19.29 19.70C19.48 19.89 19.73 20 20 20ZM5.04 19.77L18 12L5.04 4.22C4.84 4.10 4.60 4.03 4.36 4.03C4.12 4.03 3.89 4.09 3.68 4.21C3.47 4.32 3.30 4.49 3.18 4.70C3.06 4.91 2.99 5.14 3 5.38V18.61C2.99 18.85 3.06 19.08 3.18 19.29C3.30 19.50 3.47 19.67 3.68 19.79C3.89 19.90 4.12 19.96 4.36 19.96C4.60 19.96 4.84 19.89 5.04 19.77Z" fill="white"/></svg>';
+          '<svg fill="none" height="22" viewBox="0 0 24 24" width="22" xmlns="http://www.w3.org/2000/svg" focusable="false" aria-hidden="true"><path d="M20 20C20.26 20 20.51 19.89 20.70 19.70C20.89 19.51 21 19.26 21 19V5C21 4.73 20.89 4.48 20.70 4.29C20.51 4.10 20.26 4 20 4C19.73 4 19.48 4.10 19.29 4.29C19.10 4.48 19 4.73 19 5V19C19 19.26 19.10 19.51 19.29 19.70C19.48 19.89 19.73 20 20 20ZM5.04 19.77L18 12L5.04 4.22C4.84 4.10 4.60 4.03 4.36 4.03C4.12 4.03 3.89 4.09 3.68 4.21C3.47 4.32 3.30 4.49 3.18 4.70C3.06 4.91 2.99 5.14 3 5.38V18.61C2.99 18.85 3.06 19.08 3.18 19.29C3.30 19.50 3.47 19.67 3.68 19.79C3.89 19.90 4.12 19.96 4.36 19.96C4.60 19.96 4.84 19.89 5.04 19.77Z" fill="white"/></svg>';
         skipBtn.appendChild(skipText);
         skipBtn.appendChild(skipIcon);
         overlay.appendChild(skipBtn);

@@ -81,6 +81,8 @@ export async function POST(request: NextRequest) {
       targetAdSizes = [],        // 📐 수동 선택한 사이즈 배열
       creativeObjectFit = "contain", // 📐 슬롯 내 소재: contain | cover
       youtubeAdType,             // 🎬 YouTube 광고 유형
+      productFamily,
+      productSurface,
       instreamOpts,              // 🎬 인스트림 광고 옵션
       infeedOpts,                // 인피드 광고 옵션
       gdnViewportMode,           // GDN: PC vs Mobile 뷰포트
@@ -98,6 +100,8 @@ export async function POST(request: NextRequest) {
       targetAdSizes?: string[];
       creativeObjectFit?: "contain" | "cover";
       youtubeAdType?: string;
+      productFamily?: string;
+      productSurface?: string;
       infeedOpts?: {
         videoUrl?: string;
         searchQuery?: string;
@@ -147,11 +151,11 @@ export async function POST(request: NextRequest) {
         typeof youtubeAdType === "string" && youtubeAdType.trim()
           ? youtubeAdType.trim()
           : "preroll";
-      if (isLegacyYouTubeAdType(rawYoutubeAdType) || rawYoutubeAdType === "infeed-home") {
+      if (isLegacyYouTubeAdType(rawYoutubeAdType)) {
         return NextResponse.json(
           {
             error:
-              "현재 공개 상품 구성에서 지원하지 않는 YouTube 광고 유형입니다. Display/Overlay와 PC 홈 인피드는 legacy/internal 타입으로 분리되었습니다.",
+              "현재 공개 상품 구성에서 지원하지 않는 YouTube 광고 유형입니다. Display/Overlay는 legacy 타입으로 분리되었습니다.",
           },
           { status: 400 }
         );
@@ -180,7 +184,8 @@ export async function POST(request: NextRequest) {
     const hasValidVideoSource = isPreroll && isValidHttpUrl(instreamOpts?.videoUrl);
     const isInfeedYt =
       channel === "youtube" &&
-      (resolvedYoutubeAdType === "mobile-infeed-home" ||
+      (resolvedYoutubeAdType === "infeed-home" ||
+        resolvedYoutubeAdType === "mobile-infeed-home" ||
         resolvedYoutubeAdType === "infeed-search" ||
         resolvedYoutubeAdType === "infeed-watch-next");
     const isShortsYt = channel === "youtube" && resolvedYoutubeAdType === "shorts-feed";
@@ -276,6 +281,14 @@ export async function POST(request: NextRequest) {
         adSizeMode,
         targetAdSizes,
         creativeObjectFit: normalizedCreativeObjectFit,
+        productFamily:
+          typeof productFamily === "string" && productFamily.trim()
+            ? productFamily.trim()
+            : undefined,
+        productSurface:
+          typeof productSurface === "string" && productSurface.trim()
+            ? productSurface.trim()
+            : undefined,
         youtubeAdType: resolvedYoutubeAdType,
         instreamOpts: instreamOptsNormalized ?? instreamOpts,
         infeedOpts: infeedOptsNormalized ?? infeedOpts,

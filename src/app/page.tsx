@@ -5,31 +5,38 @@ import CaptureForm from "./components/CaptureForm";
 import CaptureList from "./components/CaptureList";
 
 const primaryNav = [
-  { label: "Capture Studio", active: true },
-  { label: "Result Review", active: false },
-  { label: "Campaigns", active: false },
-  { label: "Asset Library", active: false },
-  { label: "Coverage", active: false },
+  { label: "캡처 작업실", active: true },
+  { label: "결과 검수", active: false },
+  { label: "캠페인", active: false },
+  { label: "소재 라이브러리", active: false },
+  { label: "커버리지", active: false },
 ];
 
 const productGroups = [
   {
-    title: "YouTube Core",
-    status: "구현됨",
+    title: "YouTube In-stream / Bumper",
+    status: "공개 구현",
     tone: "success",
-    description: "In-stream, Bumper, Shorts, Masthead, In-feed 기본 캡처",
-    items: ["In-stream", "Bumper", "Shorts", "Masthead", "In-feed"],
+    description: "PC, AOS, iOS의 Skip, Non-skip, Bumper 지면",
+    items: ["PC Skip", "PC Non-skip", "AOS", "iOS", "Bumper"],
+  },
+  {
+    title: "YouTube Feed Surfaces",
+    status: "공개 구현",
+    tone: "success",
+    description: "Shorts, Masthead, In-feed 홈/검색/관련동영상",
+    items: ["Shorts", "Masthead", "PC Home", "MO Home", "Search", "Watch Next"],
   },
   {
     title: "Demand Gen",
-    status: "다음 구현",
-    tone: "warning",
-    description: "이미지, 캐러셀, 상품피드형 YouTube 표면 확장",
-    items: ["Image", "Carousel", "Product Feed", "Shorts Image"],
+    status: "신규 공개",
+    tone: "info",
+    description: "Google Ads 상품 흐름에서 YouTube Feed/Shorts 증빙 생성",
+    items: ["YouTube Feed", "YouTube Shorts", "metadata 분리"],
   },
   {
     title: "GDN Display",
-    status: "구현됨",
+    status: "공개 구현",
     tone: "success",
     description: "PC/MO 지면의 배너 삽입 및 랜딩 캡처",
     items: ["PC", "Mobile", "Auto slot", "Manual size"],
@@ -37,37 +44,48 @@ const productGroups = [
 ];
 
 const validationRules = [
-  "광고상품을 먼저 고르면 필요한 입력만 노출합니다.",
-  "소재 비율, 지면, CTA 조건을 캡처 전 단계에서 점검합니다.",
-  "YouTube/GDN 네이티브 합성 결과물은 픽셀 매칭 영역으로 보호합니다.",
-  "실패 원인은 운영자가 이해할 수 있는 한국어 문장으로 정리합니다.",
+  "상품 선택 후 필요한 입력만 열어 입력 실수를 줄입니다.",
+  "소재 비율, 지면, CTA, 캡처 시점을 요청 전 점검합니다.",
+  "YouTube/GDN 결과물 UI는 실제 매체 화면 기준을 우선합니다.",
+  "삭제 동작은 운영 UI에서 기본 비활성화하고 검수 이력은 보존합니다.",
 ];
 
-const samplePages = [
+const coverageRows = [
   {
-    title: "Capture Studio",
-    role: "메인 작업 화면",
-    summary: "상품 선택, 소재 입력, 프리뷰, 요청 실행을 한 흐름으로 묶습니다.",
+    product: "PC In-stream Skip",
+    surface: "YouTube PC Watch",
+    status: "공개 구현",
+    note: "Skip 버튼 5초 이후 노출 기준",
   },
   {
-    title: "Result Review Queue",
-    role: "결과 검수",
-    summary: "썸네일 큐와 우측 상세 패널로 완료/실패 결과를 빠르게 판정합니다.",
+    product: "Mobile In-stream",
+    surface: "AOS / iOS",
+    status: "공개 구현",
+    note: "모바일 뷰포트별 캡처",
   },
   {
-    title: "Product Coverage Matrix",
-    role: "상품 커버리지",
-    summary: "구현됨, 다음 구현, 제외 상품을 matrix와 muted badge로 관리합니다.",
+    product: "YouTube Shorts",
+    surface: "Shorts Feed",
+    status: "공개 구현",
+    note: "9:16 합성 렌더링",
   },
   {
-    title: "Campaign Workspace",
-    role: "캠페인 단위 관리",
-    summary: "브랜드, 캠페인, 소재, 캡처 결과를 하나의 작업 단위로 정리합니다.",
+    product: "YouTube In-feed",
+    surface: "PC/MO Home, Search, Watch Next",
+    status: "공개 구현",
+    note: "PC 홈 공개화 포함",
   },
   {
-    title: "Asset Validation Library",
-    role: "소재 검증",
-    summary: "이미지, 영상, 로고, 상품피드의 사용 가능 상품을 사전에 점검합니다.",
+    product: "Demand Gen",
+    surface: "YouTube Feed / Shorts",
+    status: "신규 공개",
+    note: "Google Ads 상품 흐름으로 식별",
+  },
+  {
+    product: "YouTube Display / Overlay",
+    surface: "Legacy",
+    status: "제외",
+    note: "최신 UI 재검증 전 공개 금지",
   },
 ];
 
@@ -76,6 +94,13 @@ const studioSteps = [
   "소재 입력",
   "지면 조건",
   "결과 검수",
+];
+
+const kpiCards = [
+  { label: "공개 캡처 타입", value: "16", meta: "YouTube, Demand Gen, GDN" },
+  { label: "신규 공개", value: "3", meta: "PC Home In-feed + Demand Gen 2종" },
+  { label: "레거시 제외", value: "2", meta: "Display, Overlay" },
+  { label: "삭제 정책", value: "Off", meta: "UI 기본 비활성" },
 ];
 
 export default function Home() {
@@ -156,36 +181,46 @@ export default function Home() {
         <main className="ops-content studio-content">
           <section className="studio-hero">
             <div>
-              <p className="ops-kicker">AdMate Lens Operations Studio</p>
+              <p className="ops-kicker">AdMate Lens · Powered by Openclaw Engine</p>
               <h2 className="studio-title">
-                광고 게재 증빙을 만들고, 검수하고, 다시 실행하는 작업실
+                광고 게재면 캡처를 요청하고 검수하는 운영 콘솔
               </h2>
               <p className="studio-subtitle">
-                YouTube/GDN 광고상품을 상품-지면-소재 흐름으로 정리해 입력
-                오류를 줄이고, 결과물 검수까지 한 화면에서 이어갑니다.
+                YouTube, Demand Gen, GDN 캡처 상품을 상품-지면-소재 흐름으로
+                정리하고 결과 검수까지 한 화면에서 처리합니다.
               </p>
             </div>
             <div className="studio-hero-actions" aria-label="작업 상태">
               <span className="studio-hero-stat">
-                <strong>2</strong>
+                <strong>3</strong>
                 <span>운영 매체</span>
               </span>
               <span className="studio-hero-stat">
-                <strong>14</strong>
-                <span>구현 타입</span>
+                <strong>16</strong>
+                <span>공개 타입</span>
               </span>
               <span className="studio-hero-stat">
-                <strong>5</strong>
-                <span>다음 샘플</span>
+                <strong>0</strong>
+                <span>삭제 허용</span>
               </span>
             </div>
+          </section>
+
+          <section className="studio-kpi-grid" aria-label="운영 요약">
+            {kpiCards.map((card) => (
+              <article className="ops-kpi-card studio-kpi-card" key={card.label}>
+                <p className="ops-kpi-label">{card.label}</p>
+                <strong className="ops-kpi-value">{card.value}</strong>
+                <span className="ops-kpi-meta">{card.meta}</span>
+              </article>
+            ))}
           </section>
 
           <section className="studio-workbench-grid" aria-label="캡처 워크벤치">
             <aside className="studio-panel studio-left-panel">
               <div className="studio-panel-header">
-                <p className="studio-eyebrow">Product Taxonomy</p>
-                <h3>상품 선택 기준</h3>
+                <p className="studio-eyebrow">Product Coverage</p>
+                <h3>캡처 상품 커버리지</h3>
               </div>
 
               <div className="studio-product-stack">
@@ -231,7 +266,7 @@ export default function Home() {
             <aside className="studio-panel studio-right-panel">
               <div className="studio-panel-header">
                 <p className="studio-eyebrow">Operator Guardrails</p>
-                <h3>입력 검증 가이드</h3>
+                <h3>실행 가드레일</h3>
               </div>
 
               <ul className="studio-check-list">
@@ -247,7 +282,7 @@ export default function Home() {
 
               <div className="studio-panel-header compact">
                 <p className="studio-eyebrow">Excluded Scope</p>
-                <h3>이번 구현 제외</h3>
+                <h3>공개 제외</h3>
               </div>
               <div className="studio-chip-row">
                 <span className="studio-chip muted">Audio</span>
@@ -265,36 +300,50 @@ export default function Home() {
                 <h3>최근 캡처 결과 검수</h3>
               </div>
               <p className="studio-panel-note">
-                완료, 실패, 처리중 결과를 확인하고 필요하면 같은 조건으로 다시
-                요청합니다.
+                완료, 실패, 처리중 결과를 확인합니다. 운영 UI에서는 삭제 대신
+                보존과 재요청을 우선합니다.
               </p>
             </div>
             <CaptureList refreshTrigger={refreshTrigger} />
           </section>
 
-          <section className="studio-samples-panel" aria-label="추천 샘플 화면">
+          <section className="studio-samples-panel" aria-label="캡처 커버리지 매트릭스">
             <div className="studio-panel-header horizontal">
               <div>
-                <p className="studio-eyebrow">UI/UX Direction</p>
-                <h3>Top 5 샘플 화면</h3>
+                <p className="studio-eyebrow">Coverage Matrix</p>
+                <h3>캡처 지면 상태</h3>
               </div>
               <p className="studio-panel-note">
-                이 다섯 화면을 기준으로 전체 운영 UI를 확장합니다.
+                공개 구현, 신규 공개, 제외 상태를 운영자가 한눈에 확인합니다.
               </p>
             </div>
 
-            <div className="studio-sample-grid">
-              {samplePages.map((page, index) => (
-                <article className="studio-sample-card" key={page.title}>
-                  <span className="studio-sample-index">
-                    {String(index + 1).padStart(2, "0")}
+            <div className="studio-coverage-table" role="table">
+              <div className="studio-coverage-row head" role="row">
+                <span role="columnheader">상품</span>
+                <span role="columnheader">지면</span>
+                <span role="columnheader">상태</span>
+                <span role="columnheader">비고</span>
+              </div>
+              {coverageRows.map((row) => (
+                <div className="studio-coverage-row" role="row" key={`${row.product}-${row.surface}`}>
+                  <strong role="cell">{row.product}</strong>
+                  <span role="cell">{row.surface}</span>
+                  <span role="cell">
+                    <em
+                      className={`studio-status-pill ${
+                        row.status === "제외"
+                          ? "muted"
+                          : row.status === "신규 공개"
+                            ? "info"
+                            : "success"
+                      }`}
+                    >
+                      {row.status}
+                    </em>
                   </span>
-                  <div>
-                    <p>{page.role}</p>
-                    <h4>{page.title}</h4>
-                    <span>{page.summary}</span>
-                  </div>
-                </article>
+                  <span role="cell">{row.note}</span>
+                </div>
               ))}
             </div>
           </section>

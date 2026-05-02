@@ -7,13 +7,13 @@ export const PUBLIC_YOUTUBE_AD_TYPES = [
   "mobile-bumper-ios",
   "shorts-feed",
   "masthead-home",
+  "infeed-home",
   "mobile-infeed-home",
   "infeed-search",
   "infeed-watch-next",
 ] as const;
 
 export const INTERNAL_YOUTUBE_AD_TYPES = [
-  "infeed-home",
 ] as const;
 
 export const LEGACY_YOUTUBE_AD_TYPES = [

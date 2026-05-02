@@ -266,6 +266,8 @@ type ProductMenu =
   | "demandgen"
   | "network-ads";
 type YouTubeProductMenu = Exclude<ProductMenu, "demandgen" | "network-ads">;
+type GoogleAdsProductMenu = Extract<ProductMenu, "demandgen" | "network-ads">;
+type DemandGenSurface = "youtube-feed" | "youtube-shorts";
 type DetailOptionPreset =
   | "pc-skip"
   | "pc-non-skip"
@@ -282,6 +284,8 @@ type DetailOptionPreset =
   | "mo-infeed-home"
   | "infeed-search"
   | "infeed-watch-next"
+  | "demandgen-youtube-feed"
+  | "demandgen-youtube-shorts"
   | "gdn-pc"
   | "gdn-mobile"
   | "yt-other";
@@ -307,7 +311,7 @@ const YOUTUBE_PRODUCT_OPTIONS: ProductMenuOption[] = [
 
 const GOOGLE_ADS_PRODUCT_OPTIONS: ProductMenuOption[] = [
   { value: "network-ads", label: "Network Ads" },
-  { value: "demandgen", label: "Demand Gen · 구현 예정", disabled: true },
+  { value: "demandgen", label: "Demand Gen" },
 ];
 
 const YOUTUBE_DETAIL_OPTIONS: DetailMenuOption[] = [
@@ -322,9 +326,15 @@ const YOUTUBE_DETAIL_OPTIONS: DetailMenuOption[] = [
   { value: "ios-bumper", label: "iOS 범퍼 · 6초" },
   { value: "shorts-feed", label: "Shorts 피드" },
   { value: "masthead-home", label: "Masthead 홈" },
+  { value: "infeed-home", label: "In-feed PC 홈" },
   { value: "mo-infeed-home", label: "In-feed 모바일 홈" },
   { value: "infeed-search", label: "In-feed 검색 결과" },
   { value: "infeed-watch-next", label: "In-feed 관련동영상" },
+];
+
+const DEMAND_GEN_DETAIL_OPTIONS: DetailMenuOption[] = [
+  { value: "demandgen-youtube-feed", label: "YouTube Feed" },
+  { value: "demandgen-youtube-shorts", label: "YouTube Shorts" },
 ];
 
 const YOUTUBE_DETAIL_OPTIONS_BY_PRODUCT: Record<YouTubeProductMenu, DetailMenuOption[]> = {
@@ -345,6 +355,7 @@ const YOUTUBE_DETAIL_OPTIONS_BY_PRODUCT: Record<YouTubeProductMenu, DetailMenuOp
   masthead: YOUTUBE_DETAIL_OPTIONS.filter((option) => option.value === "masthead-home"),
   infeed: YOUTUBE_DETAIL_OPTIONS.filter((option) =>
     [
+      "infeed-home",
       "mo-infeed-home",
       "infeed-search",
       "infeed-watch-next",
@@ -363,7 +374,11 @@ const GDN_DETAIL_OPTIONS: DetailMenuOption[] = [
 
 /** 폼 데이터 타입 */
 interface CaptureFormData {
+  /** 운영자 UI에서 선택한 매체. Demand Gen은 Google Ads 메뉴를 유지하면서 YouTube 렌더러를 사용할 수 있다. */
+  mediaMenu: MediaMenu;
   channel: string;
+  googleAdsProduct: GoogleAdsProductMenu;
+  demandGenSurface: DemandGenSurface;
   selectedPublishers: string[]; // 멀티 사이트 URL 배열
   creativeUrl: string;
   clickUrl: string;
@@ -463,7 +478,10 @@ function formatFileSize(bytes: number): string {
 
 export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
   const [form, setForm] = useState<CaptureFormData>({
+    mediaMenu: "gdn",
     channel: "gdn",
+    googleAdsProduct: "network-ads",
+    demandGenSurface: "youtube-feed",
     selectedPublishers: [],
     creativeUrl: "",
     clickUrl: "",
@@ -889,7 +907,8 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
       form.youtubeAdType === "infeed-search" ||
       form.youtubeAdType === "infeed-watch-next");
 
-  const selectedMediaMenu = (form.channel === "youtube" ? "youtube" : "gdn") as MediaMenu;
+  const isDemandGenProduct = form.googleAdsProduct === "demandgen";
+  const selectedMediaMenu = form.mediaMenu;
   const selectedProduct: ProductMenu =
     selectedMediaMenu === "youtube"
       ? isYoutubeShorts
@@ -899,9 +918,14 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
         : isYoutubeInfeed
         ? "infeed"
         : "instream"
-      : "network-ads";
+      : form.googleAdsProduct;
   const selectedOptionPreset: DetailOptionPreset = (() => {
     if (selectedMediaMenu !== "youtube") {
+      if (isDemandGenProduct) {
+        return form.demandGenSurface === "youtube-shorts"
+          ? "demandgen-youtube-shorts"
+          : "demandgen-youtube-feed";
+      }
       return form.gdnViewportMode === "mobile" ? "gdn-mobile" : "gdn-pc";
     }
     if (form.youtubeAdType === "bumper") return "pc-bumper";
@@ -937,10 +961,12 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
     "ios-bumper": "iOS 범퍼 · 6초",
     "shorts-feed": "Shorts 피드",
     "masthead-home": "Masthead 홈",
-    "infeed-home": "PC 홈 피드 · 내부 프리뷰",
+    "infeed-home": "In-feed PC 홈",
     "mo-infeed-home": "In-feed 모바일 홈",
     "infeed-search": "In-feed 검색 결과",
     "infeed-watch-next": "In-feed 관련동영상",
+    "demandgen-youtube-feed": "Demand Gen · YouTube Feed",
+    "demandgen-youtube-shorts": "Demand Gen · YouTube Shorts",
     "yt-other": "YouTube 레거시/준비중",
     "gdn-pc": "PC 지면",
     "gdn-mobile": "MO 지면",
@@ -950,6 +976,8 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
     selectedMediaMenu === "youtube" && isYouTubeProductMenu(selectedProduct)
       ? YOUTUBE_DETAIL_OPTIONS_BY_PRODUCT[selectedProduct]
       : [];
+  const availableGoogleAdsDetailOptions =
+    selectedProduct === "demandgen" ? DEMAND_GEN_DETAIL_OPTIONS : GDN_DETAIL_OPTIONS;
   const productLabel: Record<ProductMenu, string> = {
     instream: "In-stream / Bumper",
     shorts: "Shorts",
@@ -961,7 +989,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
 
   const infeedTypeLabel =
     form.youtubeAdType === "infeed-home"
-      ? "인피드 · PC 홈(내부)"
+      ? "인피드 · PC 홈"
       : form.youtubeAdType === "mobile-infeed-home"
         ? "인피드 · 모바일 홈"
       : form.youtubeAdType === "infeed-search"
@@ -971,7 +999,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
           : "인피드";
   const infeedSurfaceHint =
     form.youtubeAdType === "infeed-home"
-      ? "PC 홈 피드는 내부 검증용 프리뷰이며 공개 상품 선택에서는 제외됩니다."
+      ? "PC 홈 지면은 YouTube 데스크톱 홈 추천 피드 안에 네이티브 광고 카드를 렌더링합니다."
       : form.youtubeAdType === "mobile-infeed-home"
         ? "모바일 홈 지면은 합성 피드로 안정적인 모바일 카드 화면을 렌더링합니다."
       : form.youtubeAdType === "infeed-search"
@@ -1068,6 +1096,8 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
           // YouTube 광고 유형
           youtubeAdType:
             form.channel === "youtube" ? form.youtubeAdType : undefined,
+          productFamily: isDemandGenProduct ? "demand-gen" : undefined,
+          productSurface: isDemandGenProduct ? form.demandGenSurface : undefined,
           gdnViewportMode:
             form.channel === "gdn" ? form.gdnViewportMode : undefined,
           // 인스트림 광고 옵션
@@ -1263,11 +1293,19 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                 if (next === "youtube") {
                   setForm((prev) => ({
                     ...prev,
+                    mediaMenu: "youtube",
                     channel: "youtube",
+                    googleAdsProduct: "network-ads",
                     youtubeAdType: "mobile-preroll-aos",
                   }));
                 } else {
-                  setForm((prev) => ({ ...prev, channel: "gdn", gdnViewportMode: "pc" }));
+                  setForm((prev) => ({
+                    ...prev,
+                    mediaMenu: next,
+                    channel: "gdn",
+                    googleAdsProduct: "network-ads",
+                    gdnViewportMode: "pc",
+                  }));
                 }
               }}
             >
@@ -1290,29 +1328,48 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                 if (next === "instream") {
                   setForm((prev) => ({
                     ...prev,
+                    mediaMenu: "youtube",
                     channel: "youtube",
                     youtubeAdType: "mobile-preroll-aos",
                   }));
                 } else if (next === "shorts") {
                   setForm((prev) => ({
                     ...prev,
+                    mediaMenu: "youtube",
                     channel: "youtube",
                     youtubeAdType: "shorts-feed",
                   }));
                 } else if (next === "masthead") {
                   setForm((prev) => ({
                     ...prev,
+                    mediaMenu: "youtube",
                     channel: "youtube",
                     youtubeAdType: "masthead-home",
                   }));
                 } else if (next === "infeed") {
                   setForm((prev) => ({
                     ...prev,
+                    mediaMenu: "youtube",
                     channel: "youtube",
                     youtubeAdType: "mobile-infeed-home",
                   }));
+                } else if (next === "demandgen") {
+                  setForm((prev) => ({
+                    ...prev,
+                    mediaMenu: "gdn",
+                    channel: "youtube",
+                    googleAdsProduct: "demandgen",
+                    demandGenSurface: "youtube-feed",
+                    youtubeAdType: "mobile-infeed-home",
+                  }));
                 } else {
-                  setForm((prev) => ({ ...prev, channel: "gdn", gdnViewportMode: "pc" }));
+                  setForm((prev) => ({
+                    ...prev,
+                    mediaMenu: "gdn",
+                    channel: "gdn",
+                    googleAdsProduct: "network-ads",
+                    gdnViewportMode: "pc",
+                  }));
                 }
               }}
             >
@@ -1353,13 +1410,21 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                 const preset = e.target.value;
                 setIsOptionPanelExpanded(true);
                 if (preset === "gdn-pc") {
-                  setForm((prev) => ({ ...prev, channel: "gdn", gdnViewportMode: "pc" }));
+                  setForm((prev) => ({
+                    ...prev,
+                    mediaMenu: "gdn",
+                    channel: "gdn",
+                    googleAdsProduct: "network-ads",
+                    gdnViewportMode: "pc",
+                  }));
                   return;
                 }
                 if (preset === "gdn-mobile") {
                   setForm((prev) => ({
                     ...prev,
+                    mediaMenu: "gdn",
                     channel: "gdn",
+                    googleAdsProduct: "network-ads",
                     gdnViewportMode: "mobile",
                     targetAdSizes: prev.targetAdSizes.filter((s) =>
                       GDN_MOBILE_SIZE_KEYS.has(s),
@@ -1367,9 +1432,32 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                   }));
                   return;
                 }
+                if (preset === "demandgen-youtube-feed") {
+                  setForm((prev) => ({
+                    ...prev,
+                    mediaMenu: "gdn",
+                    channel: "youtube",
+                    googleAdsProduct: "demandgen",
+                    demandGenSurface: "youtube-feed",
+                    youtubeAdType: "mobile-infeed-home",
+                  }));
+                  return;
+                }
+                if (preset === "demandgen-youtube-shorts") {
+                  setForm((prev) => ({
+                    ...prev,
+                    mediaMenu: "gdn",
+                    channel: "youtube",
+                    googleAdsProduct: "demandgen",
+                    demandGenSurface: "youtube-shorts",
+                    youtubeAdType: "shorts-feed",
+                  }));
+                  return;
+                }
                 if (preset === "pc-skip") {
                   setForm((prev) => ({
                     ...prev,
+                    mediaMenu: "youtube",
                     channel: "youtube",
                     youtubeAdType: "preroll",
                     instreamSkipMode: "skippable",
@@ -1380,6 +1468,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                 if (preset === "pc-non-skip") {
                   setForm((prev) => ({
                     ...prev,
+                    mediaMenu: "youtube",
                     channel: "youtube",
                     youtubeAdType: "preroll",
                     instreamSkipMode: "non-skippable",
@@ -1389,6 +1478,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                 if (preset === "pc-bumper") {
                   setForm((prev) => ({
                     ...prev,
+                    mediaMenu: "youtube",
                     channel: "youtube",
                     youtubeAdType: "bumper",
                     instreamSkipMode: "non-skippable",
@@ -1399,6 +1489,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                 if (preset === "aos-skip") {
                   setForm((prev) => ({
                     ...prev,
+                    mediaMenu: "youtube",
                     channel: "youtube",
                     youtubeAdType: "mobile-preroll-aos",
                     instreamSkipMode: "skippable",
@@ -1409,6 +1500,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                 if (preset === "aos-non-skip") {
                   setForm((prev) => ({
                     ...prev,
+                    mediaMenu: "youtube",
                     channel: "youtube",
                     youtubeAdType: "mobile-preroll-aos",
                     instreamSkipMode: "non-skippable",
@@ -1418,6 +1510,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                 if (preset === "aos-bumper") {
                   setForm((prev) => ({
                     ...prev,
+                    mediaMenu: "youtube",
                     channel: "youtube",
                     youtubeAdType: "mobile-bumper-aos",
                     instreamSkipMode: "non-skippable",
@@ -1428,6 +1521,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                 if (preset === "ios-skip") {
                   setForm((prev) => ({
                     ...prev,
+                    mediaMenu: "youtube",
                     channel: "youtube",
                     youtubeAdType: "mobile-preroll-ios",
                     instreamSkipMode: "skippable",
@@ -1438,6 +1532,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                 if (preset === "ios-non-skip") {
                   setForm((prev) => ({
                     ...prev,
+                    mediaMenu: "youtube",
                     channel: "youtube",
                     youtubeAdType: "mobile-preroll-ios",
                     instreamSkipMode: "non-skippable",
@@ -1447,6 +1542,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                 if (preset === "ios-bumper") {
                   setForm((prev) => ({
                     ...prev,
+                    mediaMenu: "youtube",
                     channel: "youtube",
                     youtubeAdType: "mobile-bumper-ios",
                     instreamSkipMode: "non-skippable",
@@ -1457,6 +1553,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                 if (preset === "shorts-feed") {
                   setForm((prev) => ({
                     ...prev,
+                    mediaMenu: "youtube",
                     channel: "youtube",
                     youtubeAdType: "shorts-feed",
                   }));
@@ -1465,6 +1562,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                 if (preset === "masthead-home") {
                   setForm((prev) => ({
                     ...prev,
+                    mediaMenu: "youtube",
                     channel: "youtube",
                     youtubeAdType: "masthead-home",
                   }));
@@ -1473,6 +1571,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                 if (preset === "infeed-home") {
                   setForm((prev) => ({
                     ...prev,
+                    mediaMenu: "youtube",
                     channel: "youtube",
                     youtubeAdType: "infeed-home",
                   }));
@@ -1481,6 +1580,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                 if (preset === "mo-infeed-home") {
                   setForm((prev) => ({
                     ...prev,
+                    mediaMenu: "youtube",
                     channel: "youtube",
                     youtubeAdType: "mobile-infeed-home",
                   }));
@@ -1489,6 +1589,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                 if (preset === "infeed-search") {
                   setForm((prev) => ({
                     ...prev,
+                    mediaMenu: "youtube",
                     channel: "youtube",
                     youtubeAdType: "infeed-search",
                   }));
@@ -1497,6 +1598,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                 if (preset === "infeed-watch-next") {
                   setForm((prev) => ({
                     ...prev,
+                    mediaMenu: "youtube",
                     channel: "youtube",
                     youtubeAdType: "infeed-watch-next",
                   }));
@@ -1519,7 +1621,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                 </>
               ) : (
                 <>
-                  {GDN_DETAIL_OPTIONS.map((option) => (
+                  {availableGoogleAdsDetailOptions.map((option) => (
                     <option key={option.value} value={option.value}>
                       {option.label}
                     </option>
@@ -1555,6 +1657,10 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
         {isOptionPanelExpanded && form.channel === "youtube" && (
           <div className="mb-5 animate-fade-in">
             <p className="form-helper mt-1.5">
+              {isDemandGenProduct &&
+                (form.demandGenSurface === "youtube-shorts"
+                  ? "Demand Gen 1차는 Google Ads 상품 흐름에서 YouTube Shorts 증빙 화면을 생성합니다."
+                  : "Demand Gen 1차는 Google Ads 상품 흐름에서 YouTube Feed 증빙 화면을 생성합니다.")}
               {form.youtubeAdType === "bumper" &&
                 "범퍼는 6초 이하 non-skippable 인스트림으로 처리되며 캡처 시점은 0~5초로 제한됩니다."}
               {form.youtubeAdType === "mobile-bumper-aos" &&
@@ -1565,11 +1671,11 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                 "모바일 인스트림은 Android(Pixel 8) 뷰포트 기준으로 캡처됩니다."}
               {form.youtubeAdType === "mobile-preroll-ios" &&
                 "모바일 인스트림은 iPhone 15 뷰포트 기준으로 캡처됩니다."}
-              {isYoutubeShorts &&
+              {!isDemandGenProduct && isYoutubeShorts &&
                 "Shorts 피드는 9:16 모바일 화면에서 광고 소재, 스폰서 정보, CTA를 합성 렌더링합니다."}
               {isYoutubeMasthead &&
                 "Masthead 홈은 YouTube 홈 최상단 대형 예약형 지면으로 합성 렌더링합니다."}
-              {isYoutubeInfeed &&
+              {!isDemandGenProduct && isYoutubeInfeed &&
                 infeedSurfaceHint}
             </p>
 

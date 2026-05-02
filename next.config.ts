@@ -16,6 +16,9 @@ const CAPTURE_ROUTE_TRACE_EXCLUDES = [
 ];
 
 const nextConfig: NextConfig = {
+  turbopack: {
+    root: process.cwd(),
+  },
   serverExternalPackages: ["puppeteer-core", "@sparticuz/chromium-min"],
   outputFileTracingExcludes: {
     "/api/captures/execute": [...CAPTURE_ROUTE_TRACE_EXCLUDES],
