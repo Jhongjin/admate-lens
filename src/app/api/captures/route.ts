@@ -52,6 +52,15 @@ function isValidHttpUrl(value?: string | null): boolean {
   }
 }
 
+function isYouTubeUrl(value: string): boolean {
+  try {
+    const host = new URL(normalizeHttpUrl(value)).hostname.toLowerCase().replace(/^www\./, "");
+    return host === "youtube.com" || host.endsWith(".youtube.com") || host === "youtu.be";
+  } catch {
+    return false;
+  }
+}
+
 /** POST: 새 캡처 요청 생성 (멀티 사이트 지원) */
 export async function POST(request: NextRequest) {
   try {
@@ -197,6 +206,13 @@ export async function POST(request: NextRequest) {
     if (!channel || normalizedUrls.length === 0 || !hasSource) {
       return NextResponse.json(
         { error: "channel, publisherUrl(s), creativeUrl/videoUrl 형식을 확인해주세요." },
+        { status: 400 }
+      );
+    }
+
+    if (channel === "youtube" && normalizedUrls.some((url) => !isYouTubeUrl(url))) {
+      return NextResponse.json(
+        { error: "YouTube 캡처 요청에는 YouTube 게재면 URL만 사용할 수 있습니다." },
         { status: 400 }
       );
     }

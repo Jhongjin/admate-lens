@@ -1025,26 +1025,25 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
       ];
       const randomKoreanUrl = KOREAN_FALLBACK_VIDEOS[Math.floor(Math.random() * KOREAN_FALLBACK_VIDEOS.length)];
       const contentVideoUrl = form.instreamPublisherVideoUrl?.trim() || randomKoreanUrl;
-      const publisherUrls =
-        isYouTubeChannel && form.selectedPublishers.length === 0
-          ? form.youtubeAdType === "shorts-feed"
-            ? [
-                form.infeedVideoUrl.trim()
-                  ? normalizeHttpUrl(form.infeedVideoUrl.trim())
-                  : "https://www.youtube.com/shorts/",
-              ]
-            : form.youtubeAdType === "infeed-home" || form.youtubeAdType === "mobile-infeed-home"
+      const youtubePublisherUrls =
+        form.youtubeAdType === "shorts-feed"
+          ? [
+              form.infeedVideoUrl.trim()
+                ? normalizeHttpUrl(form.infeedVideoUrl.trim())
+                : "https://www.youtube.com/shorts/",
+            ]
+          : form.youtubeAdType === "infeed-home" || form.youtubeAdType === "mobile-infeed-home"
             ? ["https://www.youtube.com/"]
             : form.youtubeAdType === "masthead-home"
               ? ["https://www.youtube.com/"]
-            : form.youtubeAdType === "infeed-search"
-              ? [
-                  `https://www.youtube.com/results?search_query=${encodeURIComponent(
-                    form.infeedSearchQuery?.trim() || "시세이도",
-                  )}`,
-                ]
-              : [contentVideoUrl]
-          : form.selectedPublishers;
+              : form.youtubeAdType === "infeed-search"
+                ? [
+                    `https://www.youtube.com/results?search_query=${encodeURIComponent(
+                      form.infeedSearchQuery?.trim() || "시세이도",
+                    )}`,
+                  ]
+                : [contentVideoUrl];
+      const publisherUrls = isYouTubeChannel ? youtubePublisherUrls : form.selectedPublishers;
 
       const res = await fetch("/api/captures", {
         method: "POST",
@@ -3707,7 +3706,9 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                   <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
                   <circle cx="12" cy="13" r="4" />
                 </svg>
-                {form.selectedPublishers.length > 1
+                {isYouTubeChannel
+                  ? "YouTube 캡처 시작"
+                  : form.selectedPublishers.length > 1
                   ? `${form.selectedPublishers.length}개 사이트 캡처 시작`
                   : "캡처 요청 시작"}
               </>
