@@ -3743,6 +3743,9 @@ export class YouTubeCapture extends BaseChannel {
       }
     }
 
+    const progressFillPct = showSkipButton
+      ? 100
+      : Math.min(100, Math.max(0, instreamOpts.progressFillPercent ?? 33));
     const prerollPayload: PrerollInjectPagePayload = {
       imgUrl: imgDataUrl,
       isMobile,
@@ -3752,7 +3755,7 @@ export class YouTubeCapture extends BaseChannel {
       titleText: adTitle,
       enableCtaText: instreamOpts.enableCtaText !== false,
       ctaBtnText: ctaText,
-      progressFillPct: Math.min(100, Math.max(0, instreamOpts.progressFillPercent ?? 33)),
+      progressFillPct,
       showSkipButton,
       serverPlayerBox: resolvedServerPlayerBox,
     };

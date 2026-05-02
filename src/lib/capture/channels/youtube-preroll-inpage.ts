@@ -31,8 +31,8 @@ export function runPrerollInjectInPage(...args: unknown[]): boolean {
     const titleText = p.titleText;
     const enableCtaText = p.enableCtaText;
     const ctaBtnText = p.ctaBtnText;
-    const progressFillPct = p.progressFillPct;
     const showSkipButton = p.showSkipButton !== false;
+    const progressFillPct = showSkipButton ? 100 : p.progressFillPct;
 
     const playerSelectors = [
       "#yt-thumb-overlay",
