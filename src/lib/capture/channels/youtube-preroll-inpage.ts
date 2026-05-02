@@ -14,7 +14,7 @@ export interface PrerollInjectPagePayload {
   enableCtaText: boolean;
   ctaBtnText: string;
   progressFillPct: number;
-  /** false면 데스크톱 우하단 건너뛰기 버튼 미노출(논스킵 인스트림) */
+  /** false면 캡처 시점의 우하단 건너뛰기 버튼 미노출 */
   showSkipButton?: boolean;
   /** Node에서 측정한 플레이어 박스(인페이지 재탐색과 불일치 시 흰 영역·찢어짐 방지) */
   serverPlayerBox?: { left: number; top: number; width: number; height: number };

@@ -707,13 +707,26 @@ export class YouTubeCapture extends BaseChannel {
     // 캡처 시점 모드: 광고주 영상에서 미리 추출한 프레임을 우선 사용
     let prerollOverlayImageUrl = timedFrameDataUrl || creativeDataUrl;
     let prerollProgressPercent = 33;
+    const skipButtonUnlockSeconds = 5;
+    const isSkippableInstream = instreamOpts.instreamSkipMode !== "non-skippable";
+    const prerollShowSkipButton =
+      isSkippableInstream &&
+      prerollCaptureSeconds !== null &&
+      prerollCaptureSeconds >= skipButtonUnlockSeconds;
     const useTimedFrameOverlay = !!timedFrameDataUrl;
     if (prerollCaptureSeconds !== null) {
-      const denom =
-        timedFrameDurationSec > 0
-          ? timedFrameDurationSec
-          : Math.max(15, prerollCaptureSeconds + 1);
-      prerollProgressPercent = Math.min(100, Math.max(0, (prerollCaptureSeconds / denom) * 100));
+      if (isSkippableInstream) {
+        prerollProgressPercent = Math.min(
+          100,
+          Math.max(0, (prerollCaptureSeconds / skipButtonUnlockSeconds) * 100)
+        );
+      } else {
+        const denom =
+          timedFrameDurationSec > 0
+            ? timedFrameDurationSec
+            : Math.max(15, prerollCaptureSeconds + 1);
+        prerollProgressPercent = Math.min(100, Math.max(0, (prerollCaptureSeconds / denom) * 100));
+      }
     }
 
     // 6) 플레이어 정보 수집 (확장된 셀렉터)
@@ -816,6 +829,7 @@ export class YouTubeCapture extends BaseChannel {
           enableCtaText: instreamOpts.enableCtaText,
           isMobile: isMobilePlatform,
           instreamSkipMode: instreamOpts.instreamSkipMode,
+          showSkipButton: prerollShowSkipButton,
         };
         console.log(
           `[YouTube] 인스트림 옵션: title="${prerollUiOpts.adTitle}" cta="${prerollUiOpts.ctaText}" landing="${prerollUiOpts.landingUrl}" enableCtaText="${prerollUiOpts.enableCtaText}" mobile=${isMobilePlatform}`
@@ -834,7 +848,7 @@ export class YouTubeCapture extends BaseChannel {
           } else {
             console.log('[YouTube] 컴패니언 배너 삽입 생략 (opt-out)');
           }
-          const expectedSkipButton = prerollUiOpts.instreamSkipMode !== "non-skippable";
+          const expectedSkipButton = prerollUiOpts.showSkipButton === true;
           const instreamUiChecks = await page.evaluate<YouTubeDiagnostics["instreamUiChecks"]>(`
             (() => ({
               overlay: !!document.querySelector("#admate-preroll-overlay"),
@@ -884,6 +898,7 @@ export class YouTubeCapture extends BaseChannel {
         enableCtaText: instreamOpts.enableCtaText,
         isMobile: isMobilePlatform,
         instreamSkipMode: instreamOpts.instreamSkipMode,
+        showSkipButton: prerollShowSkipButton,
       });
     }
 
@@ -3489,7 +3504,7 @@ export class YouTubeCapture extends BaseChannel {
    * 📌 실제 YouTube 인스트림 광고 형태를 정확히 재현:
    *   - 좌상단: 작은 "광고" 라벨
    *   - 좌하단: 카드형 CTA (썸네일 + 상품명 + CTA 버튼 + "스폰서 · URL")
-   *   - 우하단: 스킵 가능일 때만 "건너뛰기 ▶|" 버튼
+   *   - 우하단: 캡처 시점에 스킵 가능일 때만 "건너뛰기 ▶|" 버튼
    *   - 하단: 노란색 프로그레스 바
    */
   private async injectPrerollAd(
@@ -3511,6 +3526,7 @@ export class YouTubeCapture extends BaseChannel {
       progressFillPercent?: number;
       isMobile?: boolean;
       instreamSkipMode?: "skippable" | "non-skippable";
+      showSkipButton?: boolean;
     } = {}
   ): Promise<boolean> {
     const isMobile = instreamOpts.isMobile ?? false;
@@ -3610,7 +3626,10 @@ export class YouTubeCapture extends BaseChannel {
       : escapeForInlineHtml(adTitlePlain);
     const ctaText = instreamOpts.ctaText || '자세히 알아보기';
 
-    const showSkipButton = instreamOpts.instreamSkipMode !== "non-skippable";
+    const showSkipButton =
+      typeof instreamOpts.showSkipButton === "boolean"
+        ? instreamOpts.showSkipButton
+        : instreamOpts.instreamSkipMode !== "non-skippable";
     let resolvedServerPlayerBox:
       | { left: number; top: number; width: number; height: number }
       | undefined =

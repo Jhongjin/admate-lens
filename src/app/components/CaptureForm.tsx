@@ -1693,7 +1693,9 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                     >
                       {isBumperAd
                         ? "범퍼는 6초 이하 상품이므로 0~5초 범위에서 캡처합니다."
-                        : "입력한 초수의 프레임을 추출합니다. 예: 10 입력 시 10초 프레임 캡처"}
+                        : form.instreamSkipMode === "skippable"
+                          ? "입력한 초수의 프레임을 추출합니다. Skip은 5초 이후 노출되며 5초 미만은 진행바만 표시됩니다."
+                          : "입력한 초수의 프레임을 추출합니다. 예: 10 입력 시 10초 프레임 캡처"}
                     </p>
                   </div>
 
