@@ -63,9 +63,13 @@ function normalizePlainText(value: unknown): string {
 
 async function injectKoreanFonts(page: IPageHandle): Promise<void> {
   try {
-    await page.evaluate<void>(`
-      (() => {
-        if (document.querySelector('#admate-mobile-native-fonts')) return;
+    const loaded = await page.evaluate<boolean>(`
+      (async () => {
+        const sample = '카카오 네이버 콘텐츠 광고 렌더링 확인';
+        if (document.querySelector('#admate-mobile-native-font-style')) {
+          await document.fonts.load("400 16px 'Noto Sans KR'", sample).catch(() => []);
+          return document.fonts.check("400 16px 'Noto Sans KR'", sample);
+        }
 
         const preconnect = document.createElement('link');
         preconnect.rel = 'preconnect';
@@ -77,6 +81,11 @@ async function injectKoreanFonts(page: IPageHandle): Promise<void> {
         link.id = 'admate-mobile-native-fonts';
         link.rel = 'stylesheet';
         link.href = 'https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;800;900&family=Roboto:wght@400;500;700;900&display=swap';
+        const stylesheetReady = new Promise((resolve) => {
+          link.onload = () => resolve(true);
+          link.onerror = () => resolve(false);
+          setTimeout(() => resolve(false), 7000);
+        });
         document.head.appendChild(link);
 
         const style = document.createElement('style');
@@ -87,20 +96,22 @@ async function injectKoreanFonts(page: IPageHandle): Promise<void> {
           '}',
         ].join('\\n');
         document.head.appendChild(style);
+
+        await stylesheetReady;
+        await Promise.race([
+          Promise.all([
+            document.fonts.load("400 16px 'Noto Sans KR'", sample),
+            document.fonts.load("700 16px 'Noto Sans KR'", sample),
+            document.fonts.load("900 16px 'Noto Sans KR'", sample),
+          ]),
+          new Promise((resolve) => setTimeout(resolve, 7000)),
+        ]).catch(() => []);
+        await document.fonts.ready.catch(() => undefined);
+        return document.fonts.check("400 16px 'Noto Sans KR'", sample);
       })()
     `);
-
-    const loaded = await page.evaluate<boolean>(`
-      (() => new Promise((resolve) => {
-        const timeout = setTimeout(() => resolve(false), 5000);
-        document.fonts.ready.then(() => {
-          clearTimeout(timeout);
-          resolve(document.fonts.check('16px Noto Sans KR'));
-        }).catch(() => resolve(false));
-      }))()
-    `);
     if (!loaded) {
-      await new Promise((r) => setTimeout(r, 1500));
+      await new Promise((r) => setTimeout(r, 2500));
     }
   } catch {
     await new Promise((r) => setTimeout(r, 1000));
@@ -217,7 +228,7 @@ function renderNaverMobileFeedHtml(ad: MobileNativeAdData): string {
       margin: 0;
       background: #f5f7f8;
       color: #101010;
-      font-family: -apple-system, BlinkMacSystemFont, "Noto Sans KR", "Apple SD Gothic Neo", Arial, sans-serif;
+      font-family: "Noto Sans KR", "Roboto", -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", Arial, sans-serif;
       -webkit-font-smoothing: antialiased;
     }
     .screen { width: 100vw; min-height: 100vh; background: #f5f7f8; overflow: hidden; }
@@ -238,7 +249,11 @@ function renderNaverMobileFeedHtml(ad: MobileNativeAdData): string {
     }
     .n-logo { color: #03c75a; font-size: 22px; font-weight: 900; letter-spacing: -1px; }
     .placeholder { flex: 1; color: #8b8f93; font-size: 15px; }
-    .icons { display: flex; gap: 13px; color: #30343a; font-size: 20px; }
+    .icons { display: flex; gap: 13px; color: #30343a; }
+    .ui-icon { position: relative; display: inline-block; width: 21px; height: 21px; flex: 0 0 auto; color: currentColor; }
+    .ui-icon.search::before { content: ""; position: absolute; left: 3px; top: 2px; width: 11px; height: 11px; border: 2px solid currentColor; border-radius: 50%; }
+    .ui-icon.search::after { content: ""; position: absolute; right: 1px; bottom: 4px; width: 8px; height: 2px; background: currentColor; border-radius: 2px; transform: rotate(45deg); transform-origin: center; }
+    .ui-icon.circle::before { content: ""; position: absolute; inset: 2px; border: 2px solid currentColor; border-radius: 50%; }
     .shortcut-grid {
       display: grid;
       grid-template-columns: repeat(5, 1fr);
@@ -299,7 +314,13 @@ function renderNaverMobileFeedHtml(ad: MobileNativeAdData): string {
       z-index: 5;
     }
     .tab { display: grid; justify-items: center; gap: 2px; }
-    .tab b { font-size: 18px; line-height: 18px; color: #03c75a; }
+    .tab-icon { position: relative; display: block; width: 20px; height: 20px; color: #03c75a; }
+    .tab-icon.home::before { content: ""; position: absolute; left: 3px; top: 4px; width: 14px; height: 14px; border: 2px solid currentColor; border-top: 0; border-radius: 2px; }
+    .tab-icon.home::after { content: ""; position: absolute; left: 4px; top: 2px; width: 12px; height: 12px; border-left: 2px solid currentColor; border-top: 2px solid currentColor; transform: rotate(45deg); border-radius: 2px 0 0 0; }
+    .tab-icon.content::before { content: ""; position: absolute; inset: 3px; border: 2px solid currentColor; border-radius: 2px; }
+    .tab-icon.content::after { content: ""; position: absolute; left: 7px; top: 6px; width: 7px; height: 7px; border-left: 2px solid currentColor; border-bottom: 2px solid currentColor; }
+    .tab-icon.my::before { content: ""; position: absolute; left: 5px; top: 4px; width: 10px; height: 14px; border: 2px solid currentColor; border-top-color: transparent; border-left-color: transparent; border-radius: 10px 10px 4px 10px; transform: rotate(45deg); }
+    .tab-icon.menu::before { content: ""; position: absolute; left: 4px; top: 5px; width: 12px; height: 2px; background: currentColor; border-radius: 2px; box-shadow: 0 5px 0 currentColor, 0 10px 0 currentColor; }
   </style>
 </head>
 <body>
@@ -308,7 +329,7 @@ function renderNaverMobileFeedHtml(ad: MobileNativeAdData): string {
       <div class="search">
         <div class="n-logo">N</div>
         <div class="placeholder">검색어를 입력하세요</div>
-        <div class="icons"><span>⌕</span><span>◎</span></div>
+        <div class="icons"><span class="ui-icon search" aria-hidden="true"></span><span class="ui-icon circle" aria-hidden="true"></span></div>
       </div>
     </header>
     <section class="shortcut-grid">
@@ -347,11 +368,11 @@ function renderNaverMobileFeedHtml(ad: MobileNativeAdData): string {
       </article>
     </section>
     <nav class="bottom">
-      <div class="tab"><b>⌂</b><span>홈</span></div>
-      <div class="tab"><b>⌕</b><span>검색</span></div>
-      <div class="tab"><b>▣</b><span>콘텐츠</span></div>
-      <div class="tab"><b>♡</b><span>MY</span></div>
-      <div class="tab"><b>☰</b><span>메뉴</span></div>
+      <div class="tab"><i class="tab-icon home" aria-hidden="true"></i><span>홈</span></div>
+      <div class="tab"><i class="ui-icon search" aria-hidden="true"></i><span>검색</span></div>
+      <div class="tab"><i class="tab-icon content" aria-hidden="true"></i><span>콘텐츠</span></div>
+      <div class="tab"><i class="tab-icon my" aria-hidden="true"></i><span>MY</span></div>
+      <div class="tab"><i class="tab-icon menu" aria-hidden="true"></i><span>메뉴</span></div>
     </nav>
   </main>
 </body>
@@ -380,7 +401,7 @@ function renderKakaoBizboardHtml(ad: MobileNativeAdData): string {
       margin: 0;
       background: #f2f2f2;
       color: #191919;
-      font-family: -apple-system, BlinkMacSystemFont, "Noto Sans KR", "Apple SD Gothic Neo", Arial, sans-serif;
+      font-family: "Noto Sans KR", "Roboto", -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", Arial, sans-serif;
       -webkit-font-smoothing: antialiased;
       overflow: hidden;
     }
@@ -395,7 +416,15 @@ function renderKakaoBizboardHtml(ad: MobileNativeAdData): string {
       border-bottom: 1px solid rgba(0,0,0,.05);
     }
     .title { font-size: 23px; font-weight: 800; letter-spacing: -.4px; }
-    .top-icons { display: flex; gap: 18px; color: #222; font-size: 22px; }
+    .top-icons { display: flex; gap: 18px; color: #222; }
+    .k-icon { position: relative; display: inline-block; width: 23px; height: 23px; color: currentColor; flex: 0 0 auto; }
+    .k-icon.search::before { content: ""; position: absolute; left: 3px; top: 2px; width: 12px; height: 12px; border: 2px solid currentColor; border-radius: 50%; }
+    .k-icon.search::after { content: ""; position: absolute; right: 2px; bottom: 5px; width: 8px; height: 2px; background: currentColor; border-radius: 2px; transform: rotate(45deg); }
+    .k-icon.plus::before,
+    .k-icon.plus::after { content: ""; position: absolute; left: 4px; top: 10px; width: 15px; height: 2px; background: currentColor; border-radius: 2px; }
+    .k-icon.plus::after { transform: rotate(90deg); }
+    .k-icon.gear::before { content: ""; position: absolute; inset: 3px; border: 2px solid currentColor; border-radius: 50%; }
+    .k-icon.gear::after { content: ""; position: absolute; left: 10px; top: 1px; width: 3px; height: 21px; background: currentColor; border-radius: 3px; box-shadow: -7px 7px 0 -1px currentColor, 7px -7px 0 -1px currentColor; transform: rotate(45deg); opacity: .85; }
     .bizboard {
       margin: 10px 10px 8px;
       height: 108px;
@@ -494,14 +523,18 @@ function renderKakaoBizboardHtml(ad: MobileNativeAdData): string {
       font-size: 10px;
     }
     .nav { display: grid; justify-items: center; gap: 3px; }
-    .nav b { color: #191919; font-size: 20px; line-height: 18px; }
+    .nav-icon { position: relative; display: block; width: 20px; height: 20px; color: #191919; }
+    .nav-icon.dot::before { content: ""; position: absolute; inset: 2px; background: currentColor; border-radius: 50%; }
+    .nav-icon.circle::before { content: ""; position: absolute; inset: 2px; border: 2px solid currentColor; border-radius: 50%; }
+    .nav-icon.square::before { content: ""; position: absolute; inset: 3px; border: 2px solid currentColor; border-radius: 2px; }
+    .nav-icon.more::before { content: ""; position: absolute; left: 3px; top: 9px; width: 4px; height: 4px; background: currentColor; border-radius: 50%; box-shadow: 6px 0 0 currentColor, 12px 0 0 currentColor; }
   </style>
 </head>
 <body>
   <main class="screen">
     <header class="top">
       <div class="title">채팅</div>
-      <div class="top-icons"><span>⌕</span><span>＋</span><span>⚙</span></div>
+      <div class="top-icons"><span class="k-icon search" aria-hidden="true"></span><span class="k-icon plus" aria-hidden="true"></span><span class="k-icon gear" aria-hidden="true"></span></div>
     </header>
     <section class="bizboard">
       <div class="biz-copy">
@@ -529,11 +562,11 @@ function renderKakaoBizboardHtml(ad: MobileNativeAdData): string {
       <div class="chat"><div class="avatar">D</div><div class="chat-text"><strong>친구</strong><span>주말 일정 공유할게요</span></div><div class="time">월</div></div>
     </section>
     <nav class="bottom">
-      <div class="nav"><b>●</b><span>친구</span></div>
-      <div class="nav"><b>●</b><span>채팅</span></div>
-      <div class="nav"><b>○</b><span>오픈채팅</span></div>
-      <div class="nav"><b>□</b><span>쇼핑</span></div>
-      <div class="nav"><b>⋯</b><span>더보기</span></div>
+      <div class="nav"><i class="nav-icon dot" aria-hidden="true"></i><span>친구</span></div>
+      <div class="nav"><i class="nav-icon dot" aria-hidden="true"></i><span>채팅</span></div>
+      <div class="nav"><i class="nav-icon circle" aria-hidden="true"></i><span>오픈채팅</span></div>
+      <div class="nav"><i class="nav-icon square" aria-hidden="true"></i><span>쇼핑</span></div>
+      <div class="nav"><i class="nav-icon more" aria-hidden="true"></i><span>더보기</span></div>
     </nav>
   </main>
 </body>
@@ -557,11 +590,13 @@ function renderKakaoMobileFeedHtml(ad: MobileNativeAdData): string {
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
   <style>
     * { box-sizing: border-box; }
-    html, body { width: 100%; min-height: 100%; margin: 0; background: #f4f4f4; color: #191919; font-family: -apple-system, BlinkMacSystemFont, "Noto Sans KR", "Apple SD Gothic Neo", Arial, sans-serif; -webkit-font-smoothing: antialiased; }
+    html, body { width: 100%; min-height: 100%; margin: 0; background: #f4f4f4; color: #191919; font-family: "Noto Sans KR", "Roboto", -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", Arial, sans-serif; -webkit-font-smoothing: antialiased; }
     .screen { width: 100vw; min-height: 100vh; background: #f4f4f4; overflow: hidden; }
     .head { height: 58px; padding: 10px 14px; background: #fee500; display: flex; align-items: center; gap: 10px; }
     .k { font-size: 21px; font-weight: 900; letter-spacing: -.6px; }
     .search { flex: 1; height: 36px; border-radius: 18px; background: rgba(255,255,255,.78); display: flex; align-items: center; padding: 0 13px; color: #767676; font-size: 13px; }
+    .head-more { position: relative; width: 24px; height: 24px; flex: 0 0 auto; }
+    .head-more::before { content: ""; position: absolute; left: 2px; top: 10px; width: 4px; height: 4px; background: #191919; border-radius: 50%; box-shadow: 8px 0 0 #191919, 16px 0 0 #191919; }
     .feed { padding: 10px 10px 80px; }
     .card { background: #fff; border-radius: 15px; border: 1px solid rgba(0,0,0,.06); margin-bottom: 10px; overflow: hidden; box-shadow: 0 1px 2px rgba(0,0,0,.03); }
     .story { padding: 14px; }
@@ -581,12 +616,21 @@ function renderKakaoMobileFeedHtml(ad: MobileNativeAdData): string {
     .ad-desc { margin-top: 5px; color: #606060; font-size: 13px; line-height: 19px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
     .bottom { position: fixed; left: 0; right: 0; bottom: 0; height: 57px; background: rgba(255,255,255,.96); border-top: 1px solid rgba(0,0,0,.08); display: grid; grid-template-columns: repeat(5, 1fr); align-items: center; color: #777; font-size: 10px; }
     .nav { display: grid; justify-items: center; gap: 3px; }
-    .nav b { color: #191919; font-size: 19px; line-height: 18px; }
+    .nav-icon { position: relative; display: block; width: 20px; height: 20px; color: #191919; }
+    .nav-icon.home::before { content: ""; position: absolute; left: 3px; top: 5px; width: 14px; height: 12px; border: 2px solid currentColor; border-top: 0; border-radius: 2px; }
+    .nav-icon.home::after { content: ""; position: absolute; left: 4px; top: 3px; width: 12px; height: 12px; border-left: 2px solid currentColor; border-top: 2px solid currentColor; transform: rotate(45deg); border-radius: 2px 0 0 0; }
+    .nav-icon.channel::before { content: ""; position: absolute; inset: 3px; border: 2px solid currentColor; border-radius: 2px; }
+    .nav-icon.channel::after { content: ""; position: absolute; left: 7px; top: 6px; width: 7px; height: 7px; border-left: 2px solid currentColor; border-bottom: 2px solid currentColor; }
+    .nav-icon.plus::before,
+    .nav-icon.plus::after { content: ""; position: absolute; left: 3px; top: 9px; width: 14px; height: 2px; background: currentColor; border-radius: 2px; }
+    .nav-icon.plus::after { transform: rotate(90deg); }
+    .nav-icon.my::before { content: ""; position: absolute; left: 5px; top: 4px; width: 10px; height: 14px; border: 2px solid currentColor; border-top-color: transparent; border-left-color: transparent; border-radius: 10px 10px 4px 10px; transform: rotate(45deg); }
+    .nav-icon.menu::before { content: ""; position: absolute; left: 4px; top: 5px; width: 12px; height: 2px; background: currentColor; border-radius: 2px; box-shadow: 0 5px 0 currentColor, 0 10px 0 currentColor; }
   </style>
 </head>
 <body>
   <main class="screen">
-    <header class="head"><div class="k">kakao</div><div class="search">관심있는 소식을 검색해보세요</div><div>⋯</div></header>
+    <header class="head"><div class="k">kakao</div><div class="search">관심있는 소식을 검색해보세요</div><div class="head-more" aria-hidden="true"></div></header>
     <section class="feed">
       <article class="card story"><strong>오늘의 발견</strong><span>관심사 기반으로 추천되는 콘텐츠입니다</span></article>
       <article class="card">
@@ -605,11 +649,11 @@ function renderKakaoMobileFeedHtml(ad: MobileNativeAdData): string {
       <article class="card story"><strong>추천 채널</strong><span>지금 확인하면 좋은 브랜드와 이슈</span></article>
     </section>
     <nav class="bottom">
-      <div class="nav"><b>⌂</b><span>홈</span></div>
-      <div class="nav"><b>▣</b><span>채널</span></div>
-      <div class="nav"><b>＋</b><span>작성</span></div>
-      <div class="nav"><b>♡</b><span>MY</span></div>
-      <div class="nav"><b>☰</b><span>메뉴</span></div>
+      <div class="nav"><i class="nav-icon home" aria-hidden="true"></i><span>홈</span></div>
+      <div class="nav"><i class="nav-icon channel" aria-hidden="true"></i><span>채널</span></div>
+      <div class="nav"><i class="nav-icon plus" aria-hidden="true"></i><span>작성</span></div>
+      <div class="nav"><i class="nav-icon my" aria-hidden="true"></i><span>MY</span></div>
+      <div class="nav"><i class="nav-icon menu" aria-hidden="true"></i><span>메뉴</span></div>
     </nav>
   </main>
 </body>
