@@ -184,6 +184,7 @@ export async function POST(request: NextRequest) {
                   youtubeAdType: captureMetadata.youtubeAdType ?? "preroll",
                   instreamOpts: captureMetadata.instreamOpts,
                   infeedOpts: captureMetadata.infeedOpts,
+                  mobileNativeOpts: captureMetadata.mobileNativeOpts,
                   publisherGotoRelaxed: multiBatch && resolvedChannel === "gdn",
                   gdnBatchFastMode: multiBatch && resolvedChannel === "gdn",
                   gdnViewportMode:

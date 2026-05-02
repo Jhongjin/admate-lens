@@ -6,8 +6,8 @@ import type { ExecutableYouTubeAdType } from "@/lib/capture/youtube-ad-types";
 const MEDIA_SELECT_OPTIONS: Array<{ value: MediaMenu; label: string; enabled: boolean }> = [
   { value: "gdn", label: "Google Ads", enabled: true },
   { value: "youtube", label: "YouTube", enabled: true },
-  { value: "naver", label: "Naver", enabled: false },
-  { value: "kakao", label: "Kakao", enabled: false },
+  { value: "naver", label: "Naver", enabled: true },
+  { value: "kakao", label: "Kakao", enabled: true },
 ];
 
 /**
@@ -264,10 +264,13 @@ type ProductMenu =
   | "masthead"
   | "infeed"
   | "demandgen"
-  | "network-ads";
-type YouTubeProductMenu = Exclude<ProductMenu, "demandgen" | "network-ads">;
+  | "network-ads"
+  | "naver-mobile"
+  | "kakao-mobile";
+type YouTubeProductMenu = "instream" | "shorts" | "masthead" | "infeed";
 type GoogleAdsProductMenu = Extract<ProductMenu, "demandgen" | "network-ads">;
 type DemandGenSurface = "youtube-feed" | "youtube-shorts";
+type MobileNativeSurface = "naver-mobile-feed" | "kakao-bizboard" | "kakao-mobile-feed";
 type DetailOptionPreset =
   | "pc-skip"
   | "pc-non-skip"
@@ -286,6 +289,9 @@ type DetailOptionPreset =
   | "infeed-watch-next"
   | "demandgen-youtube-feed"
   | "demandgen-youtube-shorts"
+  | "naver-mobile-feed"
+  | "kakao-bizboard"
+  | "kakao-mobile-feed"
   | "gdn-pc"
   | "gdn-mobile"
   | "yt-other";
@@ -314,6 +320,14 @@ const GOOGLE_ADS_PRODUCT_OPTIONS: ProductMenuOption[] = [
   { value: "demandgen", label: "Demand Gen" },
 ];
 
+const NAVER_PRODUCT_OPTIONS: ProductMenuOption[] = [
+  { value: "naver-mobile", label: "모바일 DA" },
+];
+
+const KAKAO_PRODUCT_OPTIONS: ProductMenuOption[] = [
+  { value: "kakao-mobile", label: "모바일 광고" },
+];
+
 const YOUTUBE_DETAIL_OPTIONS: DetailMenuOption[] = [
   { value: "pc-skip", label: "PC 인스트림 · Skip" },
   { value: "pc-non-skip", label: "PC 인스트림 · Non-skip" },
@@ -335,6 +349,15 @@ const YOUTUBE_DETAIL_OPTIONS: DetailMenuOption[] = [
 const DEMAND_GEN_DETAIL_OPTIONS: DetailMenuOption[] = [
   { value: "demandgen-youtube-feed", label: "YouTube Feed" },
   { value: "demandgen-youtube-shorts", label: "YouTube Shorts" },
+];
+
+const NAVER_DETAIL_OPTIONS: DetailMenuOption[] = [
+  { value: "naver-mobile-feed", label: "모바일 피드" },
+];
+
+const KAKAO_DETAIL_OPTIONS: DetailMenuOption[] = [
+  { value: "kakao-bizboard", label: "비즈보드" },
+  { value: "kakao-mobile-feed", label: "모바일 네이티브 피드" },
 ];
 
 const YOUTUBE_DETAIL_OPTIONS_BY_PRODUCT: Record<YouTubeProductMenu, DetailMenuOption[]> = {
@@ -379,6 +402,7 @@ interface CaptureFormData {
   channel: string;
   googleAdsProduct: GoogleAdsProductMenu;
   demandGenSurface: DemandGenSurface;
+  mobileNativeSurface: MobileNativeSurface;
   selectedPublishers: string[]; // 멀티 사이트 URL 배열
   creativeUrl: string;
   clickUrl: string;
@@ -482,6 +506,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
     channel: "gdn",
     googleAdsProduct: "network-ads",
     demandGenSurface: "youtube-feed",
+    mobileNativeSurface: "naver-mobile-feed",
     selectedPublishers: [],
     creativeUrl: "",
     clickUrl: "",
@@ -879,8 +904,10 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
     ? filteredPresets
     : filteredPresets.slice(0, 6);
 
-  /** 폼 유효성 검증 — YouTube 채널은 게재면 자동 지정 */
+  /** 폼 유효성 검증 — YouTube/Naver/Kakao 채널은 게재면 자동 지정 */
   const isYouTubeChannel = form.channel === "youtube";
+  const isMobileNativeChannel = form.channel === "naver" || form.channel === "kakao";
+  const isAutoPublisherChannel = isYouTubeChannel || isMobileNativeChannel;
   const isMobilePreroll =
     form.youtubeAdType === "mobile-preroll-aos" ||
     form.youtubeAdType === "mobile-preroll-ios" ||
@@ -907,8 +934,8 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
       form.youtubeAdType === "infeed-search" ||
       form.youtubeAdType === "infeed-watch-next");
 
-  const isDemandGenProduct = form.googleAdsProduct === "demandgen";
   const selectedMediaMenu = form.mediaMenu;
+  const isDemandGenProduct = selectedMediaMenu === "gdn" && form.googleAdsProduct === "demandgen";
   const selectedProduct: ProductMenu =
     selectedMediaMenu === "youtube"
       ? isYoutubeShorts
@@ -918,8 +945,14 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
         : isYoutubeInfeed
         ? "infeed"
         : "instream"
-      : form.googleAdsProduct;
+      : selectedMediaMenu === "naver"
+        ? "naver-mobile"
+        : selectedMediaMenu === "kakao"
+          ? "kakao-mobile"
+          : form.googleAdsProduct;
   const selectedOptionPreset: DetailOptionPreset = (() => {
+    if (selectedMediaMenu === "naver") return "naver-mobile-feed";
+    if (selectedMediaMenu === "kakao") return form.mobileNativeSurface === "kakao-mobile-feed" ? "kakao-mobile-feed" : "kakao-bizboard";
     if (selectedMediaMenu !== "youtube") {
       if (isDemandGenProduct) {
         return form.demandGenSurface === "youtube-shorts"
@@ -967,6 +1000,9 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
     "infeed-watch-next": "In-feed 관련동영상",
     "demandgen-youtube-feed": "Demand Gen · YouTube Feed",
     "demandgen-youtube-shorts": "Demand Gen · YouTube Shorts",
+    "naver-mobile-feed": "Naver · 모바일 피드",
+    "kakao-bizboard": "Kakao · 비즈보드",
+    "kakao-mobile-feed": "Kakao · 모바일 네이티브 피드",
     "yt-other": "YouTube 레거시/준비중",
     "gdn-pc": "PC 지면",
     "gdn-mobile": "MO 지면",
@@ -978,6 +1014,12 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
       : [];
   const availableGoogleAdsDetailOptions =
     selectedProduct === "demandgen" ? DEMAND_GEN_DETAIL_OPTIONS : GDN_DETAIL_OPTIONS;
+  const availableMobileNativeDetailOptions =
+    selectedMediaMenu === "naver"
+      ? NAVER_DETAIL_OPTIONS
+      : selectedMediaMenu === "kakao"
+        ? KAKAO_DETAIL_OPTIONS
+        : [];
   const productLabel: Record<ProductMenu, string> = {
     instream: "In-stream / Bumper",
     shorts: "Shorts",
@@ -985,6 +1027,8 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
     infeed: "In-feed",
     demandgen: "Demand Gen",
     "network-ads": "Network Ads",
+    "naver-mobile": "모바일 DA",
+    "kakao-mobile": "모바일 광고",
   };
 
   const infeedTypeLabel =
@@ -1021,10 +1065,12 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
     : isYoutubeInfeed || isYoutubeShorts || isYoutubeMasthead
       ? (form.creativeUrl.trim() && isValidHttpSource(form.creativeUrl.trim())) ||
         (form.infeedVideoUrl.trim() && isValidHttpSource(form.infeedVideoUrl.trim()))
+      : isMobileNativeChannel
+        ? Boolean(form.creativeUrl.trim() && isValidHttpSource(form.creativeUrl.trim()))
       : form.creativeUrl && isValidUrl(form.creativeUrl);
 
   const isFormValid =
-    (isYouTubeChannel || form.selectedPublishers.length > 0) &&
+    (isAutoPublisherChannel || form.selectedPublishers.length > 0) &&
     hasValidSource;
 
   /** 폼 제출 */
@@ -1039,8 +1085,8 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
     setIsSubmitting(true);
 
     try {
-      // YouTube 채널인 경우 기본 게재면 URL 자동 지정
-      // 콘텐츠 URL이 입력되었으면 해당 URL, 없으면 한국 인기 콘텐츠 중 랜덤
+      // 자동 지면 채널은 기본 게재면 URL을 지정한다.
+      // YouTube는 콘텐츠 URL이 입력되었으면 해당 URL, 없으면 한국 인기 콘텐츠 중 랜덤.
       const KOREAN_FALLBACK_VIDEOS = [
         "https://www.youtube.com/watch?v=09R8_2nJtjg", // BLACKPINK - Pink Venom
         "https://www.youtube.com/watch?v=gdZLi9oWNZg", // BTS - Dynamite
@@ -1071,7 +1117,17 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                     )}`,
                   ]
                 : [contentVideoUrl];
-      const publisherUrls = isYouTubeChannel ? youtubePublisherUrls : form.selectedPublishers;
+      const mobileNativePublisherUrls =
+        form.channel === "naver"
+          ? ["https://m.naver.com/"]
+          : form.mobileNativeSurface === "kakao-mobile-feed"
+            ? ["https://m.daum.net/"]
+            : ["https://talk.kakao.com/"];
+      const publisherUrls = isYouTubeChannel
+        ? youtubePublisherUrls
+        : isMobileNativeChannel
+          ? mobileNativePublisherUrls
+          : form.selectedPublishers;
 
       const res = await fetch("/api/captures", {
         method: "POST",
@@ -1096,10 +1152,37 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
           // YouTube 광고 유형
           youtubeAdType:
             form.channel === "youtube" ? form.youtubeAdType : undefined,
-          productFamily: isDemandGenProduct ? "demand-gen" : undefined,
-          productSurface: isDemandGenProduct ? form.demandGenSurface : undefined,
+          productFamily: isDemandGenProduct
+            ? "demand-gen"
+            : isMobileNativeChannel
+              ? form.channel
+              : undefined,
+          productSurface: isDemandGenProduct
+            ? form.demandGenSurface
+            : isMobileNativeChannel
+              ? form.mobileNativeSurface
+              : undefined,
           gdnViewportMode:
             form.channel === "gdn" ? form.gdnViewportMode : undefined,
+          mobileNativeOpts: isMobileNativeChannel
+            ? {
+                surface: form.mobileNativeSurface,
+                title: form.instreamAdTitle || undefined,
+                description1: form.infeedDescription1 || undefined,
+                description2: form.infeedDescription2 || undefined,
+                sponsorName: form.instreamDisplayUrl || undefined,
+                displayUrl:
+                  form.instreamDisplayUrl ||
+                  (form.clickUrl ? normalizeHttpUrl(form.clickUrl) : undefined),
+                ctaText:
+                  form.infeedCtaPrimary ||
+                  form.instreamCtaText ||
+                  undefined,
+                logoImageUrl: form.instreamLogoImageUrl
+                  ? normalizeHttpUrl(form.instreamLogoImageUrl)
+                  : undefined,
+              }
+            : undefined,
           // 인스트림 광고 옵션
           instreamOpts:
             form.channel === "youtube" && isYoutubeInstream
@@ -1298,6 +1381,22 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                     googleAdsProduct: "network-ads",
                     youtubeAdType: "mobile-preroll-aos",
                   }));
+                } else if (next === "naver") {
+                  setForm((prev) => ({
+                    ...prev,
+                    mediaMenu: "naver",
+                    channel: "naver",
+                    googleAdsProduct: "network-ads",
+                    mobileNativeSurface: "naver-mobile-feed",
+                  }));
+                } else if (next === "kakao") {
+                  setForm((prev) => ({
+                    ...prev,
+                    mediaMenu: "kakao",
+                    channel: "kakao",
+                    googleAdsProduct: "network-ads",
+                    mobileNativeSurface: "kakao-bizboard",
+                  }));
                 } else {
                   setForm((prev) => ({
                     ...prev,
@@ -1362,6 +1461,22 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                     demandGenSurface: "youtube-feed",
                     youtubeAdType: "mobile-infeed-home",
                   }));
+                } else if (next === "naver-mobile") {
+                  setForm((prev) => ({
+                    ...prev,
+                    mediaMenu: "naver",
+                    channel: "naver",
+                    googleAdsProduct: "network-ads",
+                    mobileNativeSurface: "naver-mobile-feed",
+                  }));
+                } else if (next === "kakao-mobile") {
+                  setForm((prev) => ({
+                    ...prev,
+                    mediaMenu: "kakao",
+                    channel: "kakao",
+                    googleAdsProduct: "network-ads",
+                    mobileNativeSurface: "kakao-bizboard",
+                  }));
                 } else {
                   setForm((prev) => ({
                     ...prev,
@@ -1376,6 +1491,30 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
               {selectedMediaMenu === "youtube" ? (
                 <>
                   {YOUTUBE_PRODUCT_OPTIONS.map((option) => (
+                    <option
+                      key={option.value}
+                      value={option.value}
+                      disabled={option.disabled}
+                    >
+                      {option.label}
+                    </option>
+                  ))}
+                </>
+              ) : selectedMediaMenu === "naver" ? (
+                <>
+                  {NAVER_PRODUCT_OPTIONS.map((option) => (
+                    <option
+                      key={option.value}
+                      value={option.value}
+                      disabled={option.disabled}
+                    >
+                      {option.label}
+                    </option>
+                  ))}
+                </>
+              ) : selectedMediaMenu === "kakao" ? (
+                <>
+                  {KAKAO_PRODUCT_OPTIONS.map((option) => (
                     <option
                       key={option.value}
                       value={option.value}
@@ -1451,6 +1590,26 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                     googleAdsProduct: "demandgen",
                     demandGenSurface: "youtube-shorts",
                     youtubeAdType: "shorts-feed",
+                  }));
+                  return;
+                }
+                if (preset === "naver-mobile-feed") {
+                  setForm((prev) => ({
+                    ...prev,
+                    mediaMenu: "naver",
+                    channel: "naver",
+                    googleAdsProduct: "network-ads",
+                    mobileNativeSurface: "naver-mobile-feed",
+                  }));
+                  return;
+                }
+                if (preset === "kakao-bizboard" || preset === "kakao-mobile-feed") {
+                  setForm((prev) => ({
+                    ...prev,
+                    mediaMenu: "kakao",
+                    channel: "kakao",
+                    googleAdsProduct: "network-ads",
+                    mobileNativeSurface: preset as MobileNativeSurface,
                   }));
                   return;
                 }
@@ -1619,6 +1778,14 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                     ))}
                   </optgroup>
                 </>
+              ) : selectedMediaMenu === "naver" || selectedMediaMenu === "kakao" ? (
+                <>
+                  {availableMobileNativeDetailOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </>
               ) : (
                 <>
                   {availableGoogleAdsDetailOptions.map((option) => (
@@ -1642,7 +1809,14 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
 
           <div className="flex flex-wrap items-center gap-2 pt-1">
             <span className="text-[10px] px-2 py-1 rounded-full bg-[var(--color-bg-tertiary)] text-[var(--color-text-secondary)]">
-              매체: {selectedMediaMenu === "youtube" ? "YouTube" : "Google Ads"}
+              매체:{" "}
+              {selectedMediaMenu === "youtube"
+                ? "YouTube"
+                : selectedMediaMenu === "naver"
+                  ? "Naver"
+                  : selectedMediaMenu === "kakao"
+                    ? "Kakao"
+                    : "Google Ads"}
             </span>
             <span className="text-[10px] px-2 py-1 rounded-full bg-[var(--color-bg-tertiary)] text-[var(--color-text-secondary)]">
               상품: {productLabel[selectedProduct]}
@@ -2601,9 +2775,152 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
           </div>
         )}
 
+        {isOptionPanelExpanded && isMobileNativeChannel && (
+          <div className="mb-5 animate-fade-in">
+            <div
+              className="rounded-xl border p-4"
+              style={{
+                borderColor: "var(--color-border)",
+                backgroundColor: "var(--color-bg-primary)",
+              }}
+            >
+              <div className="flex items-center gap-2 mb-3">
+                <span className="form-section-code">
+                  {form.channel === "naver" ? "NV" : "KK"}
+                </span>
+                <p
+                  className="text-sm font-semibold"
+                  style={{ color: "var(--color-text-primary)" }}
+                >
+                  모바일 광고 정보
+                </p>
+                <span
+                  className="text-[10px] px-1.5 py-0.5 rounded-full"
+                  style={{
+                    backgroundColor: "var(--color-bg-tertiary)",
+                    color: "var(--color-text-muted)",
+                  }}
+                >
+                  {detailOptionLabel[selectedOptionPreset] ?? selectedOptionPreset}
+                </span>
+              </div>
+              <p className="form-helper mb-3">
+                모바일 네이티브 지면은 업로드한 소재 이미지를 카드/비즈보드 영역에 맞춰
+                렌더링합니다. 제목·스폰서·CTA는 비워도 기본값으로 캡처됩니다.
+              </p>
+              <div className="space-y-3">
+                <div>
+                  <label
+                    className="text-[11px] font-medium mb-1 block"
+                    style={{ color: "var(--color-text-secondary)" }}
+                  >
+                    광고 제목
+                  </label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    placeholder="예: 지금 가장 많이 찾는 혜택"
+                    value={form.instreamAdTitle}
+                    onChange={(e) =>
+                      setForm((prev) => ({
+                        ...prev,
+                        instreamAdTitle: e.target.value,
+                      }))
+                    }
+                  />
+                </div>
+                <div>
+                  <label
+                    className="text-[11px] font-medium mb-1 block"
+                    style={{ color: "var(--color-text-secondary)" }}
+                  >
+                    설명 텍스트
+                  </label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    placeholder="예: 모바일 피드에서 자연스럽게 노출되는 광고 메시지"
+                    value={form.infeedDescription1}
+                    onChange={(e) =>
+                      setForm((prev) => ({
+                        ...prev,
+                        infeedDescription1: e.target.value,
+                      }))
+                    }
+                  />
+                </div>
+                <div>
+                  <label
+                    className="text-[11px] font-medium mb-1 block"
+                    style={{ color: "var(--color-text-secondary)" }}
+                  >
+                    스폰서/브랜드명
+                  </label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    placeholder="예: 시세이도코리아"
+                    value={form.instreamDisplayUrl}
+                    onChange={(e) =>
+                      setForm((prev) => ({
+                        ...prev,
+                        instreamDisplayUrl: e.target.value,
+                      }))
+                    }
+                  />
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label
+                      className="text-[11px] font-medium mb-1 block"
+                      style={{ color: "var(--color-text-secondary)" }}
+                    >
+                      CTA
+                    </label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      placeholder="자세히 보기 / 바로가기"
+                      value={form.infeedCtaPrimary}
+                      onChange={(e) =>
+                        setForm((prev) => ({
+                          ...prev,
+                          infeedCtaPrimary: e.target.value,
+                        }))
+                      }
+                    />
+                  </div>
+                  <div>
+                    <label
+                      className="text-[11px] font-medium mb-1 block"
+                      style={{ color: "var(--color-text-secondary)" }}
+                    >
+                      로고 이미지 URL
+                    </label>
+                    <input
+                      type="text"
+                      inputMode="url"
+                      autoComplete="url"
+                      className="form-input"
+                      placeholder="https://..."
+                      value={form.instreamLogoImageUrl}
+                      onChange={(e) =>
+                        setForm((prev) => ({
+                          ...prev,
+                          instreamLogoImageUrl: e.target.value,
+                        }))
+                      }
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* ===== 게재면 URL (멀티 선택) ===== */}
-        {/* YouTube 채널 선택 시 자동 게재면 안내 */}
-        {isYouTubeChannel && (
+        {/* YouTube/Naver/Kakao 채널 선택 시 자동 게재면 안내 */}
+        {isAutoPublisherChannel && (
           <div
             className="mb-5 rounded-xl border p-4 animate-fade-in"
             style={{
@@ -2618,13 +2935,22 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                   className="text-sm font-semibold"
                   style={{ color: "var(--color-accent)" }}
                 >
-                  YouTube 자동 게재면
+                  {isYouTubeChannel
+                    ? "YouTube 자동 게재면"
+                    : form.channel === "naver"
+                      ? "Naver 모바일 자동 지면"
+                      : "Kakao 모바일 자동 지면"}
                 </p>
                 <p
                   className="text-[11px] mt-0.5"
                   style={{ color: "var(--color-text-muted)" }}
                 >
-                  {isYoutubeInfeed ? (
+                  {isMobileNativeChannel ? (
+                    <>
+                      모바일 상품은 선택한 매체의 네이티브 모바일 화면으로 합성 렌더링합니다.
+                      별도 게재면 URL 선택 없이 소재 이미지와 광고 정보만 사용합니다.
+                    </>
+                  ) : isYoutubeInfeed ? (
                     <>
                       인피드 홈은 인기 피드에서, 검색·관련동영상은 각각 해당 URL에서
                       카드 UI를 합성합니다. 광고 영상 URL 또는 소재 이미지 중 하나는 필요합니다.
@@ -2640,7 +2966,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
             </div>
           </div>
         )}
-        <div className="mb-5" style={{ display: isYouTubeChannel ? "none" : undefined }}>
+        <div className="mb-5" style={{ display: isAutoPublisherChannel ? "none" : undefined }}>
           <div className="flex items-center justify-between mb-2">
             <label className="form-label mb-0">
               게재면 (Publisher){" "}
@@ -3157,7 +3483,9 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                 type="url"
                 className="form-input"
                 placeholder={
-                  isGdnMobileSurface
+                  isMobileNativeChannel
+                    ? "https://via.placeholder.com/1200x628.png"
+                    : isGdnMobileSurface
                     ? "https://via.placeholder.com/320x100.png"
                     : "https://via.placeholder.com/300x250.png"
                 }
@@ -3168,7 +3496,9 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                 required
               />
               <p className="form-helper">
-                {isGdnMobileSurface
+                {isMobileNativeChannel
+                  ? "모바일 네이티브 카드에 사용할 이미지 URL (16:9 또는 1.91:1 권장)"
+                  : isGdnMobileSurface
                   ? "광고 슬롯에 교체할 이미지 URL (모바일: 320×100 또는 300×250 권장)"
                   : "광고 슬롯에 교체할 이미지 URL (300×250 권장)"}
               </p>
@@ -3183,7 +3513,8 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
             </div>
           )}
 
-          {/* ===== 광고 사이즈 선택 ===== */}
+          {form.channel === "gdn" && (
+          /* ===== 광고 사이즈 선택 ===== */
           <div
             className="mt-4 rounded-xl border p-4"
             style={{
@@ -3593,6 +3924,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
               </div>
             )}
           </div>
+          )}
         </div>
         )}
 
@@ -3814,6 +4146,8 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                 </svg>
                 {isYouTubeChannel
                   ? "YouTube 캡처 시작"
+                  : isMobileNativeChannel
+                    ? `${form.channel === "naver" ? "Naver" : "Kakao"} 모바일 캡처 시작`
                   : form.selectedPublishers.length > 1
                   ? `${form.selectedPublishers.length}개 사이트 캡처 시작`
                   : "캡처 요청 시작"}

@@ -85,6 +85,7 @@ export async function POST(request: NextRequest) {
       productSurface,
       instreamOpts,              // 🎬 인스트림 광고 옵션
       infeedOpts,                // 인피드 광고 옵션
+      mobileNativeOpts,          // Naver/Kakao 모바일 네이티브 옵션
       gdnViewportMode,           // GDN: PC vs Mobile 뷰포트
     } = body as {
       channel: ChannelType;
@@ -113,6 +114,16 @@ export async function POST(request: NextRequest) {
         ctaSecondary?: string;
         /** 관련동영상: 메인 플레이어 덮개용 퍼블리셔 영상 시점(초) */
         watchNextPlayerFrameOffsetSec?: number;
+      };
+      mobileNativeOpts?: {
+        surface?: "naver-mobile-feed" | "kakao-bizboard" | "kakao-mobile-feed";
+        title?: string;
+        description1?: string;
+        description2?: string;
+        sponsorName?: string;
+        displayUrl?: string;
+        ctaText?: string;
+        logoImageUrl?: string;
       };
       instreamOpts?: {
         videoUrl?: string;
@@ -272,6 +283,23 @@ export async function POST(request: NextRequest) {
           : undefined,
       } as typeof infeedOpts);
 
+    const mobileNativeOptsNormalized =
+      mobileNativeOpts &&
+      ({
+        ...mobileNativeOpts,
+        surface:
+          mobileNativeOpts.surface === "kakao-bizboard" ||
+          mobileNativeOpts.surface === "kakao-mobile-feed" ||
+          mobileNativeOpts.surface === "naver-mobile-feed"
+            ? mobileNativeOpts.surface
+            : channel === "kakao"
+              ? "kakao-bizboard"
+              : "naver-mobile-feed",
+        logoImageUrl: mobileNativeOpts.logoImageUrl?.trim()
+          ? normalizeHttpUrl(mobileNativeOpts.logoImageUrl)
+          : undefined,
+      } as typeof mobileNativeOpts);
+
     // 각 URL마다 캡처 요청 생성
     for (const url of normalizedUrls) {
       const requestMetadata = {
@@ -284,14 +312,17 @@ export async function POST(request: NextRequest) {
         productFamily:
           typeof productFamily === "string" && productFamily.trim()
             ? productFamily.trim()
-            : undefined,
+            : channel === "naver" || channel === "kakao"
+              ? channel
+              : undefined,
         productSurface:
           typeof productSurface === "string" && productSurface.trim()
             ? productSurface.trim()
-            : undefined,
+            : mobileNativeOptsNormalized?.surface,
         youtubeAdType: resolvedYoutubeAdType,
         instreamOpts: instreamOptsNormalized ?? instreamOpts,
         infeedOpts: infeedOptsNormalized ?? infeedOpts,
+        mobileNativeOpts: mobileNativeOptsNormalized ?? mobileNativeOpts,
         gdnViewportMode:
           channel === "gdn"
             ? gdnViewportMode === "mobile"
@@ -500,6 +531,7 @@ async function executeBatchCaptures(captureIds: string[]): Promise<void> {
             youtubeAdType: capture.channel === "youtube" ? storedYoutubeAdType : undefined,
             instreamOpts: captureMetadata.instreamOpts,
             infeedOpts: captureMetadata.infeedOpts,
+            mobileNativeOpts: captureMetadata.mobileNativeOpts,
             publisherGotoRelaxed: multiBatch && capture.channel === "gdn",
             gdnBatchFastMode: multiBatch && capture.channel === "gdn",
             gdnViewportMode:

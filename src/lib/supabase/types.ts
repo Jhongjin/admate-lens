@@ -5,7 +5,7 @@
  */
 
 export type CaptureStatus = "pending" | "processing" | "completed" | "failed";
-export type ChannelType = "gdn" | "youtube" | "meta" | "naver";
+export type ChannelType = "gdn" | "youtube" | "meta" | "naver" | "kakao";
 
 export interface VisionDaCaptureRow {
   id: string; // uuid

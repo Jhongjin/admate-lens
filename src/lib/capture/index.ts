@@ -11,8 +11,9 @@ import type { BaseChannel } from "./channels/base-channel";
 import type { IBrowserEngine } from "./engine/browser-engine";
 import { GdnCapture } from "./channels/gdn-capture";
 import { YouTubeCapture } from "./channels/youtube-capture";
+import { KakaoCapture, NaverCapture } from "./channels/mobile-native-capture";
 
-export type ChannelType = "gdn" | "youtube" | "meta" | "naver";
+export type ChannelType = "gdn" | "youtube" | "meta" | "naver" | "kakao";
 
 /**
  * 매체 타입에 따른 캡처 채널 팩토리
@@ -24,11 +25,13 @@ export function createChannel(type: ChannelType, engine?: IBrowserEngine): BaseC
       return new GdnCapture(engine);
     case "youtube":
       return new YouTubeCapture(engine);
+    case "naver":
+      return new NaverCapture(engine);
+    case "kakao":
+      return new KakaoCapture(engine);
     // 향후 확장
     // case "meta":
     //   return new MetaCapture(engine);
-    // case "naver":
-    //   return new NaverCapture(engine);
     default:
       throw new Error(`지원하지 않는 매체 타입: ${type}`);
   }

@@ -38,6 +38,7 @@ const CHANNEL_LABELS: Record<string, string> = {
   youtube: "YouTube",
   meta: "Meta",
   naver: "Naver",
+  kakao: "Kakao",
 };
 
 const CAPTURE_DELETE_ENABLED =
@@ -121,11 +122,18 @@ function getCaptureChannelLabel(capture: CaptureRecord): string {
 
 function getProductMetaLabel(metadata: Record<string, unknown> | null): string | null {
   if (!metadata) return null;
-  if (metadata.productFamily !== "demand-gen") return null;
   const surface = metadata.productSurface;
-  if (surface === "youtube-shorts") return "Demand Gen · YouTube Shorts";
-  if (surface === "youtube-feed") return "Demand Gen · YouTube Feed";
-  return "Demand Gen";
+  if (metadata.productFamily === "demand-gen") {
+    if (surface === "youtube-shorts") return "Demand Gen · YouTube Shorts";
+    if (surface === "youtube-feed") return "Demand Gen · YouTube Feed";
+    return "Demand Gen";
+  }
+  if (metadata.productFamily === "naver") return "Naver · 모바일 피드";
+  if (metadata.productFamily === "kakao") {
+    if (surface === "kakao-mobile-feed") return "Kakao · 모바일 네이티브 피드";
+    return "Kakao · 비즈보드";
+  }
+  return null;
 }
 
 function getResultCategoryLabel(metadata: Record<string, unknown> | null): string | null {
@@ -783,7 +791,11 @@ function CaptureDetailModal({
                 </span>
               </div>
             )}
-            {capture.channel === "youtube" && capture.metadata && typeof capture.metadata === "object" && (
+            {(capture.channel === "youtube" ||
+              capture.channel === "naver" ||
+              capture.channel === "kakao") &&
+              capture.metadata &&
+              typeof capture.metadata === "object" && (
               <>
                 <div className="flex justify-between">
                   <span className="text-[var(--color-text-muted)]">상품 유형</span>
