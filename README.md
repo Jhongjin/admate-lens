@@ -111,6 +111,7 @@ npm start
 - **2026.04.24**: 유튜브 모바일 앱 네이티브 인피드 홈 렌더링(Synthetic) 파이프라인 구현 완료 및 UI 픽셀 매칭 최적화
 - **2026.05.03**: YouTube 인스트림 Skip 버튼/노란 진행바 노출 타이밍 보정, YouTube 선택 시 GDN 파블리셔 혼입 방지
 - **2026.05.03**: Demand Gen 1차 범위(YouTube Feed, YouTube Shorts, Google Ads 상품 흐름) 정리 및 Naver/Kakao 모바일 캡처 지면 1차 구현
+- **2026.05.03**: Vercel 서버리스 Chromium 추출 경합 안정화 및 Naver/Kakao 모바일 합성 지면 한글/아이콘 렌더링 보강
 
 ---
 
