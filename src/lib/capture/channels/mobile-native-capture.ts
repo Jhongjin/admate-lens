@@ -251,8 +251,8 @@ function renderNaverMobileFeedHtml(ad: MobileNativeAdData): string {
     .placeholder { flex: 1; color: #8b8f93; font-size: 15px; }
     .icons { display: flex; gap: 13px; color: #30343a; }
     .ui-icon { position: relative; display: inline-block; width: 21px; height: 21px; flex: 0 0 auto; color: currentColor; }
-    .ui-icon.search::before { content: ""; position: absolute; left: 3px; top: 2px; width: 11px; height: 11px; border: 2px solid currentColor; border-radius: 50%; }
-    .ui-icon.search::after { content: ""; position: absolute; right: 1px; bottom: 4px; width: 8px; height: 2px; background: currentColor; border-radius: 2px; transform: rotate(45deg); transform-origin: center; }
+    .ui-icon.magnify::before { content: ""; position: absolute; left: 3px; top: 2px; width: 11px; height: 11px; border: 2px solid currentColor; border-radius: 50%; }
+    .ui-icon.magnify::after { content: ""; position: absolute; right: 1px; bottom: 4px; width: 8px; height: 2px; background: currentColor; border-radius: 2px; transform: rotate(45deg); transform-origin: center; }
     .ui-icon.circle::before { content: ""; position: absolute; inset: 2px; border: 2px solid currentColor; border-radius: 50%; }
     .shortcut-grid {
       display: grid;
@@ -315,6 +315,7 @@ function renderNaverMobileFeedHtml(ad: MobileNativeAdData): string {
     }
     .tab { display: grid; justify-items: center; gap: 2px; }
     .tab-icon { position: relative; display: block; width: 20px; height: 20px; color: #03c75a; }
+    .tab .ui-icon { color: #03c75a; }
     .tab-icon.home::before { content: ""; position: absolute; left: 3px; top: 4px; width: 14px; height: 14px; border: 2px solid currentColor; border-top: 0; border-radius: 2px; }
     .tab-icon.home::after { content: ""; position: absolute; left: 4px; top: 2px; width: 12px; height: 12px; border-left: 2px solid currentColor; border-top: 2px solid currentColor; transform: rotate(45deg); border-radius: 2px 0 0 0; }
     .tab-icon.content::before { content: ""; position: absolute; inset: 3px; border: 2px solid currentColor; border-radius: 2px; }
@@ -329,7 +330,7 @@ function renderNaverMobileFeedHtml(ad: MobileNativeAdData): string {
       <div class="search">
         <div class="n-logo">N</div>
         <div class="placeholder">검색어를 입력하세요</div>
-        <div class="icons"><span class="ui-icon search" aria-hidden="true"></span><span class="ui-icon circle" aria-hidden="true"></span></div>
+        <div class="icons"><span class="ui-icon magnify" aria-hidden="true"></span><span class="ui-icon circle" aria-hidden="true"></span></div>
       </div>
     </header>
     <section class="shortcut-grid">
@@ -369,7 +370,7 @@ function renderNaverMobileFeedHtml(ad: MobileNativeAdData): string {
     </section>
     <nav class="bottom">
       <div class="tab"><i class="tab-icon home" aria-hidden="true"></i><span>홈</span></div>
-      <div class="tab"><i class="ui-icon search" aria-hidden="true"></i><span>검색</span></div>
+      <div class="tab"><i class="ui-icon magnify" aria-hidden="true"></i><span>검색</span></div>
       <div class="tab"><i class="tab-icon content" aria-hidden="true"></i><span>콘텐츠</span></div>
       <div class="tab"><i class="tab-icon my" aria-hidden="true"></i><span>MY</span></div>
       <div class="tab"><i class="tab-icon menu" aria-hidden="true"></i><span>메뉴</span></div>
@@ -418,13 +419,13 @@ function renderKakaoBizboardHtml(ad: MobileNativeAdData): string {
     .title { font-size: 23px; font-weight: 800; letter-spacing: -.4px; }
     .top-icons { display: flex; gap: 18px; color: #222; }
     .k-icon { position: relative; display: inline-block; width: 23px; height: 23px; color: currentColor; flex: 0 0 auto; }
-    .k-icon.search::before { content: ""; position: absolute; left: 3px; top: 2px; width: 12px; height: 12px; border: 2px solid currentColor; border-radius: 50%; }
-    .k-icon.search::after { content: ""; position: absolute; right: 2px; bottom: 5px; width: 8px; height: 2px; background: currentColor; border-radius: 2px; transform: rotate(45deg); }
+    .k-icon.magnify::before { content: ""; position: absolute; left: 3px; top: 2px; width: 12px; height: 12px; border: 2px solid currentColor; border-radius: 50%; }
+    .k-icon.magnify::after { content: ""; position: absolute; right: 2px; bottom: 5px; width: 8px; height: 2px; background: currentColor; border-radius: 2px; transform: rotate(45deg); }
     .k-icon.plus::before,
     .k-icon.plus::after { content: ""; position: absolute; left: 4px; top: 10px; width: 15px; height: 2px; background: currentColor; border-radius: 2px; }
     .k-icon.plus::after { transform: rotate(90deg); }
     .k-icon.gear::before { content: ""; position: absolute; inset: 3px; border: 2px solid currentColor; border-radius: 50%; }
-    .k-icon.gear::after { content: ""; position: absolute; left: 10px; top: 1px; width: 3px; height: 21px; background: currentColor; border-radius: 3px; box-shadow: -7px 7px 0 -1px currentColor, 7px -7px 0 -1px currentColor; transform: rotate(45deg); opacity: .85; }
+    .k-icon.gear::after { content: ""; position: absolute; left: 9px; top: 9px; width: 5px; height: 5px; background: currentColor; border-radius: 50%; box-shadow: 0 -8px 0 -2px currentColor, 0 8px 0 -2px currentColor, 8px 0 0 -2px currentColor, -8px 0 0 -2px currentColor; }
     .bizboard {
       margin: 10px 10px 8px;
       height: 108px;
@@ -534,7 +535,7 @@ function renderKakaoBizboardHtml(ad: MobileNativeAdData): string {
   <main class="screen">
     <header class="top">
       <div class="title">채팅</div>
-      <div class="top-icons"><span class="k-icon search" aria-hidden="true"></span><span class="k-icon plus" aria-hidden="true"></span><span class="k-icon gear" aria-hidden="true"></span></div>
+      <div class="top-icons"><span class="k-icon magnify" aria-hidden="true"></span><span class="k-icon plus" aria-hidden="true"></span><span class="k-icon gear" aria-hidden="true"></span></div>
     </header>
     <section class="bizboard">
       <div class="biz-copy">
