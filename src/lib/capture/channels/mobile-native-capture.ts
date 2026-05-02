@@ -61,6 +61,52 @@ function normalizePlainText(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
+async function injectKoreanFonts(page: IPageHandle): Promise<void> {
+  try {
+    await page.evaluate<void>(`
+      (() => {
+        if (document.querySelector('#admate-mobile-native-fonts')) return;
+
+        const preconnect = document.createElement('link');
+        preconnect.rel = 'preconnect';
+        preconnect.href = 'https://fonts.gstatic.com';
+        preconnect.crossOrigin = 'anonymous';
+        document.head.appendChild(preconnect);
+
+        const link = document.createElement('link');
+        link.id = 'admate-mobile-native-fonts';
+        link.rel = 'stylesheet';
+        link.href = 'https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;800;900&family=Roboto:wght@400;500;700;900&display=swap';
+        document.head.appendChild(link);
+
+        const style = document.createElement('style');
+        style.id = 'admate-mobile-native-font-style';
+        style.textContent = [
+          '*, *::before, *::after {',
+          "  font-family: 'Noto Sans KR', 'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif !important;",
+          '}',
+        ].join('\\n');
+        document.head.appendChild(style);
+      })()
+    `);
+
+    const loaded = await page.evaluate<boolean>(`
+      (() => new Promise((resolve) => {
+        const timeout = setTimeout(() => resolve(false), 5000);
+        document.fonts.ready.then(() => {
+          clearTimeout(timeout);
+          resolve(document.fonts.check('16px Noto Sans KR'));
+        }).catch(() => resolve(false));
+      }))()
+    `);
+    if (!loaded) {
+      await new Promise((r) => setTimeout(r, 1500));
+    }
+  } catch {
+    await new Promise((r) => setTimeout(r, 1000));
+  }
+}
+
 function hostnameFromUrl(value: string | undefined): string {
   if (!value) return "";
   try {
@@ -622,7 +668,8 @@ class MobileNativeCapture extends BaseChannel {
       document.close();
       window.scrollTo(0, 0);
     `);
-    await new Promise((r) => setTimeout(r, 1400));
+    await injectKoreanFonts(page);
+    await new Promise((r) => setTimeout(r, 800));
 
     const screenshot = await page.screenshot({
       fullPage: false,

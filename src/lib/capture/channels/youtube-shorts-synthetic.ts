@@ -92,10 +92,48 @@ export function generateYouTubeShortsSyntheticHtml(ad: ShortsAdData): string {
     }
     .top-actions {
       display: flex;
-      gap: 18px;
+      gap: 20px;
       align-items: center;
-      font-size: 22px;
-      font-weight: 700;
+    }
+    .top-icon {
+      position: relative;
+      width: 24px;
+      height: 24px;
+      display: block;
+      filter: drop-shadow(0 1px 2px rgba(0,0,0,.35));
+    }
+    .top-icon.search::before {
+      content: "";
+      position: absolute;
+      left: 2px;
+      top: 2px;
+      width: 14px;
+      height: 14px;
+      border: 2px solid #fff;
+      border-radius: 50%;
+    }
+    .top-icon.search::after {
+      content: "";
+      position: absolute;
+      left: 16px;
+      top: 16px;
+      width: 9px;
+      height: 2px;
+      border-radius: 999px;
+      background: #fff;
+      transform: rotate(45deg);
+      transform-origin: left center;
+    }
+    .top-icon.menu::before {
+      content: "";
+      position: absolute;
+      left: 10px;
+      top: 4px;
+      width: 4px;
+      height: 4px;
+      border-radius: 50%;
+      background: #fff;
+      box-shadow: 0 8px 0 #fff, 0 16px 0 #fff;
     }
     .right-rail {
       position: absolute;
@@ -245,8 +283,8 @@ export function generateYouTubeShortsSyntheticHtml(ad: ShortsAdData): string {
     <header class="topbar">
       <div class="top-title">Shorts</div>
       <div class="top-actions">
-        <span>⌕</span>
-        <span>⋮</span>
+        <span class="top-icon search"></span>
+        <span class="top-icon menu"></span>
       </div>
     </header>
     <aside class="right-rail" aria-hidden="true">
