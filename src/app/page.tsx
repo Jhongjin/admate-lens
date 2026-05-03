@@ -4,12 +4,58 @@ import { useState, useCallback } from "react";
 import CaptureForm from "./components/CaptureForm";
 import CaptureList from "./components/CaptureList";
 
+type PrimaryNavId = "studio" | "review" | "campaigns" | "assets" | "coverage";
+
 const primaryNav = [
-  { label: "캡처 작업실", active: true },
-  { label: "결과 검수", active: false },
-  { label: "캠페인", active: false },
-  { label: "소재 라이브러리", active: false },
-  { label: "커버리지", active: false },
+  { id: "studio", label: "캡처 작업실", targetId: "capture-studio" },
+  { id: "review", label: "결과 검수", targetId: "result-review" },
+  { id: "campaigns", label: "캠페인", targetId: "campaign-review" },
+  { id: "assets", label: "소재 라이브러리", targetId: "asset-library" },
+  { id: "coverage", label: "커버리지", targetId: "coverage-matrix" },
+] satisfies Array<{ id: PrimaryNavId; label: string; targetId: string }>;
+
+const viewLabels: Record<PrimaryNavId, { title: string; status: string }> = {
+  studio: { title: "캡처 작업실", status: "요청 생성" },
+  review: { title: "결과 검수", status: "결과 확인" },
+  campaigns: { title: "캠페인", status: "검토 시작" },
+  assets: { title: "소재 라이브러리", status: "검토 시작" },
+  coverage: { title: "커버리지", status: "공개 범위" },
+};
+
+const campaignReviewRows = [
+  {
+    title: "캠페인 식별자",
+    status: "부분 연결",
+    description: "DB row의 campaign_id 컬럼은 존재하지만 요청 폼에서 캠페인 선택 UI는 아직 없습니다.",
+  },
+  {
+    title: "상품/지면 metadata",
+    status: "연결됨",
+    description: "productFamily, productSurface 기준으로 YouTube, Demand Gen, Naver, Kakao 결과를 구분합니다.",
+  },
+  {
+    title: "캠페인별 검수 묶음",
+    status: "다음 작업",
+    description: "동일 캠페인의 캡처 이력을 묶어 성공/실패/재요청 상태를 볼 수 있게 확장 가능합니다.",
+  },
+];
+
+const assetReviewRows = [
+  {
+    title: "소재 입력",
+    status: "연결됨",
+    description: "이미지 URL, 영상 URL, companion, avatar, logo 입력은 현재 캡처 요청에 반영됩니다.",
+  },
+  {
+    title: "업로드 API",
+    status: "연결됨",
+    description: "소재 업로드 후 URL을 캡처 요청에 사용하는 흐름은 유지됩니다.",
+  },
+  {
+    title: "소재 라이브러리 저장소",
+    status: "다음 작업",
+    description: "별도 asset table/schema 없이 운영 UI만 먼저 열어두고, 영구 저장은 추후 설계가 필요합니다.",
+  },
 ];
 
 const productGroups = [
@@ -106,10 +152,19 @@ const kpiCards = [
 export default function Home() {
   /** 캡처 생성 시 리스트 갱신을 위한 트리거 */
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [activeNav, setActiveNav] = useState<PrimaryNavId>("studio");
 
   /** 새 캡처가 생성되면 리스트 갱신 */
   const handleCaptureCreated = useCallback(() => {
     setRefreshTrigger((prev) => prev + 1);
+  }, []);
+
+  const handleNavClick = useCallback((item: (typeof primaryNav)[number]) => {
+    setActiveNav(item.id);
+    document.getElementById(item.targetId)?.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
   }, []);
 
   return (
@@ -132,12 +187,15 @@ export default function Home() {
 
           <nav className="ops-nav" aria-label="주요 화면">
             {primaryNav.map((item) => (
-              <span
+              <button
                 key={item.label}
-                className={`ops-nav-item ${item.active ? "active" : ""}`}
+                type="button"
+                className={`ops-nav-item ${activeNav === item.id ? "active" : ""}`}
+                aria-current={activeNav === item.id ? "page" : undefined}
+                onClick={() => handleNavClick(item)}
               >
                 {item.label}
-              </span>
+              </button>
             ))}
           </nav>
 
@@ -164,7 +222,7 @@ export default function Home() {
           <div className="ops-topbar-inner">
             <div>
               <p className="text-[13px] font-semibold text-[var(--color-text-primary)]">
-                AdMate Lens
+                {viewLabels[activeNav].title}
               </p>
             </div>
 
@@ -173,13 +231,13 @@ export default function Home() {
                 <span className="w-1.5 h-1.5 rounded-full bg-[var(--color-success)]" />
                 엔진 정상
               </span>
-              <span className="badge badge-processing">Production Ready</span>
+              <span className="badge badge-processing">{viewLabels[activeNav].status}</span>
             </div>
           </div>
         </header>
 
         <main className="ops-content studio-content">
-          <section className="studio-hero">
+          <section id="capture-studio" className="studio-hero">
             <div>
               <p className="ops-kicker">AdMate Lens · Powered by Openclaw Engine</p>
               <h2 className="studio-title">
@@ -293,7 +351,7 @@ export default function Home() {
             </aside>
           </section>
 
-          <section className="studio-results-panel">
+          <section id="result-review" className="studio-results-panel">
             <div className="studio-panel-header horizontal">
               <div>
                 <p className="studio-eyebrow">Result Review</p>
@@ -307,7 +365,71 @@ export default function Home() {
             <CaptureList refreshTrigger={refreshTrigger} />
           </section>
 
-          <section className="studio-samples-panel" aria-label="캡처 커버리지 매트릭스">
+          <section id="campaign-review" className="studio-samples-panel" aria-label="캠페인 기능 검토">
+            <div className="studio-panel-header horizontal">
+              <div>
+                <p className="studio-eyebrow">Campaign Review</p>
+                <h3>캠페인 메뉴 활성화 검토</h3>
+              </div>
+              <p className="studio-panel-note">
+                DB schema 변경 없이 현재 캡처 metadata와 campaign_id 활용 가능 범위를 먼저 확인합니다.
+              </p>
+            </div>
+
+            <div className="studio-review-grid">
+              {campaignReviewRows.map((row) => (
+                <article className="studio-review-card" key={row.title}>
+                  <div className="studio-product-card-header">
+                    <h4>{row.title}</h4>
+                    <span
+                      className={`studio-status-pill ${
+                        row.status === "연결됨"
+                          ? "success"
+                          : row.status === "부분 연결"
+                            ? "warning"
+                            : "info"
+                      }`}
+                    >
+                      {row.status}
+                    </span>
+                  </div>
+                  <p>{row.description}</p>
+                </article>
+              ))}
+            </div>
+          </section>
+
+          <section id="asset-library" className="studio-samples-panel" aria-label="소재 라이브러리 기능 검토">
+            <div className="studio-panel-header horizontal">
+              <div>
+                <p className="studio-eyebrow">Asset Library</p>
+                <h3>소재 라이브러리 메뉴 활성화 검토</h3>
+              </div>
+              <p className="studio-panel-note">
+                실제 소재 파일과 URL은 캡처 결과 픽셀 매칭에 직접 영향을 주므로 저장/재사용 정책을 분리합니다.
+              </p>
+            </div>
+
+            <div className="studio-review-grid">
+              {assetReviewRows.map((row) => (
+                <article className="studio-review-card" key={row.title}>
+                  <div className="studio-product-card-header">
+                    <h4>{row.title}</h4>
+                    <span
+                      className={`studio-status-pill ${
+                        row.status === "연결됨" ? "success" : "info"
+                      }`}
+                    >
+                      {row.status}
+                    </span>
+                  </div>
+                  <p>{row.description}</p>
+                </article>
+              ))}
+            </div>
+          </section>
+
+          <section id="coverage-matrix" className="studio-samples-panel" aria-label="캡처 커버리지 매트릭스">
             <div className="studio-panel-header horizontal">
               <div>
                 <p className="studio-eyebrow">Coverage Matrix</p>

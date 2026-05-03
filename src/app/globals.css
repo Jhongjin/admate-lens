@@ -234,13 +234,23 @@ body {
 
 .ops-nav-item {
   display: flex;
+  width: 100%;
   align-items: center;
   justify-content: space-between;
   padding: 8px 10px;
+  border: 0;
   border-radius: 8px;
+  background: transparent;
   color: var(--color-text-secondary);
   font-size: 12px;
   font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+}
+
+.ops-nav-item:hover {
+  background: #f3f3f3;
+  color: var(--color-text-primary);
 }
 
 .ops-nav-item.active {
@@ -825,6 +835,14 @@ body {
   margin-bottom: 18px;
 }
 
+#capture-studio,
+#result-review,
+#campaign-review,
+#asset-library,
+#coverage-matrix {
+  scroll-margin-top: 66px;
+}
+
 .studio-title {
   max-width: 760px;
   margin-top: 4px;
@@ -987,6 +1005,34 @@ body {
   color: var(--color-text-secondary);
   font-size: 12px;
   line-height: 1.5;
+}
+
+.studio-review-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.studio-review-card {
+  min-height: 124px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 14px;
+  box-shadow: var(--shadow-card);
+}
+
+.studio-review-card h4 {
+  color: var(--color-text-primary);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.studio-review-card p {
+  margin-top: 8px;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  line-height: 1.55;
 }
 
 .studio-status-pill {
@@ -1265,6 +1311,10 @@ body {
     grid-template-columns: 1fr;
     gap: 4px;
     align-items: start;
+  }
+
+  .studio-review-grid {
+    grid-template-columns: 1fr;
   }
 
   .studio-coverage-row.head {
