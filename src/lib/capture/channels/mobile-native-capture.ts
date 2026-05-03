@@ -459,7 +459,6 @@ function renderNaverSmartChannelHtml(ad: MobileNativeAdData): string {
   const displayUrl = escapeHtml(ad.displayUrl);
   const cta = escapeHtml(ad.ctaText);
   const creative = escapeAttr(ad.creativeDataUrl);
-  const logo = escapeAttr(ad.logoDataUrl);
 
   return `<!DOCTYPE html>
 <html lang="ko">
@@ -468,47 +467,67 @@ function renderNaverSmartChannelHtml(ad: MobileNativeAdData): string {
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
   <style>
     * { box-sizing: border-box; }
-    html, body { width: 100%; min-height: 100%; margin: 0; background: #f4f6f8; color: #101010; font-family: "Noto Sans KR", "Roboto", -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", Arial, sans-serif; -webkit-font-smoothing: antialiased; }
-    .screen { width: 100vw; min-height: 100vh; background: #f4f6f8; overflow: hidden; }
-    .search { margin: 10px 14px 9px; height: 46px; border: 2px solid #03c75a; border-radius: 24px; background: #fff; display: flex; align-items: center; gap: 10px; padding: 0 14px; }
-    .n-logo { color: #03c75a; font-size: 22px; font-weight: 900; letter-spacing: -1px; }
-    .placeholder { flex: 1; color: #8b8f93; font-size: 15px; }
-    .channel-tabs { height: 48px; display: grid; grid-template-columns: repeat(5, 1fr); align-items: center; background: #fff; border-top: 1px solid rgba(0,0,0,.04); border-bottom: 1px solid rgba(0,0,0,.06); color: #34383c; font-size: 13px; font-weight: 800; text-align: center; }
-    .channel-tabs .active { color: #03c75a; }
-    .smart { margin: 10px; border-radius: 17px; background: #fff; overflow: hidden; border: 1px solid rgba(0,0,0,.06); box-shadow: 0 1px 2px rgba(0,0,0,.04); }
-    .smart-head { height: 31px; padding: 0 12px; display: flex; align-items: center; gap: 7px; color: #757b80; font-size: 11px; border-bottom: 1px solid rgba(0,0,0,.05); }
-    .ad-badge { border: 1px solid #d8dde3; border-radius: 4px; padding: 1px 4px; color: #7a8086; font-size: 10px; font-weight: 800; }
-    .smart-body { min-height: 118px; display: flex; align-items: stretch; background: linear-gradient(135deg, #f7fff9 0%, #ffffff 58%); }
-    .copy { flex: 1; padding: 16px 8px 15px 14px; min-width: 0; }
-    .brand { display: flex; align-items: center; gap: 7px; margin-bottom: 9px; color: #5d6369; font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .logo { width: 24px; height: 24px; border-radius: 8px; object-fit: cover; background: #eef1f3; }
-    .title { font-size: 18px; line-height: 24px; font-weight: 900; letter-spacing: -.35px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-    .desc { margin-top: 5px; color: #676d72; font-size: 12px; line-height: 17px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-    .cta { margin-top: 10px; width: fit-content; height: 28px; padding: 0 12px; border-radius: 14px; background: #03c75a; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 850; }
-    .thumb { width: 42%; min-height: 118px; object-fit: cover; display: block; background: #e9ecef; }
-    .news { margin: 0 10px 10px; padding: 15px 14px; background: #fff; border: 1px solid rgba(0,0,0,.06); border-radius: 16px; }
-    .news strong { display: block; font-size: 16px; line-height: 22px; }
-    .news span { display: block; margin-top: 6px; color: #8b8f93; font-size: 12px; }
+    html, body { width: 100%; min-height: 100%; margin: 0; background: #eaf3f6; color: #101010; font-family: "Noto Sans KR", "Roboto", -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", Arial, sans-serif; -webkit-font-smoothing: antialiased; }
+    .screen { width: 100vw; min-height: 100vh; background: #eaf3f6; overflow: hidden; }
+    .appbar { height: 52px; padding: 12px 18px 0; display: flex; align-items: flex-start; justify-content: space-between; color: #20252b; }
+    .left, .right { display: flex; align-items: center; gap: 16px; }
+    .hamburger, .bell, .user, .search-dot, .chev { position: relative; display: inline-block; width: 24px; height: 24px; color: currentColor; flex: 0 0 auto; }
+    .hamburger::before { content: ""; position: absolute; left: 2px; top: 5px; width: 18px; height: 2px; background: currentColor; border-radius: 2px; box-shadow: 0 7px 0 currentColor, 0 14px 0 currentColor; }
+    .pay { width: 28px; height: 28px; border: 2px solid #20252b; border-radius: 50%; display: grid; place-items: center; font-size: 10px; font-weight: 900; }
+    .bell::before { content: ""; position: absolute; left: 6px; top: 4px; width: 12px; height: 14px; border: 2px solid currentColor; border-radius: 8px 8px 4px 4px; }
+    .bell::after { content: "2"; position: absolute; right: 0; top: -4px; width: 15px; height: 15px; border-radius: 50%; background: #ff3b30; color: #fff; display: grid; place-items: center; font-size: 9px; font-weight: 900; }
+    .user::before { content: ""; position: absolute; inset: 3px; border: 2px solid currentColor; border-radius: 50%; }
+    .searchbox { margin: 24px auto 20px; width: 82%; height: 60px; border-radius: 30px; background: #fff; box-shadow: 0 8px 18px rgba(21,35,45,.08); display: flex; align-items: center; padding: 0 22px; gap: 16px; }
+    .n-logo { color: #03c75a; font-size: 30px; font-weight: 900; letter-spacing: -1px; }
+    .placeholder { flex: 1; color: #8b9096; font-size: 15px; }
+    .green-dot { width: 28px; height: 28px; border-radius: 50%; background: #03c75a; position: relative; }
+    .green-dot::after { content: ""; position: absolute; inset: 9px; border-radius: 50%; background: #fff; }
+    .smart { margin: 0 18px 12px; height: 82px; display: grid; grid-template-columns: 94px 1fr 24px; gap: 12px; align-items: center; }
+    .smart img { width: 94px; height: 58px; border-radius: 8px; object-fit: cover; background: #dfe5e9; }
+    .smart-copy strong { display: block; font-size: 15px; line-height: 20px; font-weight: 850; letter-spacing: -.2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .smart-copy span { display: block; margin-top: 4px; color: #6f7780; font-size: 12px; line-height: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .chev::before { content: ""; position: absolute; left: 7px; top: 6px; width: 8px; height: 8px; border-top: 2px solid #b7bec5; border-right: 2px solid #b7bec5; transform: rotate(45deg); }
+    .service-strip { margin: 0 10px 8px; min-height: 48px; border-radius: 10px; background: #fff; display: flex; align-items: center; gap: 14px; padding: 0 14px; box-shadow: 0 4px 12px rgba(0,0,0,.05); color: #20252b; font-size: 13px; white-space: nowrap; overflow: hidden; }
+    .service-strip b { color: #03c75a; font-weight: 900; }
+    .service-strip span { color: #d5dbe0; }
+    .content-card { margin: 8px 10px 0; border-radius: 12px; background: #fff; box-shadow: 0 2px 8px rgba(0,0,0,.05); overflow: hidden; }
+    .weather { height: 54px; padding: 0 14px; display: flex; align-items: center; gap: 12px; font-size: 13px; border-bottom: 1px solid #eef1f3; }
+    .weather strong { font-size: 15px; }
+    .blue { color: #2b8cff; font-size: 12px; font-weight: 800; }
+    .news-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 12px 14px 14px; }
+    .news-item img { width: 100%; aspect-ratio: 1 / 1; object-fit: cover; border-radius: 10px; background: #dfe5e9; display: block; }
+    .news-item strong { display: block; margin-top: 8px; font-size: 13px; line-height: 18px; font-weight: 650; letter-spacing: -.2px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+    .feedline { margin: 10px; background: #fff; border-radius: 12px; padding: 13px 14px; color: #20252b; box-shadow: 0 2px 8px rgba(0,0,0,.04); }
+    .feedline strong { display: block; font-size: 14px; line-height: 20px; }
+    .feedline span { display: block; margin-top: 5px; color: #8b9096; font-size: 11px; }
   </style>
 </head>
 <body>
   <main class="screen">
-    <div class="search"><div class="n-logo">N</div><div class="placeholder">검색어를 입력하세요</div></div>
-    <nav class="channel-tabs"><div class="active">뉴스</div><div>연예</div><div>스포츠</div><div>경제</div><div>쇼핑</div></nav>
+    <header class="appbar">
+      <div class="left"><span class="hamburger"></span><span class="pay">pay</span></div>
+      <div class="right"><span class="bell"></span><span class="user"></span></div>
+    </header>
+    <section class="searchbox">
+      <div class="n-logo">N</div><div class="placeholder">검색어를 입력하세요</div><div class="green-dot"></div>
+    </section>
     <article class="smart">
-      <div class="smart-head"><span class="ad-badge">AD</span><span>스마트채널 · ${displayUrl}</span></div>
-      <div class="smart-body">
-        <div class="copy">
-          <div class="brand"><img class="logo" src="${logo}" alt="" /><span>${sponsor}</span></div>
-          <div class="title">${title}</div>
-          <div class="desc">${desc1}</div>
-          <div class="cta">${cta}</div>
-        </div>
-        <img class="thumb" src="${creative}" alt="" />
+      <img src="${creative}" alt="" />
+      <div class="smart-copy">
+        <strong>${title}</strong>
+        <span>${desc1 || `${sponsor} · ${displayUrl}`}</span>
       </div>
+      <i class="chev"></i>
     </article>
-    <article class="news"><strong>지금 많이 본 소식</strong><span>네이버 주요 서비스 상단 콘텐츠 영역입니다</span></article>
-    <article class="news"><strong>오늘의 추천 콘텐츠</strong><span>관심사 기반으로 이어지는 모바일 콘텐츠입니다</span></article>
+    <nav class="service-strip"><b>메일</b><b>카페</b><b>스토어</b><span>|</span><em>뉴스</em><em>엔터</em><em>스포츠</em></nav>
+    <section class="content-card">
+      <div class="weather"><strong>12.6° 춘천</strong><span>|</span><span>코스닥 1,192.35</span><span class="blue">▼2.29%</span></div>
+      <div class="news-grid">
+        <div class="news-item"><img src="${creative}" alt="" /><strong>지금 가장 많이 보는 주요 이슈를 확인해보세요</strong></div>
+        <div class="news-item"><img src="${creative}" alt="" /><strong>관심사 기반 콘텐츠가 이어집니다</strong></div>
+      </div>
+    </section>
+    <article class="feedline"><strong>${sponsor} · 스폰서 · ${displayUrl}</strong><span>${cta}</span></article>
   </main>
 </body>
 </html>`;
@@ -533,14 +552,18 @@ function renderNaverNativeBannerFeedHtml(ad: MobileNativeAdData): string {
     html, body { width: 100%; min-height: 100%; margin: 0; background: #f5f7f8; color: #101010; font-family: "Noto Sans KR", "Roboto", -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", Arial, sans-serif; -webkit-font-smoothing: antialiased; }
     .screen { width: 100vw; min-height: 100vh; background: #f5f7f8; overflow: hidden; }
     .top { padding: 10px 14px 8px; background: #fff; border-bottom: 1px solid rgba(0,0,0,.05); }
-    .search { height: 46px; border: 2px solid #03c75a; border-radius: 24px; display: flex; align-items: center; padding: 0 14px; background: #fff; gap: 10px; }
+    .search { height: 42px; border: 2px solid #03c75a; border-radius: 23px; display: flex; align-items: center; padding: 0 14px; background: #fff; gap: 10px; }
     .n-logo { color: #03c75a; font-size: 22px; font-weight: 900; letter-spacing: -1px; }
     .placeholder { flex: 1; color: #8b8f93; font-size: 15px; }
+    .nav { height: 48px; padding: 0 12px; display: flex; align-items: center; gap: 20px; background: #fff; border-bottom: 1px solid #eef1f3; font-size: 15px; font-weight: 850; white-space: nowrap; }
+    .nav .active { color: #03c75a; position: relative; }
+    .nav .active::after { content: ""; position: absolute; left: 0; right: 0; bottom: -14px; height: 3px; border-radius: 3px; background: #03c75a; }
     .feed { padding: 10px 10px 80px; }
     .card { background: #fff; border: 1px solid rgba(0,0,0,.06); border-radius: 16px; overflow: hidden; box-shadow: 0 1px 2px rgba(0,0,0,.03); margin-bottom: 10px; }
     .news { padding: 14px; }
     .news-kicker { color: #03a64a; font-size: 12px; font-weight: 800; }
     .news-title { margin-top: 6px; font-size: 16px; line-height: 22px; font-weight: 800; }
+    .news-meta { margin-top: 7px; color: #8b9096; font-size: 12px; }
     .native { padding: 12px 13px; display: grid; grid-template-columns: 1fr 118px; gap: 12px; align-items: center; }
     .brand { display: flex; align-items: center; gap: 7px; color: #747a80; font-size: 11px; margin-bottom: 7px; }
     .brand img { width: 24px; height: 24px; border-radius: 8px; object-fit: cover; background: #eef1f3; }
@@ -555,8 +578,9 @@ function renderNaverNativeBannerFeedHtml(ad: MobileNativeAdData): string {
 <body>
   <main class="screen">
     <header class="top"><div class="search"><div class="n-logo">N</div><div class="placeholder">검색어를 입력하세요</div></div></header>
+    <nav class="nav"><span>추천</span><span class="active">뉴스</span><span>엔터</span><span>스포츠</span><span>경제</span></nav>
     <section class="feed">
-      <article class="card news"><div class="news-kicker">추천</div><div class="news-title">사용자 관심사 기반으로 이어지는 콘텐츠 피드입니다</div></article>
+      <article class="card news"><div class="news-kicker">언론사편집</div><div class="news-title">주요 이슈와 관심사를 카드 형태로 확인해보세요</div><div class="news-meta">기자 · 연재 · MY</div></article>
       <article class="card native">
         <div>
           <div class="brand"><img src="${logo}" alt="" /><span>${sponsor}</span><span class="ad-badge">AD</span></div>
@@ -566,7 +590,7 @@ function renderNaverNativeBannerFeedHtml(ad: MobileNativeAdData): string {
         </div>
         <img class="thumb" src="${creative}" alt="" />
       </article>
-      <article class="card news"><div class="news-kicker">오늘의 주요 콘텐츠</div><div class="news-title">지금 많이 본 소식과 관심사를 한 번에 확인해 보세요</div></article>
+      <article class="card news"><div class="news-kicker">오늘의 주요 콘텐츠</div><div class="news-title">지금 많이 본 소식과 관심사를 한 번에 확인해 보세요</div><div class="news-meta">네이버 뉴스 · 방금 전</div></article>
     </section>
   </main>
 </body>
@@ -574,8 +598,6 @@ function renderNaverNativeBannerFeedHtml(ad: MobileNativeAdData): string {
 }
 
 function renderNaverImageBannerMobileHtml(ad: MobileNativeAdData): string {
-  const title = escapeHtml(ad.title);
-  const desc1 = escapeHtml(ad.description1);
   const sponsor = escapeHtml(ad.sponsorName);
   const displayUrl = escapeHtml(ad.displayUrl);
   const cta = escapeHtml(ad.ctaText);
@@ -588,42 +610,52 @@ function renderNaverImageBannerMobileHtml(ad: MobileNativeAdData): string {
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
   <style>
     * { box-sizing: border-box; }
-    html, body { width: 100%; min-height: 100%; margin: 0; background: #f5f7f8; color: #101010; font-family: "Noto Sans KR", "Roboto", -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", Arial, sans-serif; -webkit-font-smoothing: antialiased; }
-    .screen { width: 100vw; min-height: 100vh; background: #f5f7f8; overflow: hidden; }
-    .search { margin: 10px 14px; height: 46px; border: 2px solid #03c75a; border-radius: 24px; background: #fff; display: flex; align-items: center; gap: 10px; padding: 0 14px; }
-    .n-logo { color: #03c75a; font-size: 22px; font-weight: 900; letter-spacing: -1px; }
-    .placeholder { flex: 1; color: #8b8f93; font-size: 15px; }
-    .section { padding: 0 10px 80px; }
-    .card { background: #fff; border: 1px solid rgba(0,0,0,.06); border-radius: 16px; overflow: hidden; box-shadow: 0 1px 2px rgba(0,0,0,.03); margin-bottom: 10px; }
-    .news { padding: 14px; }
-    .news strong { display: block; font-size: 16px; line-height: 22px; }
-    .news span { display: block; margin-top: 7px; color: #8b8f93; font-size: 12px; }
-    .banner-head { height: 32px; padding: 0 12px; display: flex; align-items: center; gap: 7px; color: #70777d; font-size: 11px; border-bottom: 1px solid rgba(0,0,0,.05); }
-    .ad-badge { border: 1px solid #d8dde3; border-radius: 4px; padding: 1px 4px; color: #7a8086; font-size: 10px; font-weight: 800; }
-    .banner { position: relative; height: 132px; background: #0b1220; overflow: hidden; }
-    .banner img { width: 100%; height: 100%; object-fit: cover; display: block; }
-    .shade { position: absolute; inset: 0; background: linear-gradient(90deg, rgba(0,0,0,.58), rgba(0,0,0,.16) 58%, rgba(0,0,0,.02)); }
-    .copy { position: absolute; left: 16px; top: 16px; right: 108px; color: #fff; }
-    .title { font-size: 18px; line-height: 24px; font-weight: 900; letter-spacing: -.3px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-    .desc { margin-top: 5px; color: rgba(255,255,255,.86); font-size: 12px; line-height: 17px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-    .cta { position: absolute; left: 16px; bottom: 14px; height: 28px; padding: 0 12px; border-radius: 14px; background: #fff; color: #111; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 850; }
+    html, body { width: 100%; min-height: 100%; margin: 0; background: #eef3f6; color: #101010; font-family: "Noto Sans KR", "Roboto", -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", Arial, sans-serif; -webkit-font-smoothing: antialiased; }
+    .screen { width: 100vw; min-height: 100vh; background: #eef3f6; overflow: hidden; }
+    .naver-news { margin: 8px auto 0; width: 92%; background: #fff; border: 1px solid rgba(0,0,0,.08); box-shadow: 0 2px 8px rgba(0,0,0,.05); }
+    .topnav { height: 50px; display: flex; align-items: center; padding: 0 14px; gap: 16px; border-bottom: 1px solid #eef1f3; font-size: 15px; font-weight: 850; white-space: nowrap; }
+    .n-logo { color: #03c75a; font-size: 25px; font-weight: 900; letter-spacing: -1px; margin-right: 2px; }
+    .active { color: #03c75a; position: relative; }
+    .active::after { content: ""; position: absolute; left: 0; right: 0; bottom: -14px; height: 3px; border-radius: 3px; background: #03c75a; }
+    .search-icon { margin-left: auto; position: relative; width: 22px; height: 22px; color: #03c75a; }
+    .search-icon::before { content: ""; position: absolute; left: 2px; top: 1px; width: 13px; height: 13px; border: 2px solid currentColor; border-radius: 50%; }
+    .search-icon::after { content: ""; position: absolute; right: 1px; bottom: 4px; width: 8px; height: 2px; background: currentColor; border-radius: 2px; transform: rotate(45deg); }
+    .news-strip { padding: 8px 14px 10px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; border-bottom: 1px solid #eef1f3; }
+    .headline { min-height: 64px; border-radius: 8px; background: #fff; border: 1px solid #e1e6ea; box-shadow: 0 1px 3px rgba(0,0,0,.05); padding: 9px; font-size: 12px; line-height: 17px; display: flex; align-items: center; color: #30343a; overflow: hidden; }
+    .publisher { height: 58px; padding: 0 14px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #eef1f3; }
+    .publisher strong { font-size: 15px; font-weight: 900; letter-spacing: -.2px; }
+    .publisher span { color: #8b9096; font-size: 12px; }
+    .ad-wrap { position: relative; background: #fff; border-bottom: 8px solid #eef3f6; }
+    .ad-pill { position: absolute; right: 6px; top: 6px; height: 18px; padding: 0 5px; border: 1px solid #ccd3d8; border-radius: 9px; background: rgba(255,255,255,.86); color: #8a9198; display: grid; place-items: center; font-size: 10px; font-weight: 700; z-index: 2; }
+    .banner { width: 100%; aspect-ratio: 2.65 / 1; object-fit: cover; display: block; background: #e6eaee; }
+    .chips { display: flex; gap: 8px; padding: 10px 14px 12px; background: #fff; overflow: hidden; }
+    .chip { height: 34px; padding: 0 13px; border-radius: 17px; background: #f5e3e5; color: #5d4b4e; display: flex; align-items: center; gap: 6px; font-size: 13px; white-space: nowrap; }
+    .chip:nth-child(2) { background: #f7f3ee; }
+    .paper { padding: 14px; background: #fff; border-bottom: 1px solid #eef1f3; }
+    .paper-head { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+    .mark { width: 35px; height: 35px; border-radius: 50%; background: #eef7fb; display: grid; place-items: center; color: #03a64a; font-size: 11px; font-weight: 900; }
+    .paper-title strong { display: block; font-size: 15px; line-height: 18px; }
+    .paper-title span { color: #8b9096; font-size: 11px; }
+    .news-line { height: 31px; display: flex; align-items: center; border-top: 1px solid #eef1f3; color: #2e3338; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   </style>
 </head>
 <body>
   <main class="screen">
-    <div class="search"><div class="n-logo">N</div><div class="placeholder">검색어를 입력하세요</div></div>
-    <section class="section">
-      <article class="card news"><strong>서비스 통합 주요 콘텐츠</strong><span>네이버 모바일 서비스 영역입니다</span></article>
-      <article class="card">
-        <div class="banner-head"><span class="ad-badge">AD</span><span>${sponsor} · ${displayUrl}</span></div>
-        <div class="banner">
-          <img src="${creative}" alt="" />
-          <div class="shade"></div>
-          <div class="copy"><div class="title">${title}</div><div class="desc">${desc1}</div></div>
-          <div class="cta">${cta}</div>
-        </div>
+    <section class="naver-news">
+      <nav class="topnav"><span class="n-logo">N</span><span>추천</span><span class="active">뉴스</span><span>엔터</span><span>스포츠</span><span>카스레</span><span class="search-icon"></span></nav>
+      <div class="news-strip"><div class="headline">주요 이슈와 속보를 한 번에 확인해보세요</div><div class="headline">관심사별 뉴스 카드가 이어집니다</div></div>
+      <header class="publisher"><div><strong>${sponsor}</strong><br /><span>전체기사 ></span></div><span>랭킹  |  이슈</span></header>
+      <article class="ad-wrap">
+        <span class="ad-pill">AD</span>
+        <img class="banner" src="${creative}" alt="" />
+        <div class="chips"><span class="chip">${cta}</span><span class="chip">${displayUrl}</span></div>
       </article>
-      <article class="card news"><strong>관심사 기반 추천</strong><span>사용자 흐름 안에서 다음 콘텐츠가 이어집니다</span></article>
+      <section class="paper">
+        <div class="paper-head"><div class="mark">뉴스</div><div class="paper-title"><strong>주요뉴스</strong><span>스폰서 · ${displayUrl}</span></div></div>
+        <div class="news-line">지금 많이 본 소식과 관심사를 확인해보세요</div>
+        <div class="news-line">콘텐츠 피드 안에서 다음 기사 카드가 이어집니다</div>
+        <div class="news-line">브랜드 메시지가 네이티브 흐름 안에 노출됩니다</div>
+      </section>
     </section>
   </main>
 </body>
