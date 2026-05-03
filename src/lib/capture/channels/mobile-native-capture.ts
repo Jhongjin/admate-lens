@@ -484,12 +484,14 @@ function renderNaverSmartChannelHtml(ad: MobileNativeAdData): string {
     .green-dot::after { content: ""; position: absolute; inset: 9px; border-radius: 50%; background: #fff; }
     .smart { margin: 0 18px 12px; height: 82px; display: grid; grid-template-columns: 94px 1fr 24px; gap: 12px; align-items: center; }
     .smart img { width: 94px; height: 58px; border-radius: 8px; object-fit: cover; background: #dfe5e9; }
+    .smart-copy { min-width: 0; }
     .smart-copy strong { display: block; font-size: 15px; line-height: 20px; font-weight: 850; letter-spacing: -.2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .smart-copy span { display: block; margin-top: 4px; color: #6f7780; font-size: 12px; line-height: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .chev::before { content: ""; position: absolute; left: 7px; top: 6px; width: 8px; height: 8px; border-top: 2px solid #b7bec5; border-right: 2px solid #b7bec5; transform: rotate(45deg); }
     .service-strip { margin: 0 10px 8px; min-height: 48px; border-radius: 10px; background: #fff; display: flex; align-items: center; gap: 14px; padding: 0 14px; box-shadow: 0 4px 12px rgba(0,0,0,.05); color: #20252b; font-size: 13px; white-space: nowrap; overflow: hidden; }
     .service-strip b { color: #03c75a; font-weight: 900; }
     .service-strip span { color: #d5dbe0; }
+    .service-strip em { font-style: normal; }
     .content-card { margin: 8px 10px 0; border-radius: 12px; background: #fff; box-shadow: 0 2px 8px rgba(0,0,0,.05); overflow: hidden; }
     .weather { height: 54px; padding: 0 14px; display: flex; align-items: center; gap: 12px; font-size: 13px; border-bottom: 1px solid #eef1f3; }
     .weather strong { font-size: 15px; }
@@ -598,7 +600,6 @@ function renderNaverNativeBannerFeedHtml(ad: MobileNativeAdData): string {
 }
 
 function renderNaverImageBannerMobileHtml(ad: MobileNativeAdData): string {
-  const sponsor = escapeHtml(ad.sponsorName);
   const displayUrl = escapeHtml(ad.displayUrl);
   const cta = escapeHtml(ad.ctaText);
   const creative = escapeAttr(ad.creativeDataUrl);
@@ -612,8 +613,8 @@ function renderNaverImageBannerMobileHtml(ad: MobileNativeAdData): string {
     * { box-sizing: border-box; }
     html, body { width: 100%; min-height: 100%; margin: 0; background: #eef3f6; color: #101010; font-family: "Noto Sans KR", "Roboto", -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", Arial, sans-serif; -webkit-font-smoothing: antialiased; }
     .screen { width: 100vw; min-height: 100vh; background: #eef3f6; overflow: hidden; }
-    .naver-news { margin: 8px auto 0; width: 92%; background: #fff; border: 1px solid rgba(0,0,0,.08); box-shadow: 0 2px 8px rgba(0,0,0,.05); }
-    .topnav { height: 50px; display: flex; align-items: center; padding: 0 14px; gap: 16px; border-bottom: 1px solid #eef1f3; font-size: 15px; font-weight: 850; white-space: nowrap; }
+    .naver-news { margin: 0 auto; width: 100%; min-height: 100vh; background: #fff; }
+    .topnav { height: 52px; display: flex; align-items: center; padding: 0 14px; gap: 14px; border-bottom: 1px solid #eef1f3; font-size: 15px; font-weight: 850; white-space: nowrap; }
     .n-logo { color: #03c75a; font-size: 25px; font-weight: 900; letter-spacing: -1px; margin-right: 2px; }
     .active { color: #03c75a; position: relative; }
     .active::after { content: ""; position: absolute; left: 0; right: 0; bottom: -14px; height: 3px; border-radius: 3px; background: #03c75a; }
@@ -627,7 +628,7 @@ function renderNaverImageBannerMobileHtml(ad: MobileNativeAdData): string {
     .publisher span { color: #8b9096; font-size: 12px; }
     .ad-wrap { position: relative; background: #fff; border-bottom: 8px solid #eef3f6; }
     .ad-pill { position: absolute; right: 6px; top: 6px; height: 18px; padding: 0 5px; border: 1px solid #ccd3d8; border-radius: 9px; background: rgba(255,255,255,.86); color: #8a9198; display: grid; place-items: center; font-size: 10px; font-weight: 700; z-index: 2; }
-    .banner { width: 100%; aspect-ratio: 2.65 / 1; object-fit: cover; display: block; background: #e6eaee; }
+    .banner { width: 100%; aspect-ratio: 2 / 1; object-fit: cover; display: block; background: #e6eaee; }
     .chips { display: flex; gap: 8px; padding: 10px 14px 12px; background: #fff; overflow: hidden; }
     .chip { height: 34px; padding: 0 13px; border-radius: 17px; background: #f5e3e5; color: #5d4b4e; display: flex; align-items: center; gap: 6px; font-size: 13px; white-space: nowrap; }
     .chip:nth-child(2) { background: #f7f3ee; }
@@ -644,14 +645,14 @@ function renderNaverImageBannerMobileHtml(ad: MobileNativeAdData): string {
     <section class="naver-news">
       <nav class="topnav"><span class="n-logo">N</span><span>추천</span><span class="active">뉴스</span><span>엔터</span><span>스포츠</span><span>카스레</span><span class="search-icon"></span></nav>
       <div class="news-strip"><div class="headline">주요 이슈와 속보를 한 번에 확인해보세요</div><div class="headline">관심사별 뉴스 카드가 이어집니다</div></div>
-      <header class="publisher"><div><strong>${sponsor}</strong><br /><span>전체기사 ></span></div><span>랭킹  |  이슈</span></header>
+      <header class="publisher"><div><strong>머니투데이</strong><br /><span>전체기사 ></span></div><span>랭킹  |  이슈</span></header>
       <article class="ad-wrap">
         <span class="ad-pill">AD</span>
         <img class="banner" src="${creative}" alt="" />
         <div class="chips"><span class="chip">${cta}</span><span class="chip">${displayUrl}</span></div>
       </article>
       <section class="paper">
-        <div class="paper-head"><div class="mark">뉴스</div><div class="paper-title"><strong>주요뉴스</strong><span>스폰서 · ${displayUrl}</span></div></div>
+        <div class="paper-head"><div class="mark">뉴스</div><div class="paper-title"><strong>주요뉴스</strong><span>05월 03일 11:10</span></div></div>
         <div class="news-line">지금 많이 본 소식과 관심사를 확인해보세요</div>
         <div class="news-line">콘텐츠 피드 안에서 다음 기사 카드가 이어집니다</div>
         <div class="news-line">브랜드 메시지가 네이티브 흐름 안에 노출됩니다</div>
