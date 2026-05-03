@@ -276,7 +276,12 @@ type NaverMobileSurface =
   | "naver-native-banner-feed"
   | "naver-image-banner-mobile"
   | "naver-mobile-feed";
-type KakaoMobileSurface = "kakao-bizboard" | "kakao-mobile-feed";
+type KakaoMobileSurface =
+  | "kakao-bizboard"
+  | "kakao-display-native"
+  | "kakao-display-catalog"
+  | "kakao-product-catalog"
+  | "kakao-mobile-feed";
 type MobileNativeSurface = NaverMobileSurface | KakaoMobileSurface;
 type DetailOptionPreset =
   | "pc-skip"
@@ -302,6 +307,9 @@ type DetailOptionPreset =
   | "naver-image-banner-mobile"
   | "naver-mobile-feed"
   | "kakao-bizboard"
+  | "kakao-display-native"
+  | "kakao-display-catalog"
+  | "kakao-product-catalog"
   | "kakao-mobile-feed"
   | "gdn-pc"
   | "gdn-mobile"
@@ -336,7 +344,7 @@ const NAVER_PRODUCT_OPTIONS: ProductMenuOption[] = [
 ];
 
 const KAKAO_PRODUCT_OPTIONS: ProductMenuOption[] = [
-  { value: "kakao-mobile", label: "모바일 광고" },
+  { value: "kakao-mobile", label: "성과형 광고" },
 ];
 
 const YOUTUBE_DETAIL_OPTIONS: DetailMenuOption[] = [
@@ -371,7 +379,9 @@ const NAVER_DETAIL_OPTIONS: DetailMenuOption[] = [
 
 const KAKAO_DETAIL_OPTIONS: DetailMenuOption[] = [
   { value: "kakao-bizboard", label: "비즈보드" },
-  { value: "kakao-mobile-feed", label: "모바일 네이티브 피드" },
+  { value: "kakao-display-native", label: "디스플레이 네이티브" },
+  { value: "kakao-display-catalog", label: "디스플레이 카탈로그" },
+  { value: "kakao-product-catalog", label: "상품 카탈로그" },
 ];
 
 function normalizeNaverMobileSurface(surface: MobileNativeSurface): NaverMobileSurface {
@@ -394,6 +404,29 @@ function isNaverDetailPreset(preset: string): preset is NaverMobileSurface {
     preset === "naver-native-banner-feed" ||
     preset === "naver-image-banner-mobile" ||
     preset === "naver-mobile-feed"
+  );
+}
+
+function normalizeKakaoMobileSurface(surface: MobileNativeSurface): KakaoMobileSurface {
+  if (surface === "kakao-mobile-feed") return "kakao-display-native";
+  if (
+    surface === "kakao-bizboard" ||
+    surface === "kakao-display-native" ||
+    surface === "kakao-display-catalog" ||
+    surface === "kakao-product-catalog"
+  ) {
+    return surface;
+  }
+  return "kakao-bizboard";
+}
+
+function isKakaoDetailPreset(preset: string): preset is KakaoMobileSurface {
+  return (
+    preset === "kakao-bizboard" ||
+    preset === "kakao-display-native" ||
+    preset === "kakao-display-catalog" ||
+    preset === "kakao-product-catalog" ||
+    preset === "kakao-mobile-feed"
   );
 }
 
@@ -991,7 +1024,9 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
     if (selectedMediaMenu === "naver") {
       return normalizeNaverMobileSurface(form.mobileNativeSurface) as DetailOptionPreset;
     }
-    if (selectedMediaMenu === "kakao") return form.mobileNativeSurface === "kakao-mobile-feed" ? "kakao-mobile-feed" : "kakao-bizboard";
+    if (selectedMediaMenu === "kakao") {
+      return normalizeKakaoMobileSurface(form.mobileNativeSurface) as DetailOptionPreset;
+    }
     if (selectedMediaMenu !== "youtube") {
       if (isDemandGenProduct) {
         return form.demandGenSurface === "youtube-shorts"
@@ -1045,7 +1080,10 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
     "naver-image-banner-mobile": "Naver · 이미지 배너",
     "naver-mobile-feed": "Naver · 피드 광고",
     "kakao-bizboard": "Kakao · 비즈보드",
-    "kakao-mobile-feed": "Kakao · 모바일 네이티브 피드",
+    "kakao-display-native": "Kakao · 디스플레이 네이티브",
+    "kakao-mobile-feed": "Kakao · 디스플레이 네이티브",
+    "kakao-display-catalog": "Kakao · 디스플레이 카탈로그",
+    "kakao-product-catalog": "Kakao · 상품 카탈로그",
     "yt-other": "YouTube 레거시/준비중",
     "gdn-pc": "PC 지면",
     "gdn-mobile": "MO 지면",
@@ -1071,7 +1109,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
     demandgen: "Demand Gen",
     "network-ads": "Network Ads",
     "naver-mobile": "디스플레이 광고",
-    "kakao-mobile": "모바일 광고",
+    "kakao-mobile": "성과형 광고",
   };
 
   const infeedTypeLabel =
@@ -1163,9 +1201,9 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
       const mobileNativePublisherUrls =
         form.channel === "naver"
           ? ["https://m.naver.com/"]
-          : form.mobileNativeSurface === "kakao-mobile-feed"
-            ? ["https://m.daum.net/"]
-            : ["https://talk.kakao.com/"];
+          : normalizeKakaoMobileSurface(form.mobileNativeSurface) === "kakao-bizboard"
+            ? ["https://talk.kakao.com/"]
+            : ["https://m.daum.net/"];
       const publisherUrls = isYouTubeChannel
         ? youtubePublisherUrls
         : isMobileNativeChannel
@@ -1646,13 +1684,13 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                   }));
                   return;
                 }
-                if (preset === "kakao-bizboard" || preset === "kakao-mobile-feed") {
+                if (isKakaoDetailPreset(preset)) {
                   setForm((prev) => ({
                     ...prev,
                     mediaMenu: "kakao",
                     channel: "kakao",
                     googleAdsProduct: "network-ads",
-                    mobileNativeSurface: preset as MobileNativeSurface,
+                    mobileNativeSurface: normalizeKakaoMobileSurface(preset),
                   }));
                   return;
                 }
@@ -2848,8 +2886,8 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                 </span>
               </div>
               <p className="form-helper mb-3">
-                모바일 네이티브 지면은 업로드한 소재 이미지를 카드/비즈보드 영역에 맞춰
-                렌더링합니다. 제목·스폰서·CTA는 비워도 기본값으로 캡처됩니다.
+                모바일 자동 합성 지면은 선택한 상품 surface에 맞춰 업로드 소재를 렌더링합니다.
+                제목·스폰서·CTA는 비워도 기본값으로 캡처됩니다.
               </p>
               <div className="space-y-3">
                 <div>

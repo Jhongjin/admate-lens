@@ -123,6 +123,9 @@ export async function POST(request: NextRequest) {
           | "naver-image-banner-mobile"
           | "naver-mobile-feed"
           | "kakao-bizboard"
+          | "kakao-display-native"
+          | "kakao-display-catalog"
+          | "kakao-product-catalog"
           | "kakao-mobile-feed";
         title?: string;
         description1?: string;
@@ -297,11 +300,16 @@ export async function POST(request: NextRequest) {
         surface:
           mobileNativeOpts.surface === "naver-mobile-feed"
             ? "naver-feed-mobile"
+            : mobileNativeOpts.surface === "kakao-mobile-feed"
+              ? "kakao-display-native"
             : mobileNativeOpts.surface === "naver-smart-channel-mobile" ||
                 mobileNativeOpts.surface === "naver-feed-mobile" ||
                 mobileNativeOpts.surface === "naver-native-banner-feed" ||
                 mobileNativeOpts.surface === "naver-image-banner-mobile" ||
                 mobileNativeOpts.surface === "kakao-bizboard" ||
+                mobileNativeOpts.surface === "kakao-display-native" ||
+                mobileNativeOpts.surface === "kakao-display-catalog" ||
+                mobileNativeOpts.surface === "kakao-product-catalog" ||
                 mobileNativeOpts.surface === "kakao-mobile-feed"
               ? mobileNativeOpts.surface
               : channel === "kakao"

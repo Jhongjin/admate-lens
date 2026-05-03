@@ -12,7 +12,12 @@ type NaverMobileSurface =
   | "naver-native-banner-feed"
   | "naver-image-banner-mobile"
   | "naver-mobile-feed";
-type KakaoMobileSurface = "kakao-bizboard" | "kakao-mobile-feed";
+type KakaoMobileSurface =
+  | "kakao-bizboard"
+  | "kakao-display-native"
+  | "kakao-display-catalog"
+  | "kakao-product-catalog"
+  | "kakao-mobile-feed";
 type MobileNativeSurface =
   | NaverMobileSurface
   | KakaoMobileSurface;
@@ -25,8 +30,20 @@ const NAVER_SURFACES: readonly NaverMobileSurface[] = [
   "naver-mobile-feed",
 ];
 
+const KAKAO_SURFACES: readonly KakaoMobileSurface[] = [
+  "kakao-bizboard",
+  "kakao-display-native",
+  "kakao-display-catalog",
+  "kakao-product-catalog",
+  "kakao-mobile-feed",
+];
+
 function isNaverSurface(surface?: string): surface is NaverMobileSurface {
   return NAVER_SURFACES.includes(surface as NaverMobileSurface);
+}
+
+function isKakaoSurface(surface?: string): surface is KakaoMobileSurface {
+  return KAKAO_SURFACES.includes(surface as KakaoMobileSurface);
 }
 
 type MobileNativeOpts = {
@@ -186,7 +203,9 @@ function defaultSurface(platform: MobileNativePlatform, requested?: string): Mob
     }
     return "naver-smart-channel-mobile";
   }
-  if (requested === "kakao-mobile-feed") return "kakao-mobile-feed";
+  if (isKakaoSurface(requested)) {
+    return requested === "kakao-mobile-feed" ? "kakao-display-native" : requested;
+  }
   return "kakao-bizboard";
 }
 
@@ -214,7 +233,13 @@ function buildAdData(
           : surface === "naver-native-banner-feed"
             ? "콘텐츠와 함께 보는 브랜드 소식"
             : "지금 가장 많이 찾는 혜택"
-      : "오늘의 추천 브랜드 소식";
+      : surface === "kakao-display-catalog"
+        ? "추천 상품을 한 번에 확인해보세요"
+        : surface === "kakao-product-catalog"
+          ? "내 관심 상품을 모아보세요"
+          : surface === "kakao-display-native"
+            ? "콘텐츠 사이에서 자연스럽게 만나는 소식"
+            : "카카오톡에서 만나는 브랜드 소식";
   const defaultDescription =
     platform === "naver"
       ? surface === "naver-smart-channel-mobile"
@@ -224,7 +249,13 @@ function buildAdData(
           : surface === "naver-native-banner-feed"
             ? "이미지, 텍스트, CTA로 구성된 네이티브 배너입니다."
             : "모바일 피드에서 자연스럽게 노출되는 피드 광고입니다."
-      : "카카오 모바일 지면에 맞춘 광고 메시지를 확인해보세요.";
+      : surface === "kakao-display-catalog"
+        ? "여러 상품과 혜택을 카탈로그 카드로 노출합니다."
+        : surface === "kakao-product-catalog"
+          ? "상품 정보를 기반으로 맞춤형 카탈로그 광고를 구성합니다."
+          : surface === "kakao-display-native"
+            ? "카카오 콘텐츠 지면 안에 자연스럽게 노출되는 네이티브 광고입니다."
+            : "카카오톡 핵심 영역에서 브랜드 메시지를 전달합니다.";
 
   return {
     platform,
@@ -236,7 +267,11 @@ function buildAdData(
     displayUrl: displayHost || (platform === "naver" ? "brand.naver.com" : "brand.kakao.com"),
     ctaText:
       normalizePlainText(opts.ctaText) ||
-      (surface === "kakao-bizboard" ? "바로가기" : "자세히 보기"),
+      (surface === "kakao-display-catalog" || surface === "kakao-product-catalog"
+        ? "구매하기"
+        : surface === "kakao-bizboard"
+          ? "바로가기"
+          : "자세히 보기"),
     creativeDataUrl,
     logoDataUrl,
   };
@@ -883,6 +918,106 @@ function renderKakaoMobileFeedHtml(ad: MobileNativeAdData): string {
 </html>`;
 }
 
+function renderKakaoCatalogHtml(
+  ad: MobileNativeAdData,
+  variant: "display" | "product",
+): string {
+  const title = escapeHtml(ad.title);
+  const desc1 = escapeHtml(ad.description1);
+  const sponsor = escapeHtml(ad.sponsorName);
+  const displayUrl = escapeHtml(ad.displayUrl);
+  const cta = escapeHtml(ad.ctaText);
+  const creative = escapeAttr(ad.creativeDataUrl);
+  const logo = escapeAttr(ad.logoDataUrl);
+  const isProduct = variant === "product";
+  const surfaceLabel = isProduct ? "상품 카탈로그" : "디스플레이 카탈로그";
+  const sectionTitle = isProduct ? "관심 상품 추천" : "브랜드 추천 컬렉션";
+  const subTitle = isProduct
+    ? "최근 본 상품과 유사한 혜택을 확인해보세요"
+    : "여러 상품을 한 번에 둘러볼 수 있는 카탈로그 광고입니다";
+
+  return `<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+  <style>
+    * { box-sizing: border-box; }
+    html, body { width: 100%; min-height: 100%; margin: 0; background: #f4f4f4; color: #191919; font-family: "Noto Sans KR", "Roboto", -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", Arial, sans-serif; -webkit-font-smoothing: antialiased; }
+    .screen { width: 100vw; min-height: 100vh; background: #f4f4f4; overflow: hidden; }
+    .head { height: 58px; padding: 10px 14px; background: #fee500; display: flex; align-items: center; gap: 10px; }
+    .k { font-size: 21px; font-weight: 900; letter-spacing: -.6px; }
+    .search { flex: 1; height: 36px; border-radius: 18px; background: rgba(255,255,255,.78); display: flex; align-items: center; padding: 0 13px; color: #767676; font-size: 13px; }
+    .feed { padding: 10px 10px 80px; }
+    .card { background: #fff; border-radius: 15px; border: 1px solid rgba(0,0,0,.06); margin-bottom: 10px; overflow: hidden; box-shadow: 0 1px 2px rgba(0,0,0,.03); }
+    .story { padding: 14px; }
+    .story strong { display: block; font-size: 16px; line-height: 22px; letter-spacing: -.2px; }
+    .story span { display: block; margin-top: 7px; color: #8c8c8c; font-size: 12px; }
+    .catalog-head { height: 40px; padding: 0 13px; display: flex; align-items: center; gap: 8px; color: #777; font-size: 12px; border-bottom: 1px solid rgba(0,0,0,.05); }
+    .catalog-head b { border: 1px solid #d5d5d5; color: #777; border-radius: 4px; padding: 1px 4px; font-size: 10px; }
+    .brand { padding: 13px; display: flex; align-items: center; gap: 9px; }
+    .logo { width: 34px; height: 34px; border-radius: 12px; object-fit: cover; background: #eef0f3; }
+    .brand-copy { min-width: 0; flex: 1; }
+    .brand-copy strong { display: block; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .brand-copy span { display: block; color: #858585; font-size: 11px; line-height: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .cta { height: 31px; min-width: 78px; border-radius: 16px; background: #191919; color: #fff; display: flex; align-items: center; justify-content: center; padding: 0 12px; font-size: 12px; font-weight: 800; }
+    .hero { padding: 0 13px 13px; }
+    .title { font-size: 18px; line-height: 24px; font-weight: 850; letter-spacing: -.3px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+    .desc { margin-top: 5px; color: #606060; font-size: 13px; line-height: 19px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+    .rail { display: grid; grid-auto-flow: column; grid-auto-columns: 43%; gap: 9px; overflow: hidden; padding: 0 13px 14px; }
+    .item { border-radius: 13px; background: #f7f7f7; border: 1px solid rgba(0,0,0,.06); overflow: hidden; }
+    .item img { width: 100%; aspect-ratio: 1 / 1; object-fit: cover; display: block; background: #e9e9e9; }
+    .item-copy { padding: 9px; }
+    .item-copy strong { display: block; font-size: 13px; line-height: 17px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .price { margin-top: 4px; color: #191919; font-size: 13px; font-weight: 850; }
+    .tag { margin-top: 3px; color: #8c8c8c; font-size: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .bottom { position: fixed; left: 0; right: 0; bottom: 0; height: 57px; background: rgba(255,255,255,.96); border-top: 1px solid rgba(0,0,0,.08); display: grid; grid-template-columns: repeat(5, 1fr); align-items: center; color: #777; font-size: 10px; }
+    .nav { display: grid; justify-items: center; gap: 3px; }
+    .nav-dot { width: 21px; height: 21px; border-radius: 50%; background: #191919; opacity: .9; }
+  </style>
+</head>
+<body>
+  <main class="screen">
+    <header class="head"><div class="k">kakao</div><div class="search">관심있는 상품을 검색해보세요</div></header>
+    <section class="feed">
+      <article class="card story"><strong>${sectionTitle}</strong><span>${subTitle}</span></article>
+      <article class="card">
+        <div class="catalog-head"><b>AD</b><span>${surfaceLabel}</span></div>
+        <div class="brand">
+          <img class="logo" src="${logo}" alt="" />
+          <div class="brand-copy"><strong>${sponsor}</strong><span>스폰서 · ${displayUrl}</span></div>
+          <div class="cta">${cta}</div>
+        </div>
+        <div class="hero"><div class="title">${title}</div><div class="desc">${desc1}</div></div>
+        <div class="rail">
+          <div class="item"><img src="${creative}" alt="" /><div class="item-copy"><strong>${sponsor} 추천 1</strong><div class="price">혜택가 확인</div><div class="tag">맞춤 추천</div></div></div>
+          <div class="item"><img src="${creative}" alt="" /><div class="item-copy"><strong>${sponsor} 추천 2</strong><div class="price">바로 보기</div><div class="tag">인기 상품</div></div></div>
+          <div class="item"><img src="${creative}" alt="" /><div class="item-copy"><strong>${sponsor} 추천 3</strong><div class="price">더 알아보기</div><div class="tag">연관 상품</div></div></div>
+        </div>
+      </article>
+      <article class="card story"><strong>추천 콘텐츠</strong><span>사용자 흐름 안에서 다음 콘텐츠가 이어집니다</span></article>
+    </section>
+    <nav class="bottom">
+      <div class="nav"><i class="nav-dot" aria-hidden="true"></i><span>홈</span></div>
+      <div class="nav"><i class="nav-dot" aria-hidden="true"></i><span>채널</span></div>
+      <div class="nav"><i class="nav-dot" aria-hidden="true"></i><span>작성</span></div>
+      <div class="nav"><i class="nav-dot" aria-hidden="true"></i><span>MY</span></div>
+      <div class="nav"><i class="nav-dot" aria-hidden="true"></i><span>메뉴</span></div>
+    </nav>
+  </main>
+</body>
+</html>`;
+}
+
+function renderKakaoHtml(ad: MobileNativeAdData): string {
+  if (ad.surface === "kakao-display-catalog") return renderKakaoCatalogHtml(ad, "display");
+  if (ad.surface === "kakao-product-catalog") return renderKakaoCatalogHtml(ad, "product");
+  if (ad.surface === "kakao-display-native" || ad.surface === "kakao-mobile-feed") {
+    return renderKakaoMobileFeedHtml(ad);
+  }
+  return renderKakaoBizboardHtml(ad);
+}
+
 class MobileNativeCapture extends BaseChannel {
   private diagnostics: MobileNativeDiagnostics | null = null;
 
@@ -924,9 +1059,7 @@ class MobileNativeCapture extends BaseChannel {
     const html =
       this.platform === "naver"
         ? renderNaverHtml(ad)
-        : surface === "kakao-mobile-feed"
-          ? renderKakaoMobileFeedHtml(ad)
-          : renderKakaoBizboardHtml(ad);
+        : renderKakaoHtml(ad);
 
     await page.goto("about:blank", { waitUntil: "load", timeout: 10000 });
     await page.evaluate<void>(`

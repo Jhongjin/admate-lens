@@ -49,6 +49,14 @@ const NAVER_SURFACE_LABELS: Record<string, string> = {
   "naver-image-banner-mobile": "Naver · 이미지 배너",
 };
 
+const KAKAO_SURFACE_LABELS: Record<string, string> = {
+  "kakao-bizboard": "Kakao · 비즈보드",
+  "kakao-display-native": "Kakao · 디스플레이 네이티브",
+  "kakao-mobile-feed": "Kakao · 디스플레이 네이티브",
+  "kakao-display-catalog": "Kakao · 디스플레이 카탈로그",
+  "kakao-product-catalog": "Kakao · 상품 카탈로그",
+};
+
 const CAPTURE_DELETE_ENABLED =
   process.env.NEXT_PUBLIC_ENABLE_CAPTURE_DELETE === "true";
 
@@ -142,8 +150,9 @@ function getProductMetaLabel(metadata: Record<string, unknown> | null): string |
       : "Naver · 디스플레이 광고";
   }
   if (metadata.productFamily === "kakao") {
-    if (surface === "kakao-mobile-feed") return "Kakao · 모바일 네이티브 피드";
-    return "Kakao · 비즈보드";
+    return typeof surface === "string"
+      ? KAKAO_SURFACE_LABELS[surface] || "Kakao · 성과형 광고"
+      : "Kakao · 성과형 광고";
   }
   return null;
 }
