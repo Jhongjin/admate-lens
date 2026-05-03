@@ -497,7 +497,10 @@ function renderNaverSmartChannelHtml(ad: MobileNativeAdData): string {
     .weather strong { font-size: 15px; }
     .blue { color: #2b8cff; font-size: 12px; font-weight: 800; }
     .news-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 12px 14px 14px; }
-    .news-item img { width: 100%; aspect-ratio: 1 / 1; object-fit: cover; border-radius: 10px; background: #dfe5e9; display: block; }
+    .organic-thumb { position: relative; width: 100%; aspect-ratio: 1 / 1; border-radius: 10px; overflow: hidden; background: #dfe5e9; }
+    .organic-thumb::after { content: ""; position: absolute; inset: 0; background: linear-gradient(135deg, rgba(255,255,255,.12), rgba(0,0,0,.06)); }
+    .organic-a { background: linear-gradient(135deg, #d9e8dd 0%, #93b68a 48%, #516d46 100%); }
+    .organic-b { background: linear-gradient(135deg, #eceff2 0%, #c9d3dc 45%, #8a9bad 100%); }
     .news-item strong { display: block; margin-top: 8px; font-size: 13px; line-height: 18px; font-weight: 650; letter-spacing: -.2px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
     .feedline { margin: 10px; background: #fff; border-radius: 12px; padding: 13px 14px; color: #20252b; box-shadow: 0 2px 8px rgba(0,0,0,.04); }
     .feedline strong { display: block; font-size: 14px; line-height: 20px; }
@@ -525,8 +528,8 @@ function renderNaverSmartChannelHtml(ad: MobileNativeAdData): string {
     <section class="content-card">
       <div class="weather"><strong>12.6° 춘천</strong><span>|</span><span>코스닥 1,192.35</span><span class="blue">▼2.29%</span></div>
       <div class="news-grid">
-        <div class="news-item"><img src="${creative}" alt="" /><strong>지금 가장 많이 보는 주요 이슈를 확인해보세요</strong></div>
-        <div class="news-item"><img src="${creative}" alt="" /><strong>관심사 기반 콘텐츠가 이어집니다</strong></div>
+        <div class="news-item"><div class="organic-thumb organic-a"></div><strong>지금 가장 많이 보는 주요 이슈를 확인해보세요</strong></div>
+        <div class="news-item"><div class="organic-thumb organic-b"></div><strong>관심사 기반 콘텐츠가 이어집니다</strong></div>
       </div>
     </section>
     <article class="feedline"><strong>${sponsor} · 스폰서 · ${displayUrl}</strong><span>${cta}</span></article>
