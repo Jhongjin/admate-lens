@@ -1,12 +1,18 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import CaptureForm from "./components/CaptureForm";
 import CaptureList from "./components/CaptureList";
 
-type PrimaryNavId = "studio" | "review" | "campaigns" | "assets" | "coverage";
+type PrimaryNavId = "home" | "studio" | "review" | "campaigns" | "assets" | "coverage";
+
+type CaptureSummaryRecord = {
+  status?: string;
+  metadata?: Record<string, unknown> | null;
+};
 
 const primaryNav = [
+  { id: "home", label: "캡처 홈", targetId: "lens-home" },
   { id: "studio", label: "캡처 작업실", targetId: "capture-studio" },
   { id: "review", label: "결과 검수", targetId: "result-review" },
   { id: "campaigns", label: "캠페인", targetId: "campaign-review" },
@@ -15,6 +21,7 @@ const primaryNav = [
 ] satisfies Array<{ id: PrimaryNavId; label: string; targetId: string }>;
 
 const viewLabels: Record<PrimaryNavId, { title: string; status: string }> = {
+  home: { title: "AdMate Lens", status: "캡처 홈" },
   studio: { title: "캡처 작업실", status: "요청 생성" },
   review: { title: "결과 검수", status: "결과 확인" },
   campaigns: { title: "캠페인", status: "검토 시작" },
@@ -87,51 +94,58 @@ const productGroups = [
     description: "PC/MO 지면의 배너 삽입 및 랜딩 캡처",
     items: ["PC", "Mobile", "Auto slot", "Manual size"],
   },
+  {
+    title: "Naver / Kakao Mobile",
+    status: "공개 구현",
+    tone: "success",
+    description: "국내 모바일 주요 지면의 네이티브/배너 증빙 생성",
+    items: ["Naver 4종", "Kakao 4종", "모바일 지면"],
+  },
 ];
 
 const validationRules = [
-  "상품 선택 후 필요한 입력만 열어 입력 실수를 줄입니다.",
-  "소재 비율, 지면, CTA, 캡처 시점을 요청 전 점검합니다.",
-  "YouTube/GDN 결과물 UI는 실제 매체 화면 기준을 우선합니다.",
-  "삭제 동작은 운영 UI에서 기본 비활성화하고 검수 이력은 보존합니다.",
+  "실제 매체 화면과의 유사도를 최우선으로 검수합니다.",
+  "픽셀, 레이아웃, CTA, 캡처 시점이 지면 기준과 맞는지 확인합니다.",
+  "캡처 결과물 UI와 광고 미리보기는 AdMate 테마로 임의 변경하지 않습니다.",
+  "AdMate/Openclaw 톤 적용은 운영자 UI와 작업 허브에만 한정합니다.",
 ];
 
 const coverageRows = [
   {
-    product: "PC In-stream Skip",
-    surface: "YouTube PC Watch",
+    product: "YouTube In-stream / Bumper",
+    surface: "PC, AOS, iOS · Skip/Non-skip/Bumper",
     status: "공개 구현",
-    note: "Skip 버튼 5초 이후 노출 기준",
+    note: "Skip 버튼 노출 시점과 진행바 기준 검수",
   },
   {
-    product: "Mobile In-stream",
-    surface: "AOS / iOS",
+    product: "YouTube Feed / Shorts / Masthead",
+    surface: "Home, Search, Watch Next, Shorts, Masthead",
     status: "공개 구현",
-    note: "모바일 뷰포트별 캡처",
-  },
-  {
-    product: "YouTube Shorts",
-    surface: "Shorts Feed",
-    status: "공개 구현",
-    note: "9:16 합성 렌더링",
-  },
-  {
-    product: "YouTube In-feed",
-    surface: "PC/MO Home, Search, Watch Next",
-    status: "공개 구현",
-    note: "PC 홈 공개화 포함",
+    note: "Feed/Shorts 우선 운영, Masthead 홈 유지",
   },
   {
     product: "Demand Gen",
-    surface: "YouTube Feed / Shorts",
-    status: "신규 공개",
-    note: "Google Ads 상품 흐름으로 식별",
+    surface: "Google Ads · YouTube Feed / Shorts",
+    status: "공개 구현",
+    note: "Google Ads 상품 흐름으로 metadata 분리",
+  },
+  {
+    product: "GDN Display",
+    surface: "PC / Mobile Display",
+    status: "공개 구현",
+    note: "실제 게재면 배너 삽입과 랜딩 캡처",
+  },
+  {
+    product: "Naver / Kakao 모바일 지면",
+    surface: "Naver 4종 / Kakao 4종",
+    status: "공개 구현",
+    note: "국내 모바일 네이티브/배너 지면 1차 구현",
   },
   {
     product: "YouTube Display / Overlay",
-    surface: "Legacy",
+    surface: "Legacy 제외",
     status: "제외",
-    note: "최신 UI 재검증 전 공개 금지",
+    note: "최신 YouTube UI 재구현 전 공개 금지",
   },
 ];
 
@@ -143,29 +157,126 @@ const studioSteps = [
 ];
 
 const kpiCards = [
-  { label: "공개 캡처 타입", value: "16", meta: "YouTube, Demand Gen, GDN" },
-  { label: "신규 공개", value: "3", meta: "PC Home In-feed + Demand Gen 2종" },
+  { label: "공개 캡처 타입", value: "27", meta: "YouTube, Demand Gen, GDN, Naver, Kakao" },
+  { label: "국내 모바일 지면", value: "8", meta: "Naver 4종 + Kakao 4종" },
   { label: "레거시 제외", value: "2", meta: "Display, Overlay" },
   { label: "삭제 정책", value: "Off", meta: "UI 기본 비활성" },
 ];
 
+const homeActionCards = [
+  {
+    title: "새 캡처 만들기",
+    description: "상품, 지면, 소재를 선택해 새 증빙 캡처를 생성합니다.",
+    targetId: "capture-studio",
+    tone: "primary",
+  },
+  {
+    title: "최근 캡처 결과",
+    description: "완료, 실패, 처리중 캡처 이력을 확인합니다.",
+    targetId: "result-review",
+    tone: "default",
+  },
+  {
+    title: "검수 필요 결과",
+    description: "품질 플래그와 실패 사유를 결과 목록에서 확인합니다.",
+    targetId: "result-review",
+    tone: "warning",
+  },
+  {
+    title: "지원 지면 커버리지",
+    description: "공개/제외 지면과 상품별 구현 상태를 봅니다.",
+    targetId: "coverage-matrix",
+    tone: "default",
+  },
+] as const;
+
+const externalLinks = [
+  {
+    title: "접근 요청",
+    href: "https://sentinel.admate.ai.kr/access-request",
+    description: "권한과 운영 콘솔 접근은 Sentinel에서 요청합니다.",
+  },
+  {
+    title: "AdMate 홈",
+    href: "https://home.admate.ai.kr",
+    description: "전체 AdMate 제품 링크 관문으로 이동합니다.",
+  },
+] as const;
+
+const initialDashboardStats = {
+  recent: "0",
+  completed: "0",
+  failed: "0",
+  reviewNeeded: "0",
+};
+
 export default function Home() {
   /** 캡처 생성 시 리스트 갱신을 위한 트리거 */
   const [refreshTrigger, setRefreshTrigger] = useState(0);
-  const [activeNav, setActiveNav] = useState<PrimaryNavId>("studio");
+  const [activeNav, setActiveNav] = useState<PrimaryNavId>("home");
+  const [dashboardStats, setDashboardStats] = useState(initialDashboardStats);
 
   /** 새 캡처가 생성되면 리스트 갱신 */
   const handleCaptureCreated = useCallback(() => {
     setRefreshTrigger((prev) => prev + 1);
   }, []);
 
-  const handleNavClick = useCallback((item: (typeof primaryNav)[number]) => {
-    setActiveNav(item.id);
-    document.getElementById(item.targetId)?.scrollIntoView({
+  const scrollToSection = useCallback((targetId: string, navId?: PrimaryNavId) => {
+    if (navId) setActiveNav(navId);
+    document.getElementById(targetId)?.scrollIntoView({
       behavior: "smooth",
       block: "start",
     });
   }, []);
+
+  const handleNavClick = useCallback(
+    (item: (typeof primaryNav)[number]) => {
+      scrollToSection(item.targetId, item.id);
+    },
+    [scrollToSection],
+  );
+
+  useEffect(() => {
+    let isMounted = true;
+    const isReviewNeeded = (capture: CaptureSummaryRecord) => {
+      const metadata = capture.metadata;
+      const diagnostics = metadata?.diagnostics as
+        | { captureQuality?: { flags?: unknown[] } }
+        | undefined;
+      const flags = Array.isArray(diagnostics?.captureQuality?.flags)
+        ? diagnostics.captureQuality.flags
+        : [];
+      return (
+        metadata?.resultCategory === "ad_capture_review_needed" ||
+        capture.status === "failed" ||
+        flags.length > 0
+      );
+    };
+
+    async function loadDashboardStats() {
+      try {
+        const res = await fetch(`/api/captures?limit=30&_t=${Date.now()}`, {
+          cache: "no-store",
+        });
+        const result = (await res.json()) as { data?: CaptureSummaryRecord[] };
+        const captures = Array.isArray(result.data) ? result.data : [];
+        if (!isMounted) return;
+        setDashboardStats({
+          recent: String(captures.length),
+          completed: String(captures.filter((capture) => capture.status === "completed").length),
+          failed: String(captures.filter((capture) => capture.status === "failed").length),
+          reviewNeeded: String(captures.filter(isReviewNeeded).length),
+        });
+      } catch {
+        if (isMounted) setDashboardStats(initialDashboardStats);
+      }
+    }
+
+    loadDashboardStats();
+    return () => {
+      isMounted = false;
+    };
+  }, [refreshTrigger]);
 
   return (
     <div className="ops-shell studio-shell">
@@ -237,24 +348,122 @@ export default function Home() {
         </header>
 
         <main className="ops-content studio-content">
+          <section id="lens-home" className="lens-home-hub" aria-label="AdMate Lens 캡처 홈">
+            <div className="lens-home-copy">
+              <p className="ops-kicker">lens.admate.ai.kr · Capture Home</p>
+              <h2>AdMate Lens</h2>
+              <p>
+                광고 게재 화면과 보고서 증빙 이미지를 자동 생성하는 캡처 자동화 도구입니다.
+                Lens는 캡처/증빙 생성 품질과 지면 커버리지를 담당하고, 접근 권한과 운영 기준은
+                Sentinel/Openclaw 흐름을 따릅니다.
+              </p>
+              <div className="lens-home-actions" aria-label="주요 작업">
+                <button
+                  type="button"
+                  className="lens-home-button primary"
+                  onClick={() => scrollToSection("capture-studio", "studio")}
+                >
+                  새 캡처 만들기
+                </button>
+                <button
+                  type="button"
+                  className="lens-home-button"
+                  onClick={() => scrollToSection("result-review", "review")}
+                >
+                  최근 결과 보기
+                </button>
+              </div>
+            </div>
+
+            <div className="lens-home-status" aria-label="운영 상태 요약">
+              <article>
+                <span>공개 캡처 타입</span>
+                <strong>27</strong>
+                <em>YouTube, Demand Gen, GDN, Naver, Kakao</em>
+              </article>
+              <article>
+                <span>최근 캡처</span>
+                <strong>{dashboardStats.recent}</strong>
+                <em>최근 30건 기준</em>
+              </article>
+              <article>
+                <span>완료 / 실패</span>
+                <strong>{dashboardStats.completed} / {dashboardStats.failed}</strong>
+                <em>결과 검수 상태</em>
+              </article>
+              <article>
+                <span>검수 필요</span>
+                <strong>{dashboardStats.reviewNeeded}</strong>
+                <em>품질 플래그 또는 실패 포함</em>
+              </article>
+            </div>
+          </section>
+
+          <section className="lens-action-grid" aria-label="AdMate Lens 주요 작업 CTA">
+            {homeActionCards.map((card) => (
+              <button
+                type="button"
+                key={card.title}
+                className={`lens-action-card ${card.tone}`}
+                onClick={() =>
+                  scrollToSection(
+                    card.targetId,
+                    card.targetId === "capture-studio"
+                      ? "studio"
+                      : card.targetId === "coverage-matrix"
+                        ? "coverage"
+                        : "review",
+                  )
+                }
+              >
+                <strong>{card.title}</strong>
+                <span>{card.description}</span>
+              </button>
+            ))}
+            {externalLinks.map((link) => (
+              <a
+                key={link.href}
+                className="lens-action-card external"
+                href={link.href}
+                target="_blank"
+                rel="noreferrer"
+              >
+                <strong>{link.title}</strong>
+                <span>{link.description}</span>
+              </a>
+            ))}
+          </section>
+
+          <section className="lens-quality-panel" aria-label="AdMate Lens 품질 기준">
+            <div>
+              <p className="studio-eyebrow">Quality Standard</p>
+              <h3>캡처 결과물과 운영자 UI의 경계</h3>
+            </div>
+            <ul>
+              {validationRules.map((rule) => (
+                <li key={rule}>{rule}</li>
+              ))}
+            </ul>
+          </section>
+
           <section id="capture-studio" className="studio-hero">
             <div>
-              <p className="ops-kicker">AdMate Lens · Powered by Openclaw Engine</p>
+              <p className="ops-kicker">Capture Studio · Powered by Openclaw Engine</p>
               <h2 className="studio-title">
-                광고 게재면 캡처를 요청하고 검수하는 운영 콘솔
+                캡처 요청 생성
               </h2>
               <p className="studio-subtitle">
-                YouTube, Demand Gen, GDN 캡처 상품을 상품-지면-소재 흐름으로
-                정리하고 결과 검수까지 한 화면에서 처리합니다.
+                기존 작업실은 root 안의 주요 작업 섹션으로 유지합니다. 상품, 지면,
+                소재 정보를 입력하면 결과 검수 영역에서 증빙 이미지를 확인할 수 있습니다.
               </p>
             </div>
             <div className="studio-hero-actions" aria-label="작업 상태">
               <span className="studio-hero-stat">
-                <strong>3</strong>
+                <strong>5</strong>
                 <span>운영 매체</span>
               </span>
               <span className="studio-hero-stat">
-                <strong>16</strong>
+                <strong>27</strong>
                 <span>공개 타입</span>
               </span>
               <span className="studio-hero-stat">

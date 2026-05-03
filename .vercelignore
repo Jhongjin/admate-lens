@@ -1,0 +1,17 @@
+.git
+.next
+.vercel
+node_modules
+
+.env
+.env.*
+
+.agents
+.ai
+.cursor
+archive
+
+*.tsbuildinfo
+eval_*.txt
+eval_*.js
+out.txt
