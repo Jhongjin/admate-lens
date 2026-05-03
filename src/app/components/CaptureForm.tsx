@@ -270,7 +270,14 @@ type ProductMenu =
 type YouTubeProductMenu = "instream" | "shorts" | "masthead" | "infeed";
 type GoogleAdsProductMenu = Extract<ProductMenu, "demandgen" | "network-ads">;
 type DemandGenSurface = "youtube-feed" | "youtube-shorts";
-type MobileNativeSurface = "naver-mobile-feed" | "kakao-bizboard" | "kakao-mobile-feed";
+type NaverMobileSurface =
+  | "naver-smart-channel-mobile"
+  | "naver-feed-mobile"
+  | "naver-native-banner-feed"
+  | "naver-image-banner-mobile"
+  | "naver-mobile-feed";
+type KakaoMobileSurface = "kakao-bizboard" | "kakao-mobile-feed";
+type MobileNativeSurface = NaverMobileSurface | KakaoMobileSurface;
 type DetailOptionPreset =
   | "pc-skip"
   | "pc-non-skip"
@@ -289,6 +296,10 @@ type DetailOptionPreset =
   | "infeed-watch-next"
   | "demandgen-youtube-feed"
   | "demandgen-youtube-shorts"
+  | "naver-smart-channel-mobile"
+  | "naver-feed-mobile"
+  | "naver-native-banner-feed"
+  | "naver-image-banner-mobile"
   | "naver-mobile-feed"
   | "kakao-bizboard"
   | "kakao-mobile-feed"
@@ -321,7 +332,7 @@ const GOOGLE_ADS_PRODUCT_OPTIONS: ProductMenuOption[] = [
 ];
 
 const NAVER_PRODUCT_OPTIONS: ProductMenuOption[] = [
-  { value: "naver-mobile", label: "모바일 DA" },
+  { value: "naver-mobile", label: "디스플레이 광고" },
 ];
 
 const KAKAO_PRODUCT_OPTIONS: ProductMenuOption[] = [
@@ -352,13 +363,39 @@ const DEMAND_GEN_DETAIL_OPTIONS: DetailMenuOption[] = [
 ];
 
 const NAVER_DETAIL_OPTIONS: DetailMenuOption[] = [
-  { value: "naver-mobile-feed", label: "모바일 피드" },
+  { value: "naver-smart-channel-mobile", label: "스마트채널" },
+  { value: "naver-feed-mobile", label: "피드 광고" },
+  { value: "naver-native-banner-feed", label: "네이티브 배너" },
+  { value: "naver-image-banner-mobile", label: "이미지 배너" },
 ];
 
 const KAKAO_DETAIL_OPTIONS: DetailMenuOption[] = [
   { value: "kakao-bizboard", label: "비즈보드" },
   { value: "kakao-mobile-feed", label: "모바일 네이티브 피드" },
 ];
+
+function normalizeNaverMobileSurface(surface: MobileNativeSurface): NaverMobileSurface {
+  if (surface === "naver-mobile-feed") return "naver-feed-mobile";
+  if (
+    surface === "naver-smart-channel-mobile" ||
+    surface === "naver-feed-mobile" ||
+    surface === "naver-native-banner-feed" ||
+    surface === "naver-image-banner-mobile"
+  ) {
+    return surface;
+  }
+  return "naver-smart-channel-mobile";
+}
+
+function isNaverDetailPreset(preset: string): preset is NaverMobileSurface {
+  return (
+    preset === "naver-smart-channel-mobile" ||
+    preset === "naver-feed-mobile" ||
+    preset === "naver-native-banner-feed" ||
+    preset === "naver-image-banner-mobile" ||
+    preset === "naver-mobile-feed"
+  );
+}
 
 const YOUTUBE_DETAIL_OPTIONS_BY_PRODUCT: Record<YouTubeProductMenu, DetailMenuOption[]> = {
   instream: YOUTUBE_DETAIL_OPTIONS.filter((option) =>
@@ -506,7 +543,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
     channel: "gdn",
     googleAdsProduct: "network-ads",
     demandGenSurface: "youtube-feed",
-    mobileNativeSurface: "naver-mobile-feed",
+    mobileNativeSurface: "naver-smart-channel-mobile",
     selectedPublishers: [],
     creativeUrl: "",
     clickUrl: "",
@@ -951,7 +988,9 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
           ? "kakao-mobile"
           : form.googleAdsProduct;
   const selectedOptionPreset: DetailOptionPreset = (() => {
-    if (selectedMediaMenu === "naver") return "naver-mobile-feed";
+    if (selectedMediaMenu === "naver") {
+      return normalizeNaverMobileSurface(form.mobileNativeSurface) as DetailOptionPreset;
+    }
     if (selectedMediaMenu === "kakao") return form.mobileNativeSurface === "kakao-mobile-feed" ? "kakao-mobile-feed" : "kakao-bizboard";
     if (selectedMediaMenu !== "youtube") {
       if (isDemandGenProduct) {
@@ -1000,7 +1039,11 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
     "infeed-watch-next": "In-feed 관련동영상",
     "demandgen-youtube-feed": "Demand Gen · YouTube Feed",
     "demandgen-youtube-shorts": "Demand Gen · YouTube Shorts",
-    "naver-mobile-feed": "Naver · 모바일 피드",
+    "naver-smart-channel-mobile": "Naver · 스마트채널",
+    "naver-feed-mobile": "Naver · 피드 광고",
+    "naver-native-banner-feed": "Naver · 네이티브 배너",
+    "naver-image-banner-mobile": "Naver · 이미지 배너",
+    "naver-mobile-feed": "Naver · 피드 광고",
     "kakao-bizboard": "Kakao · 비즈보드",
     "kakao-mobile-feed": "Kakao · 모바일 네이티브 피드",
     "yt-other": "YouTube 레거시/준비중",
@@ -1027,7 +1070,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
     infeed: "In-feed",
     demandgen: "Demand Gen",
     "network-ads": "Network Ads",
-    "naver-mobile": "모바일 DA",
+    "naver-mobile": "디스플레이 광고",
     "kakao-mobile": "모바일 광고",
   };
 
@@ -1387,7 +1430,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                     mediaMenu: "naver",
                     channel: "naver",
                     googleAdsProduct: "network-ads",
-                    mobileNativeSurface: "naver-mobile-feed",
+                    mobileNativeSurface: "naver-smart-channel-mobile",
                   }));
                 } else if (next === "kakao") {
                   setForm((prev) => ({
@@ -1467,7 +1510,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                     mediaMenu: "naver",
                     channel: "naver",
                     googleAdsProduct: "network-ads",
-                    mobileNativeSurface: "naver-mobile-feed",
+                    mobileNativeSurface: "naver-smart-channel-mobile",
                   }));
                 } else if (next === "kakao-mobile") {
                   setForm((prev) => ({
@@ -1593,13 +1636,13 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                   }));
                   return;
                 }
-                if (preset === "naver-mobile-feed") {
+                if (isNaverDetailPreset(preset)) {
                   setForm((prev) => ({
                     ...prev,
                     mediaMenu: "naver",
                     channel: "naver",
                     googleAdsProduct: "network-ads",
-                    mobileNativeSurface: "naver-mobile-feed",
+                    mobileNativeSurface: normalizeNaverMobileSurface(preset),
                   }));
                   return;
                 }

@@ -28,9 +28,10 @@ AdMate Lens는 다양한 매체(YouTube, Google Ads/GDN, Naver, Kakao 등)에서
   - 데스크톱 및 모바일 프레임 지원
 
 ### 3. Naver / Kakao 모바일 지면
-- **Naver 모바일 피드**:
-  - 모바일 네이티브 피드형 광고 증빙 화면 합성
-  - 소재, 광고주명, CTA, 설명 문구, 모바일 상태바/피드 컨텍스트 렌더링
+- **Naver 디스플레이 광고 1차 지면**:
+  - 스마트채널, 피드 광고, 네이티브 배너, 이미지 배너 증빙 화면 합성
+  - 소재, 광고주명, CTA, 설명 문구, 모바일 상태바/서비스 컨텍스트 렌더링
+  - 레거시 `naver-mobile-feed` 요청은 `naver-feed-mobile`로 호환 처리
 - **Kakao 모바일 광고**:
   - Kakao Bizboard 1차 지면 지원
   - Kakao/Daum 모바일 네이티브 피드형 광고 지원
@@ -112,6 +113,7 @@ npm start
 - **2026.05.03**: YouTube 인스트림 Skip 버튼/노란 진행바 노출 타이밍 보정, YouTube 선택 시 GDN 파블리셔 혼입 방지
 - **2026.05.03**: Demand Gen 1차 범위(YouTube Feed, YouTube Shorts, Google Ads 상품 흐름) 정리 및 Naver/Kakao 모바일 캡처 지면 1차 구현
 - **2026.05.03**: Vercel 서버리스 Chromium 추출 경합 안정화 및 Naver/Kakao 모바일 합성 지면 한글/아이콘 렌더링 보강
+- **2026.05.03**: Naver 모바일 상품을 스마트채널, 피드 광고, 네이티브 배너, 이미지 배너 surface로 분리
 
 ---
 

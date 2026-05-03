@@ -116,7 +116,14 @@ export async function POST(request: NextRequest) {
         watchNextPlayerFrameOffsetSec?: number;
       };
       mobileNativeOpts?: {
-        surface?: "naver-mobile-feed" | "kakao-bizboard" | "kakao-mobile-feed";
+        surface?:
+          | "naver-smart-channel-mobile"
+          | "naver-feed-mobile"
+          | "naver-native-banner-feed"
+          | "naver-image-banner-mobile"
+          | "naver-mobile-feed"
+          | "kakao-bizboard"
+          | "kakao-mobile-feed";
         title?: string;
         description1?: string;
         description2?: string;
@@ -288,13 +295,18 @@ export async function POST(request: NextRequest) {
       ({
         ...mobileNativeOpts,
         surface:
-          mobileNativeOpts.surface === "kakao-bizboard" ||
-          mobileNativeOpts.surface === "kakao-mobile-feed" ||
           mobileNativeOpts.surface === "naver-mobile-feed"
-            ? mobileNativeOpts.surface
-            : channel === "kakao"
-              ? "kakao-bizboard"
-              : "naver-mobile-feed",
+            ? "naver-feed-mobile"
+            : mobileNativeOpts.surface === "naver-smart-channel-mobile" ||
+                mobileNativeOpts.surface === "naver-feed-mobile" ||
+                mobileNativeOpts.surface === "naver-native-banner-feed" ||
+                mobileNativeOpts.surface === "naver-image-banner-mobile" ||
+                mobileNativeOpts.surface === "kakao-bizboard" ||
+                mobileNativeOpts.surface === "kakao-mobile-feed"
+              ? mobileNativeOpts.surface
+              : channel === "kakao"
+                ? "kakao-bizboard"
+                : "naver-smart-channel-mobile",
         logoImageUrl: mobileNativeOpts.logoImageUrl?.trim()
           ? normalizeHttpUrl(mobileNativeOpts.logoImageUrl)
           : undefined,

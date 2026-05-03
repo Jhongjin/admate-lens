@@ -6,10 +6,28 @@ import {
 import { BaseChannel, type CaptureRequest } from "./base-channel";
 
 type MobileNativePlatform = "naver" | "kakao";
+type NaverMobileSurface =
+  | "naver-smart-channel-mobile"
+  | "naver-feed-mobile"
+  | "naver-native-banner-feed"
+  | "naver-image-banner-mobile"
+  | "naver-mobile-feed";
+type KakaoMobileSurface = "kakao-bizboard" | "kakao-mobile-feed";
 type MobileNativeSurface =
-  | "naver-mobile-feed"
-  | "kakao-bizboard"
-  | "kakao-mobile-feed";
+  | NaverMobileSurface
+  | KakaoMobileSurface;
+
+const NAVER_SURFACES: readonly NaverMobileSurface[] = [
+  "naver-smart-channel-mobile",
+  "naver-feed-mobile",
+  "naver-native-banner-feed",
+  "naver-image-banner-mobile",
+  "naver-mobile-feed",
+];
+
+function isNaverSurface(surface?: string): surface is NaverMobileSurface {
+  return NAVER_SURFACES.includes(surface as NaverMobileSurface);
+}
 
 type MobileNativeOpts = {
   surface?: MobileNativeSurface;
@@ -162,7 +180,12 @@ function fallbackLogoDataUrl(platform: MobileNativePlatform, sponsorName: string
 }
 
 function defaultSurface(platform: MobileNativePlatform, requested?: string): MobileNativeSurface {
-  if (platform === "naver") return "naver-mobile-feed";
+  if (platform === "naver") {
+    if (isNaverSurface(requested)) {
+      return requested === "naver-mobile-feed" ? "naver-feed-mobile" : requested;
+    }
+    return "naver-smart-channel-mobile";
+  }
   if (requested === "kakao-mobile-feed") return "kakao-mobile-feed";
   return "kakao-bizboard";
 }
@@ -182,18 +205,32 @@ function buildAdData(
   const sponsorName =
     normalizePlainText(opts.sponsorName) ||
     (platform === "naver" ? "브랜드 스토어" : "브랜드 채널");
+  const defaultTitle =
+    platform === "naver"
+      ? surface === "naver-smart-channel-mobile"
+        ? "브랜드 소식과 혜택을 확인해보세요"
+        : surface === "naver-image-banner-mobile"
+          ? "모바일 배너 광고"
+          : surface === "naver-native-banner-feed"
+            ? "콘텐츠와 함께 보는 브랜드 소식"
+            : "지금 가장 많이 찾는 혜택"
+      : "오늘의 추천 브랜드 소식";
+  const defaultDescription =
+    platform === "naver"
+      ? surface === "naver-smart-channel-mobile"
+        ? "네이버 주요 서비스 상단에서 비즈니스 메시지를 전달합니다."
+        : surface === "naver-image-banner-mobile"
+          ? "네이버 모바일 지면에 노출되는 이미지 배너입니다."
+          : surface === "naver-native-banner-feed"
+            ? "이미지, 텍스트, CTA로 구성된 네이티브 배너입니다."
+            : "모바일 피드에서 자연스럽게 노출되는 피드 광고입니다."
+      : "카카오 모바일 지면에 맞춘 광고 메시지를 확인해보세요.";
 
   return {
     platform,
     surface,
-    title:
-      normalizePlainText(opts.title) ||
-      (platform === "naver" ? "지금 가장 많이 찾는 혜택" : "오늘의 추천 브랜드 소식"),
-    description1:
-      normalizePlainText(opts.description1) ||
-      (platform === "naver"
-        ? "모바일 피드에서 자연스럽게 노출되는 네이티브 광고입니다."
-        : "카카오 모바일 지면에 맞춘 광고 메시지를 확인해보세요."),
+    title: normalizePlainText(opts.title) || defaultTitle,
+    description1: normalizePlainText(opts.description1) || defaultDescription,
     description2: normalizePlainText(opts.description2),
     sponsorName,
     displayUrl: displayHost || (platform === "naver" ? "brand.naver.com" : "brand.kakao.com"),
@@ -378,6 +415,191 @@ function renderNaverMobileFeedHtml(ad: MobileNativeAdData): string {
   </main>
 </body>
 </html>`;
+}
+
+function renderNaverSmartChannelHtml(ad: MobileNativeAdData): string {
+  const title = escapeHtml(ad.title);
+  const desc1 = escapeHtml(ad.description1);
+  const sponsor = escapeHtml(ad.sponsorName);
+  const displayUrl = escapeHtml(ad.displayUrl);
+  const cta = escapeHtml(ad.ctaText);
+  const creative = escapeAttr(ad.creativeDataUrl);
+  const logo = escapeAttr(ad.logoDataUrl);
+
+  return `<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+  <style>
+    * { box-sizing: border-box; }
+    html, body { width: 100%; min-height: 100%; margin: 0; background: #f4f6f8; color: #101010; font-family: "Noto Sans KR", "Roboto", -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", Arial, sans-serif; -webkit-font-smoothing: antialiased; }
+    .screen { width: 100vw; min-height: 100vh; background: #f4f6f8; overflow: hidden; }
+    .search { margin: 10px 14px 9px; height: 46px; border: 2px solid #03c75a; border-radius: 24px; background: #fff; display: flex; align-items: center; gap: 10px; padding: 0 14px; }
+    .n-logo { color: #03c75a; font-size: 22px; font-weight: 900; letter-spacing: -1px; }
+    .placeholder { flex: 1; color: #8b8f93; font-size: 15px; }
+    .channel-tabs { height: 48px; display: grid; grid-template-columns: repeat(5, 1fr); align-items: center; background: #fff; border-top: 1px solid rgba(0,0,0,.04); border-bottom: 1px solid rgba(0,0,0,.06); color: #34383c; font-size: 13px; font-weight: 800; text-align: center; }
+    .channel-tabs .active { color: #03c75a; }
+    .smart { margin: 10px; border-radius: 17px; background: #fff; overflow: hidden; border: 1px solid rgba(0,0,0,.06); box-shadow: 0 1px 2px rgba(0,0,0,.04); }
+    .smart-head { height: 31px; padding: 0 12px; display: flex; align-items: center; gap: 7px; color: #757b80; font-size: 11px; border-bottom: 1px solid rgba(0,0,0,.05); }
+    .ad-badge { border: 1px solid #d8dde3; border-radius: 4px; padding: 1px 4px; color: #7a8086; font-size: 10px; font-weight: 800; }
+    .smart-body { min-height: 118px; display: flex; align-items: stretch; background: linear-gradient(135deg, #f7fff9 0%, #ffffff 58%); }
+    .copy { flex: 1; padding: 16px 8px 15px 14px; min-width: 0; }
+    .brand { display: flex; align-items: center; gap: 7px; margin-bottom: 9px; color: #5d6369; font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .logo { width: 24px; height: 24px; border-radius: 8px; object-fit: cover; background: #eef1f3; }
+    .title { font-size: 18px; line-height: 24px; font-weight: 900; letter-spacing: -.35px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+    .desc { margin-top: 5px; color: #676d72; font-size: 12px; line-height: 17px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+    .cta { margin-top: 10px; width: fit-content; height: 28px; padding: 0 12px; border-radius: 14px; background: #03c75a; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 850; }
+    .thumb { width: 42%; min-height: 118px; object-fit: cover; display: block; background: #e9ecef; }
+    .news { margin: 0 10px 10px; padding: 15px 14px; background: #fff; border: 1px solid rgba(0,0,0,.06); border-radius: 16px; }
+    .news strong { display: block; font-size: 16px; line-height: 22px; }
+    .news span { display: block; margin-top: 6px; color: #8b8f93; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <main class="screen">
+    <div class="search"><div class="n-logo">N</div><div class="placeholder">검색어를 입력하세요</div></div>
+    <nav class="channel-tabs"><div class="active">뉴스</div><div>연예</div><div>스포츠</div><div>경제</div><div>쇼핑</div></nav>
+    <article class="smart">
+      <div class="smart-head"><span class="ad-badge">AD</span><span>스마트채널 · ${displayUrl}</span></div>
+      <div class="smart-body">
+        <div class="copy">
+          <div class="brand"><img class="logo" src="${logo}" alt="" /><span>${sponsor}</span></div>
+          <div class="title">${title}</div>
+          <div class="desc">${desc1}</div>
+          <div class="cta">${cta}</div>
+        </div>
+        <img class="thumb" src="${creative}" alt="" />
+      </div>
+    </article>
+    <article class="news"><strong>지금 많이 본 소식</strong><span>네이버 주요 서비스 상단 콘텐츠 영역입니다</span></article>
+    <article class="news"><strong>오늘의 추천 콘텐츠</strong><span>관심사 기반으로 이어지는 모바일 콘텐츠입니다</span></article>
+  </main>
+</body>
+</html>`;
+}
+
+function renderNaverNativeBannerFeedHtml(ad: MobileNativeAdData): string {
+  const title = escapeHtml(ad.title);
+  const desc1 = escapeHtml(ad.description1);
+  const sponsor = escapeHtml(ad.sponsorName);
+  const displayUrl = escapeHtml(ad.displayUrl);
+  const cta = escapeHtml(ad.ctaText);
+  const creative = escapeAttr(ad.creativeDataUrl);
+  const logo = escapeAttr(ad.logoDataUrl);
+
+  return `<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+  <style>
+    * { box-sizing: border-box; }
+    html, body { width: 100%; min-height: 100%; margin: 0; background: #f5f7f8; color: #101010; font-family: "Noto Sans KR", "Roboto", -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", Arial, sans-serif; -webkit-font-smoothing: antialiased; }
+    .screen { width: 100vw; min-height: 100vh; background: #f5f7f8; overflow: hidden; }
+    .top { padding: 10px 14px 8px; background: #fff; border-bottom: 1px solid rgba(0,0,0,.05); }
+    .search { height: 46px; border: 2px solid #03c75a; border-radius: 24px; display: flex; align-items: center; padding: 0 14px; background: #fff; gap: 10px; }
+    .n-logo { color: #03c75a; font-size: 22px; font-weight: 900; letter-spacing: -1px; }
+    .placeholder { flex: 1; color: #8b8f93; font-size: 15px; }
+    .feed { padding: 10px 10px 80px; }
+    .card { background: #fff; border: 1px solid rgba(0,0,0,.06); border-radius: 16px; overflow: hidden; box-shadow: 0 1px 2px rgba(0,0,0,.03); margin-bottom: 10px; }
+    .news { padding: 14px; }
+    .news-kicker { color: #03a64a; font-size: 12px; font-weight: 800; }
+    .news-title { margin-top: 6px; font-size: 16px; line-height: 22px; font-weight: 800; }
+    .native { padding: 12px 13px; display: grid; grid-template-columns: 1fr 118px; gap: 12px; align-items: center; }
+    .brand { display: flex; align-items: center; gap: 7px; color: #747a80; font-size: 11px; margin-bottom: 7px; }
+    .brand img { width: 24px; height: 24px; border-radius: 8px; object-fit: cover; background: #eef1f3; }
+    .ad-badge { border: 1px solid #d8dde3; border-radius: 4px; padding: 1px 4px; color: #7a8086; font-size: 10px; font-weight: 800; }
+    .title { font-size: 16px; line-height: 22px; font-weight: 900; letter-spacing: -.25px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+    .desc { margin-top: 4px; color: #687078; font-size: 12px; line-height: 17px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+    .meta { margin-top: 8px; display: flex; align-items: center; gap: 8px; color: #8b8f93; font-size: 11px; }
+    .cta { height: 26px; padding: 0 10px; border-radius: 13px; background: #03c75a; color: #fff; display: inline-flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 850; }
+    .thumb { width: 118px; height: 118px; object-fit: cover; border-radius: 13px; background: #e9ecef; }
+  </style>
+</head>
+<body>
+  <main class="screen">
+    <header class="top"><div class="search"><div class="n-logo">N</div><div class="placeholder">검색어를 입력하세요</div></div></header>
+    <section class="feed">
+      <article class="card news"><div class="news-kicker">추천</div><div class="news-title">사용자 관심사 기반으로 이어지는 콘텐츠 피드입니다</div></article>
+      <article class="card native">
+        <div>
+          <div class="brand"><img src="${logo}" alt="" /><span>${sponsor}</span><span class="ad-badge">AD</span></div>
+          <div class="title">${title}</div>
+          <div class="desc">${desc1}</div>
+          <div class="meta"><span>스폰서 · ${displayUrl}</span><span class="cta">${cta}</span></div>
+        </div>
+        <img class="thumb" src="${creative}" alt="" />
+      </article>
+      <article class="card news"><div class="news-kicker">오늘의 주요 콘텐츠</div><div class="news-title">지금 많이 본 소식과 관심사를 한 번에 확인해 보세요</div></article>
+    </section>
+  </main>
+</body>
+</html>`;
+}
+
+function renderNaverImageBannerMobileHtml(ad: MobileNativeAdData): string {
+  const title = escapeHtml(ad.title);
+  const desc1 = escapeHtml(ad.description1);
+  const sponsor = escapeHtml(ad.sponsorName);
+  const displayUrl = escapeHtml(ad.displayUrl);
+  const cta = escapeHtml(ad.ctaText);
+  const creative = escapeAttr(ad.creativeDataUrl);
+
+  return `<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+  <style>
+    * { box-sizing: border-box; }
+    html, body { width: 100%; min-height: 100%; margin: 0; background: #f5f7f8; color: #101010; font-family: "Noto Sans KR", "Roboto", -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", Arial, sans-serif; -webkit-font-smoothing: antialiased; }
+    .screen { width: 100vw; min-height: 100vh; background: #f5f7f8; overflow: hidden; }
+    .search { margin: 10px 14px; height: 46px; border: 2px solid #03c75a; border-radius: 24px; background: #fff; display: flex; align-items: center; gap: 10px; padding: 0 14px; }
+    .n-logo { color: #03c75a; font-size: 22px; font-weight: 900; letter-spacing: -1px; }
+    .placeholder { flex: 1; color: #8b8f93; font-size: 15px; }
+    .section { padding: 0 10px 80px; }
+    .card { background: #fff; border: 1px solid rgba(0,0,0,.06); border-radius: 16px; overflow: hidden; box-shadow: 0 1px 2px rgba(0,0,0,.03); margin-bottom: 10px; }
+    .news { padding: 14px; }
+    .news strong { display: block; font-size: 16px; line-height: 22px; }
+    .news span { display: block; margin-top: 7px; color: #8b8f93; font-size: 12px; }
+    .banner-head { height: 32px; padding: 0 12px; display: flex; align-items: center; gap: 7px; color: #70777d; font-size: 11px; border-bottom: 1px solid rgba(0,0,0,.05); }
+    .ad-badge { border: 1px solid #d8dde3; border-radius: 4px; padding: 1px 4px; color: #7a8086; font-size: 10px; font-weight: 800; }
+    .banner { position: relative; height: 132px; background: #0b1220; overflow: hidden; }
+    .banner img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .shade { position: absolute; inset: 0; background: linear-gradient(90deg, rgba(0,0,0,.58), rgba(0,0,0,.16) 58%, rgba(0,0,0,.02)); }
+    .copy { position: absolute; left: 16px; top: 16px; right: 108px; color: #fff; }
+    .title { font-size: 18px; line-height: 24px; font-weight: 900; letter-spacing: -.3px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+    .desc { margin-top: 5px; color: rgba(255,255,255,.86); font-size: 12px; line-height: 17px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+    .cta { position: absolute; left: 16px; bottom: 14px; height: 28px; padding: 0 12px; border-radius: 14px; background: #fff; color: #111; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 850; }
+  </style>
+</head>
+<body>
+  <main class="screen">
+    <div class="search"><div class="n-logo">N</div><div class="placeholder">검색어를 입력하세요</div></div>
+    <section class="section">
+      <article class="card news"><strong>서비스 통합 주요 콘텐츠</strong><span>네이버 모바일 서비스 영역입니다</span></article>
+      <article class="card">
+        <div class="banner-head"><span class="ad-badge">AD</span><span>${sponsor} · ${displayUrl}</span></div>
+        <div class="banner">
+          <img src="${creative}" alt="" />
+          <div class="shade"></div>
+          <div class="copy"><div class="title">${title}</div><div class="desc">${desc1}</div></div>
+          <div class="cta">${cta}</div>
+        </div>
+      </article>
+      <article class="card news"><strong>관심사 기반 추천</strong><span>사용자 흐름 안에서 다음 콘텐츠가 이어집니다</span></article>
+    </section>
+  </main>
+</body>
+</html>`;
+}
+
+function renderNaverHtml(ad: MobileNativeAdData): string {
+  if (ad.surface === "naver-smart-channel-mobile") return renderNaverSmartChannelHtml(ad);
+  if (ad.surface === "naver-native-banner-feed") return renderNaverNativeBannerFeedHtml(ad);
+  if (ad.surface === "naver-image-banner-mobile") return renderNaverImageBannerMobileHtml(ad);
+  return renderNaverMobileFeedHtml(ad);
 }
 
 function renderKakaoBizboardHtml(ad: MobileNativeAdData): string {
@@ -701,7 +923,7 @@ class MobileNativeCapture extends BaseChannel {
     const ad = buildAdData(this.platform, request, creative.dataUrl, logo.dataUrl);
     const html =
       this.platform === "naver"
-        ? renderNaverMobileFeedHtml(ad)
+        ? renderNaverHtml(ad)
         : surface === "kakao-mobile-feed"
           ? renderKakaoMobileFeedHtml(ad)
           : renderKakaoBizboardHtml(ad);

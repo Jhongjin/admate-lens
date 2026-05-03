@@ -41,6 +41,14 @@ const CHANNEL_LABELS: Record<string, string> = {
   kakao: "Kakao",
 };
 
+const NAVER_SURFACE_LABELS: Record<string, string> = {
+  "naver-smart-channel-mobile": "Naver · 스마트채널",
+  "naver-feed-mobile": "Naver · 피드 광고",
+  "naver-mobile-feed": "Naver · 피드 광고",
+  "naver-native-banner-feed": "Naver · 네이티브 배너",
+  "naver-image-banner-mobile": "Naver · 이미지 배너",
+};
+
 const CAPTURE_DELETE_ENABLED =
   process.env.NEXT_PUBLIC_ENABLE_CAPTURE_DELETE === "true";
 
@@ -128,7 +136,11 @@ function getProductMetaLabel(metadata: Record<string, unknown> | null): string |
     if (surface === "youtube-feed") return "Demand Gen · YouTube Feed";
     return "Demand Gen";
   }
-  if (metadata.productFamily === "naver") return "Naver · 모바일 피드";
+  if (metadata.productFamily === "naver") {
+    return typeof surface === "string"
+      ? NAVER_SURFACE_LABELS[surface] || "Naver · 디스플레이 광고"
+      : "Naver · 디스플레이 광고";
+  }
   if (metadata.productFamily === "kakao") {
     if (surface === "kakao-mobile-feed") return "Kakao · 모바일 네이티브 피드";
     return "Kakao · 비즈보드";
