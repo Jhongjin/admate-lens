@@ -1,0 +1,49 @@
+[
+  {
+    "productFamily": "demand-gen",
+    "productSurface": "youtube-feed",
+    "youtubeAdType": "mobile-infeed-home",
+    "infeedOpts": {
+      "headline": "브랜드 소식과 혜택을 확인하세요",
+      "ctaText": "자세히 보기"
+    },
+    "capturedAt": "2026-05-05T00:00:00.000Z",
+    "durationMs": 7421,
+    "resultCategory": "ad_capture_ok",
+    "diagnostics": {
+      "slotsDetected": 1,
+      "slotsInjected": 1,
+      "screenshotMode": "viewport",
+      "captureQuality": {
+        "needsReview": false,
+        "flags": [],
+        "score": 100
+      }
+    },
+    "runtime": {
+      "provider": "vercel-chromium",
+      "capturedAt": "2026-05-05T00:00:00.000Z",
+      "durationMs": 7421,
+      "diagnostics": {
+        "slotsDetected": 1,
+        "slotsInjected": 1,
+        "screenshotMode": "viewport",
+        "captureQuality": {
+          "needsReview": false,
+          "flags": [],
+          "score": 100
+        }
+      }
+    }
+  },
+  {
+    "gdnViewportMode": "pc",
+    "failureCategory": "timeout",
+    "failureCode": "capture_timeout",
+    "failedAt": "2026-05-05T00:01:30.000Z",
+    "fallback": {
+      "attempted": true,
+      "provider": "browserbase"
+    }
+  }
+]

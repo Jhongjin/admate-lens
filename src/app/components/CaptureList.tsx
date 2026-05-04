@@ -192,6 +192,64 @@ function getFailureCategoryLabel(metadata: Record<string, unknown> | null): stri
   return "실행 오류";
 }
 
+function getQualityStateLabel(metadata: Record<string, unknown> | null): string | null {
+  const resultLabel = getResultCategoryLabel(metadata);
+  const reviewLabel = getQualityReviewLabel(metadata);
+  if (resultLabel && reviewLabel) return `${resultLabel} · ${reviewLabel}`;
+  if (resultLabel) return resultLabel;
+  return getFailureCategoryLabel(metadata);
+}
+
+function getQualityFlagCountLabel(metadata: Record<string, unknown> | null): string | null {
+  const diagnostics = metadata?.diagnostics as Record<string, unknown> | undefined;
+  const quality = diagnostics?.captureQuality as { flags?: unknown } | undefined;
+  const flags = Array.isArray(quality?.flags) ? quality.flags : null;
+  if (!flags) return null;
+  return flags.length > 0 ? `검수 플래그 ${flags.length}개` : "검수 플래그 없음";
+}
+
+function getRuntimeProviderLabel(metadata: Record<string, unknown> | null): string | null {
+  if (!metadata) return null;
+  const runtime = metadata.runtime as Record<string, unknown> | undefined;
+  const provider =
+    typeof runtime?.provider === "string"
+      ? runtime.provider
+      : typeof metadata.runtimeProvider === "string"
+        ? metadata.runtimeProvider
+        : null;
+  if (!provider) return null;
+  if (provider === "vercel-chromium") return "Vercel Chromium";
+  if (provider === "browserbase") return "Browserbase";
+  return provider;
+}
+
+function getMetadataSurfaceCode(metadata: Record<string, unknown> | null): string | null {
+  if (!metadata) return null;
+  const family = typeof metadata.productFamily === "string" ? metadata.productFamily : null;
+  const surface = typeof metadata.productSurface === "string" ? metadata.productSurface : null;
+  const youtubeAdType = typeof metadata.youtubeAdType === "string" ? metadata.youtubeAdType : null;
+  const gdnViewportMode = typeof metadata.gdnViewportMode === "string" ? metadata.gdnViewportMode : null;
+  if (family && surface) return `${family} / ${surface}`;
+  if (surface) return surface;
+  if (youtubeAdType) return `youtube / ${youtubeAdType}`;
+  if (gdnViewportMode) return `gdn / ${gdnViewportMode}`;
+  return null;
+}
+
+function getMetadataEventTime(metadata: Record<string, unknown> | null): string | null {
+  if (!metadata) return null;
+  const value =
+    typeof metadata.capturedAt === "string"
+      ? metadata.capturedAt
+      : typeof metadata.failedAt === "string"
+        ? metadata.failedAt
+        : null;
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return formatDate(value);
+}
+
 export default function CaptureList({ refreshTrigger }: CaptureListProps) {
   const [captures, setCaptures] = useState<CaptureRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -336,8 +394,9 @@ export default function CaptureList({ refreshTrigger }: CaptureListProps) {
         <div className="flex gap-1 bg-[var(--color-bg-primary)] rounded-lg p-1 border border-[var(--color-border)]">
           {[
             { key: "all", label: "전체" },
-            { key: "completed", label: "완료" },
+            { key: "pending", label: "대기중" },
             { key: "processing", label: "처리중" },
+            { key: "completed", label: "완료" },
             { key: "failed", label: "실패" },
           ].map((tab) => (
             <button
@@ -526,10 +585,7 @@ export default function CaptureList({ refreshTrigger }: CaptureListProps) {
                     )}
                     {capture.status === "completed" && capture.metadata && typeof capture.metadata === "object" && (
                       <p className="text-[11px] text-[var(--color-text-muted)] mt-1">
-                        {getResultCategoryLabel(capture.metadata)}
-                        {getQualityReviewLabel(capture.metadata)
-                          ? ` · ${getQualityReviewLabel(capture.metadata)}`
-                          : ""}
+                        {getQualityStateLabel(capture.metadata)}
                       </p>
                     )}
                     {capture.status === "failed" && capture.metadata && typeof capture.metadata === "object" && (
@@ -652,6 +708,13 @@ function CaptureDetailModal({
   onDelete: (id: string) => void;
 }) {
   const status = STATUS_LABELS[capture.status] || STATUS_LABELS.pending;
+  const metadata =
+    capture.metadata && typeof capture.metadata === "object" ? capture.metadata : null;
+  const qualityStateLabel = getQualityStateLabel(metadata);
+  const qualityFlagCountLabel = getQualityFlagCountLabel(metadata);
+  const runtimeProviderLabel = getRuntimeProviderLabel(metadata);
+  const metadataSurfaceCode = getMetadataSurfaceCode(metadata);
+  const metadataEventTime = getMetadataEventTime(metadata);
 
   return (
     <div
@@ -804,27 +867,56 @@ function CaptureDetailModal({
               <span className="text-[var(--color-text-muted)]">랜딩 캡처</span>
               <span className="text-[var(--color-text-secondary)]">{capture.capture_landing ? "예" : "아니오"}</span>
             </div>
-            {capture.metadata && typeof capture.metadata === "object" && getDurationMs(capture.metadata) !== null && (
+            {metadata && getDurationMs(metadata) !== null && (
               <div className="flex justify-between">
                 <span className="text-[var(--color-text-muted)]">소요 시간</span>
                 <span className="text-[var(--color-text-secondary)]">
-                  {((getDurationMs(capture.metadata) || 0) / 1000).toFixed(1)}초
+                  {((getDurationMs(metadata) || 0) / 1000).toFixed(1)}초
                 </span>
+              </div>
+            )}
+            {metadata && qualityStateLabel && (
+              <div className="flex justify-between">
+                <span className="text-[var(--color-text-muted)]">품질 상태</span>
+                <span className="text-[var(--color-text-secondary)]">{qualityStateLabel}</span>
+              </div>
+            )}
+            {metadata && qualityFlagCountLabel && (
+              <div className="flex justify-between">
+                <span className="text-[var(--color-text-muted)]">품질 플래그</span>
+                <span className="text-[var(--color-text-secondary)]">{qualityFlagCountLabel}</span>
+              </div>
+            )}
+            {metadata && runtimeProviderLabel && (
+              <div className="flex justify-between">
+                <span className="text-[var(--color-text-muted)]">렌더링 런타임</span>
+                <span className="text-[var(--color-text-secondary)]">{runtimeProviderLabel}</span>
+              </div>
+            )}
+            {metadata && metadataSurfaceCode && (
+              <div className="flex justify-between">
+                <span className="text-[var(--color-text-muted)]">메타데이터 surface</span>
+                <span className="text-[var(--color-text-secondary)] font-mono text-xs">{metadataSurfaceCode}</span>
+              </div>
+            )}
+            {metadata && metadataEventTime && (
+              <div className="flex justify-between">
+                <span className="text-[var(--color-text-muted)]">메타데이터 시각</span>
+                <span className="text-[var(--color-text-secondary)]">{metadataEventTime}</span>
               </div>
             )}
             {(capture.channel === "youtube" ||
               capture.channel === "naver" ||
               capture.channel === "kakao") &&
-              capture.metadata &&
-              typeof capture.metadata === "object" && (
+              metadata && (
               <>
                 <div className="flex justify-between">
                   <span className="text-[var(--color-text-muted)]">상품 유형</span>
                   <span className="text-[var(--color-text-secondary)]">
                     {(() => {
-                      const productLabel = getProductMetaLabel(capture.metadata);
+                      const productLabel = getProductMetaLabel(metadata);
                       if (productLabel) return productLabel;
-                      const yt = getYoutubeMeta(capture.metadata);
+                      const yt = getYoutubeMeta(metadata);
                       return getYoutubeAdTypeLabel(yt.adType) ?? "-";
                     })()}
                   </span>
@@ -833,7 +925,7 @@ function CaptureDetailModal({
                   <span className="text-[var(--color-text-muted)]">캡처 시점</span>
                   <span className="text-[var(--color-text-secondary)]">
                     {(() => {
-                      const yt = getYoutubeMeta(capture.metadata);
+                      const yt = getYoutubeMeta(metadata);
                       return yt.captureSecond !== undefined ? `${yt.captureSecond}초` : "-";
                     })()}
                   </span>

@@ -7,7 +7,11 @@
     "dev": "next dev --turbopack",
     "build": "next build",
     "start": "next start",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "check:surface-registry": "node scripts/check-surface-registry.mjs",
+    "check:capture-metadata": "node scripts/check-capture-output-metadata.mjs scripts/fixtures/capture-metadata-smoke.json",
+    "check:capture-dimensions": "node scripts/check-capture-dimensions.mjs",
+    "verify:harness": "npm run check:surface-registry && npm run check:capture-metadata"
   },
   "dependencies": {
     "@sparticuz/chromium-min": "^143.0.4",
