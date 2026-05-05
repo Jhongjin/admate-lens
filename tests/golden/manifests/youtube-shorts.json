@@ -1,0 +1,46 @@
+{
+  "schemaVersion": 1,
+  "surface": "youtube-shorts",
+  "channel": "youtube",
+  "productFamily": "youtube",
+  "productSurface": "shorts",
+  "sampleState": "pending-sample",
+  "sensitivity": "repo-safe-placeholder",
+  "golden": {
+    "imagePath": "tests/golden/images/youtube-shorts/golden.png",
+    "metadataPath": "tests/golden/metadata/youtube-shorts.json",
+    "sha256": null,
+    "width": 1170,
+    "height": 2532
+  },
+  "candidate": {
+    "imagePath": "tests/golden/candidates/youtube-shorts/current.png",
+    "outputDir": "tests/golden/candidates/youtube-shorts",
+    "source": "manual-or-capture-result"
+  },
+  "diff": {
+    "outputDir": "tests/golden/diffs/youtube-shorts",
+    "reportPath": "tests/golden/reports/youtube-shorts/report.json",
+    "diffImagePath": "tests/golden/diffs/youtube-shorts/diff.png",
+    "maxPixelDiffRatio": 0.01,
+    "maxMeanDelta": 3.5,
+    "pixelDeltaThreshold": 12,
+    "failOnDimensionMismatch": true
+  },
+  "requiredMetadata": [
+    "capturedAt",
+    "durationMs",
+    "resultCategory",
+    "diagnostics",
+    "diagnostics.captureQuality",
+    "runtime.provider",
+    "runtime.capturedAt",
+    "runtime.durationMs",
+    "youtubeAdType"
+  ],
+  "expectedMetadata": {
+    "youtubeAdType": "shorts-feed",
+    "resultCategory": "ad_capture_ok"
+  },
+  "notes": "Pending until a repo-safe YouTube Shorts capture is approved as golden."
+}

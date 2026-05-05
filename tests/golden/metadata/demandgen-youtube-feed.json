@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "surface": "demandgen-youtube-feed",
+  "sampleState": "pending-sample",
+  "fixtureKind": "placeholder",
+  "metadata": {
+    "capturedAt": "2026-05-05T00:00:00.000Z",
+    "durationMs": 1,
+    "resultCategory": "ad_capture_ok",
+    "productFamily": "demand-gen",
+    "productSurface": "youtube-feed",
+    "youtubeAdType": "mobile-infeed-home",
+    "diagnostics": {
+      "adType": "mobile-infeed-home",
+      "injectionSuccess": true,
+      "captureQuality": {
+        "needsReview": false,
+        "flags": [],
+        "score": 100
+      }
+    },
+    "runtime": {
+      "provider": "placeholder",
+      "capturedAt": "2026-05-05T00:00:00.000Z",
+      "durationMs": 1
+    }
+  }
+}

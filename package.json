@@ -11,7 +11,12 @@
     "check:surface-registry": "node scripts/check-surface-registry.mjs",
     "check:capture-metadata": "node scripts/check-capture-output-metadata.mjs scripts/fixtures/capture-metadata-smoke.json",
     "check:capture-dimensions": "node scripts/check-capture-dimensions.mjs",
-    "verify:harness": "npm run check:surface-registry && npm run check:capture-metadata"
+    "check:golden-manifest": "node scripts/check-golden-manifest.mjs",
+    "check:golden-metadata": "node scripts/check-golden-metadata.mjs",
+    "check:golden-dimensions": "node scripts/check-golden-dimensions.mjs",
+    "check:golden-pixels": "node scripts/check-golden-pixels.mjs",
+    "verify:harness": "npm run check:surface-registry && npm run check:capture-metadata",
+    "verify:golden": "npm run check:golden-manifest && npm run check:golden-metadata && npm run check:golden-dimensions && npm run check:golden-pixels"
   },
   "dependencies": {
     "@sparticuz/chromium-min": "^143.0.4",

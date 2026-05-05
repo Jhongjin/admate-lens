@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "surface": "youtube-pc-instream-skip",
+  "sampleState": "pending-sample",
+  "fixtureKind": "placeholder",
+  "metadata": {
+    "capturedAt": "2026-05-05T00:00:00.000Z",
+    "durationMs": 1,
+    "resultCategory": "ad_capture_ok",
+    "youtubeAdType": "preroll",
+    "instreamOpts": {
+      "skipSeconds": 5,
+      "isSkippable": true
+    },
+    "diagnostics": {
+      "adType": "preroll",
+      "injectionSuccess": true,
+      "captureQuality": {
+        "needsReview": false,
+        "flags": [],
+        "score": 100
+      }
+    },
+    "runtime": {
+      "provider": "placeholder",
+      "capturedAt": "2026-05-05T00:00:00.000Z",
+      "durationMs": 1
+    }
+  }
+}

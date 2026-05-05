@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 1,
+  "surface": "demandgen-youtube-feed",
+  "channel": "youtube",
+  "productFamily": "demand-gen",
+  "productSurface": "youtube-feed",
+  "sampleState": "pending-sample",
+  "sensitivity": "repo-safe-placeholder",
+  "golden": {
+    "imagePath": "tests/golden/images/demandgen-youtube-feed/golden.png",
+    "metadataPath": "tests/golden/metadata/demandgen-youtube-feed.json",
+    "sha256": null,
+    "width": 1170,
+    "height": 2532
+  },
+  "candidate": {
+    "imagePath": "tests/golden/candidates/demandgen-youtube-feed/current.png",
+    "outputDir": "tests/golden/candidates/demandgen-youtube-feed",
+    "source": "manual-or-capture-result"
+  },
+  "diff": {
+    "outputDir": "tests/golden/diffs/demandgen-youtube-feed",
+    "reportPath": "tests/golden/reports/demandgen-youtube-feed/report.json",
+    "diffImagePath": "tests/golden/diffs/demandgen-youtube-feed/diff.png",
+    "maxPixelDiffRatio": 0.01,
+    "maxMeanDelta": 3.5,
+    "pixelDeltaThreshold": 12,
+    "failOnDimensionMismatch": true
+  },
+  "requiredMetadata": [
+    "capturedAt",
+    "durationMs",
+    "resultCategory",
+    "diagnostics",
+    "diagnostics.captureQuality",
+    "runtime.provider",
+    "runtime.capturedAt",
+    "runtime.durationMs",
+    "productFamily",
+    "productSurface",
+    "youtubeAdType"
+  ],
+  "expectedMetadata": {
+    "productFamily": "demand-gen",
+    "productSurface": "youtube-feed",
+    "youtubeAdType": "mobile-infeed-home",
+    "resultCategory": "ad_capture_ok"
+  },
+  "notes": "Pending until a repo-safe Demand Gen YouTube Feed capture is approved as golden."
+}

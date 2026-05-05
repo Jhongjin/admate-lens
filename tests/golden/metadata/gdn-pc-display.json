@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "surface": "gdn-pc-display",
+  "sampleState": "pending-sample",
+  "fixtureKind": "placeholder",
+  "metadata": {
+    "capturedAt": "2026-05-05T00:00:00.000Z",
+    "durationMs": 1,
+    "resultCategory": "ad_capture_ok",
+    "gdnViewportMode": "pc",
+    "diagnostics": {
+      "slotsDetected": 1,
+      "slotsInjected": 1,
+      "screenshotMode": "viewport",
+      "captureQuality": {
+        "needsReview": false,
+        "flags": [],
+        "score": 100
+      }
+    },
+    "runtime": {
+      "provider": "placeholder",
+      "capturedAt": "2026-05-05T00:00:00.000Z",
+      "durationMs": 1
+    }
+  }
+}

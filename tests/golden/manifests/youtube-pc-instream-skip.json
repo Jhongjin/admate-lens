@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "surface": "youtube-pc-instream-skip",
+  "channel": "youtube",
+  "productFamily": "youtube",
+  "productSurface": "pc-instream-skip",
+  "sampleState": "pending-sample",
+  "sensitivity": "repo-safe-placeholder",
+  "golden": {
+    "imagePath": "tests/golden/images/youtube-pc-instream-skip/golden.png",
+    "metadataPath": "tests/golden/metadata/youtube-pc-instream-skip.json",
+    "sha256": null,
+    "width": 1920,
+    "height": 1080
+  },
+  "candidate": {
+    "imagePath": "tests/golden/candidates/youtube-pc-instream-skip/current.png",
+    "outputDir": "tests/golden/candidates/youtube-pc-instream-skip",
+    "source": "manual-or-capture-result"
+  },
+  "diff": {
+    "outputDir": "tests/golden/diffs/youtube-pc-instream-skip",
+    "reportPath": "tests/golden/reports/youtube-pc-instream-skip/report.json",
+    "diffImagePath": "tests/golden/diffs/youtube-pc-instream-skip/diff.png",
+    "maxPixelDiffRatio": 0.0075,
+    "maxMeanDelta": 3,
+    "pixelDeltaThreshold": 12,
+    "failOnDimensionMismatch": true
+  },
+  "requiredMetadata": [
+    "capturedAt",
+    "durationMs",
+    "resultCategory",
+    "diagnostics",
+    "diagnostics.captureQuality",
+    "runtime.provider",
+    "runtime.capturedAt",
+    "runtime.durationMs",
+    "youtubeAdType",
+    "instreamOpts.skipSeconds"
+  ],
+  "expectedMetadata": {
+    "youtubeAdType": "preroll",
+    "instreamOpts.skipSeconds": 5,
+    "resultCategory": "ad_capture_ok"
+  },
+  "notes": "Pending until a repo-safe YouTube PC in-stream skip capture is approved as golden."
+}
