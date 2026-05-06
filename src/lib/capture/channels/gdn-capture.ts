@@ -572,7 +572,9 @@ export class GdnCapture extends BaseChannel {
     }
 
     // 캡처 직전 고정 배지 보정: 사이트 CSS로 배지가 가려지는 경우를 방지
-    await this.ensureAdDisclosureBadge(page);
+    await this.ensureAdDisclosureBadge(page, {
+      mobileViewport: gdnViewportMode === "mobile",
+    });
 
     // 🔑 스크롤 복원 후 충분한 렌더링 안정화 (블로터 등 동적 사이트 대응)
     await new Promise((r) => setTimeout(r, batchFastMode ? 800 : 2000));
@@ -930,11 +932,135 @@ export class GdnCapture extends BaseChannel {
     throw lastErr instanceof Error ? lastErr : new Error(String(lastErr ?? `${phase} failed`));
   }
 
-  private async ensureAdDisclosureBadge(page: IPageHandle): Promise<void> {
+  private async ensureAdDisclosureBadge(
+    page: IPageHandle,
+    options: { mobileViewport?: boolean } = {},
+  ): Promise<void> {
+    const mobileViewport = Boolean(options.mobileViewport);
     await page.evaluate<void>(`
       (() => {
+        const requestedMobileViewport = ${mobileViewport ? "true" : "false"};
         const targets = Array.from(document.querySelectorAll('[data-injected="admate"], [data-injected="admate-wrapper"]'));
         if (targets.length === 0) return;
+
+        const DISCLOSURE_PRESETS = {
+          pcDisplay: {
+            id: 'gdn-display-control-cluster',
+            height: 15,
+            cell: 13,
+            icon: 13,
+            top: 0,
+            right: 1,
+            gap: 0,
+            dotRadius: 1.2,
+            rowBackground: 'rgba(255,255,255,0.92)',
+            pillPadding: '1px 2px',
+            pillRadius: 1,
+            pillShadow: 'none',
+          },
+          mobileDisplay: {
+            id: 'gdn-mobile-display-badge',
+            height: 14,
+            cell: 12,
+            icon: 12,
+            top: 0,
+            right: 1,
+            gap: 0,
+            dotRadius: 1.1,
+            rowBackground: 'rgba(255,255,255,0.92)',
+            pillPadding: '1px 2px',
+            pillRadius: 1,
+            pillShadow: 'none',
+          },
+          nativeBanner: {
+            id: 'gdn-native-banner-adchoices',
+            height: 15,
+            cell: 13,
+            icon: 13,
+            top: 2,
+            right: 2,
+            gap: 0,
+            dotRadius: 1.2,
+            rowBackground: 'rgba(255,255,255,0.88)',
+            pillPadding: '1px 2px',
+            pillRadius: 1,
+            pillShadow: 'none',
+          },
+        };
+
+        function resolveDisclosurePreset(host) {
+          const rect = host.getBoundingClientRect();
+          const viewportW = window.innerWidth || document.documentElement.clientWidth || 0;
+          const aspect = rect.height > 0 ? rect.width / rect.height : 0;
+          const isMobileViewport = requestedMobileViewport || (viewportW > 0 && viewportW <= 640);
+          const isNativeLike =
+            rect.width >= 220 &&
+            rect.width <= 420 &&
+            rect.height >= 72 &&
+            rect.height <= 180 &&
+            aspect >= 1.8;
+
+          if (isNativeLike) return DISCLOSURE_PRESETS.nativeBanner;
+          if (isMobileViewport) return DISCLOSURE_PRESETS.mobileDisplay;
+          return DISCLOSURE_PRESETS.pcDisplay;
+        }
+
+        function makeCellCss(preset) {
+          return (
+            'display:inline-flex !important;align-items:center !important;justify-content:center !important;' +
+            'width:' + preset.cell + 'px !important;height:' + preset.height + 'px !important;' +
+            'min-width:' + preset.cell + 'px !important;min-height:' + preset.height + 'px !important;' +
+            'padding:0 !important;margin:0 !important;line-height:0 !important;box-sizing:border-box !important;' +
+            'background:' + preset.rowBackground + ' !important;background-color:' + preset.rowBackground + ' !important;' +
+            'border-radius:0 !important;box-shadow:none !important;border:none !important;'
+          );
+        }
+
+        function makeIconBoxCss(preset, width) {
+          return (
+            'line-height:0 !important;display:inline-block !important;height:' + preset.icon + 'px !important;' +
+            'width:' + width + 'px !important;vertical-align:top !important;position:relative !important;'
+          );
+        }
+
+        function makeMenuCellCss(preset) {
+          return [
+            'cursor: pointer !important',
+            'height: ' + preset.height + 'px !important',
+            'width: ' + preset.cell + 'px !important',
+            'z-index: 2147483646 !important',
+            'background-color: ' + preset.rowBackground + ' !important',
+            'display: inline-flex !important',
+            'align-items: center !important',
+            'justify-content: center !important',
+            'position: relative !important',
+            'padding: 0 !important',
+            'margin: 0 !important',
+            'line-height: 0 !important',
+          ].join('; ');
+        }
+
+        function resizeExistingIcons(badge, preset) {
+          const svgs = badge.querySelectorAll('svg');
+          svgs.forEach((svg) => {
+            svg.setAttribute('width', String(preset.icon));
+            svg.setAttribute('height', String(preset.icon));
+            svg.style.setProperty('height', preset.icon + 'px', 'important');
+            svg.style.setProperty('width', preset.icon + 'px', 'important');
+          });
+          const iconBoxes = badge.querySelectorAll('.il-icon');
+          iconBoxes.forEach((iconBox) => {
+            iconBox.style.cssText = makeIconBoxCss(preset, preset.icon);
+          });
+          const menuDots = badge.querySelectorAll('.cbb svg circle');
+          menuDots.forEach((dot) => {
+            dot.setAttribute('r', String(preset.dotRadius));
+          });
+          const menuCell = badge.querySelector('.cbb');
+          if (menuCell) {
+            menuCell.style.cssText = makeMenuCellCss(preset);
+          }
+        }
 
         function syncBadgeToCreativeCorner(host, img) {
           const badge = host.querySelector(':scope > [data-injected="admate-badge"]');
@@ -943,9 +1069,10 @@ export class GdnCapture extends BaseChannel {
           if (!nw || !nh) return;
 
           const fit = (getComputedStyle(img).objectFit || 'fill').toLowerCase();
-          const edge = 4;
+          const preset = resolveDisclosurePreset(host);
+          const edge = preset.right;
           if (fit !== 'contain') {
-            badge.style.setProperty('top', '1px', 'important');
+            badge.style.setProperty('top', preset.top + 'px', 'important');
             badge.style.setProperty('right', edge + 'px', 'important');
             badge.style.setProperty('left', 'auto', 'important');
             badge.style.setProperty('bottom', 'auto', 'important');
@@ -981,9 +1108,9 @@ export class GdnCapture extends BaseChannel {
           const fitTop = ir.top + oy * sy;
           const fitW = dw * sx;
 
-          const bw = badge.offsetWidth || 40;
+          const bw = badge.offsetWidth || (preset.cell * 2 + preset.gap);
           const left = fitLeft + fitW - bw - edge - hr.left;
-          const top = fitTop + 1 - hr.top;
+          const top = fitTop + preset.top - hr.top;
 
           badge.style.setProperty('top', top + 'px', 'important');
           badge.style.setProperty('left', left + 'px', 'important');
@@ -992,15 +1119,10 @@ export class GdnCapture extends BaseChannel {
         }
 
         function ensureBadgeForTarget(target) {
-          const cellCss =
-            'display:inline-flex !important;align-items:center !important;justify-content:center !important;' +
-            'width:15px !important;height:15px !important;min-width:15px !important;min-height:15px !important;' +
-            'padding:0 !important;margin:0 !important;line-height:0 !important;box-sizing:border-box !important;' +
-            'background:#ffffff !important;background-color:#ffffff !important;border-radius:0 !important;' +
-            'box-shadow:none !important;border:none !important;';
-
           const host = target.closest('[data-injected="admate-wrapper"]') || target.parentElement || target;
           if (!host) return;
+          const preset = resolveDisclosurePreset(host);
+          const cellCss = makeCellCss(preset);
           const hostStyle = window.getComputedStyle(host);
           if (hostStyle.position === 'static') {
             host.style.setProperty('position', 'relative', 'important');
@@ -1017,10 +1139,10 @@ export class GdnCapture extends BaseChannel {
             badge.className = 'abgc';
             badge.style.cssText = [
               'display: block !important',
-              'height: 15px !important',
+              'height: ' + preset.height + 'px !important',
               'position: absolute !important',
-              'right: 4px !important',
-              'top: 1px !important',
+              'right: ' + preset.right + 'px !important',
+              'top: ' + preset.top + 'px !important',
               'text-rendering: geometricPrecision !important',
               'z-index: 2147483646 !important',
               'cursor: pointer !important',
@@ -1035,15 +1157,15 @@ export class GdnCapture extends BaseChannel {
             ilWrap.className = 'il-wrap';
             ilWrap.setAttribute('data-injected', 'admate-badge-row');
             ilWrap.style.cssText = [
-              'background-color: #ffffff !important',
-              'height: 15px !important',
+              'background-color: ' + preset.rowBackground + ' !important',
+              'height: ' + preset.height + 'px !important',
               'white-space: nowrap !important',
               'display: inline-flex !important',
               'align-items: center !important',
               'vertical-align: top !important',
               'padding: 0 !important',
               'margin: 0 !important',
-              'gap: 2px !important',
+              'gap: ' + preset.gap + 'px !important',
             ].join('; ');
 
             const hidden = document.createElement('input');
@@ -1058,10 +1180,9 @@ export class GdnCapture extends BaseChannel {
 
             const ilIconInfo = document.createElement('div');
             ilIconInfo.className = 'il-icon';
-            ilIconInfo.style.cssText =
-              'line-height:0 !important;display:inline-block !important;height:15px !important;width:auto !important;vertical-align:top !important;';
+            ilIconInfo.style.cssText = makeIconBoxCss(preset, preset.icon);
             ilIconInfo.innerHTML =
-              '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 15 15" width="15" height="15">' +
+              '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 15 15" width="' + preset.icon + '" height="' + preset.icon + '">' +
                 '<path fill="#00aecd" d="M7.5 1.5a6 6 0 100 12 6 6 0 100-12m0 1a5 5 0 110 10 5 5 0 110-10zM6.625 11h1.75V6.5h-1.75zM7.5 3.75a1 1 0 100 2 1 1 0 100-2z"></path>' +
               '</svg>';
             cellInfo.appendChild(ilIconInfo);
@@ -1070,29 +1191,17 @@ export class GdnCapture extends BaseChannel {
             cbb.className = 'cbb';
             cbb.setAttribute('for', uid);
             cbb.id = uid + '_lbl';
-            cbb.style.cssText = [
-              'cursor: pointer !important',
-              'height: 15px !important',
-              'width: 15px !important',
-              'z-index: 2147483646 !important',
-              'background-color: #ffffff !important',
-              'display: inline-flex !important',
-              'position: relative !important',
-              'padding: 0 !important',
-              'margin: 0 !important',
-              'line-height: 0 !important',
-            ].join('; ');
+            cbb.style.cssText = makeMenuCellCss(preset);
 
             const ilIconMenu = document.createElement('div');
             ilIconMenu.className = 'il-icon';
-            ilIconMenu.style.cssText =
-              'line-height:0 !important;display:inline-block !important;height:15px !important;width:15px !important;vertical-align:top !important;position:relative !important;';
+            ilIconMenu.style.cssText = makeIconBoxCss(preset, preset.icon);
             ilIconMenu.innerHTML =
-              '<svg fill="none" height="15" viewBox="0 0 15 15" width="15" xmlns="http://www.w3.org/2000/svg" ' +
-                'style="position:absolute !important;top:0 !important;right:0 !important;height:15px !important;width:15px !important;">' +
-                '<circle cx="7.5" cy="3.5" fill="#00aecd" r="1.5"></circle>' +
-                '<circle cx="7.5" cy="7.5" fill="#00aecd" r="1.5"></circle>' +
-                '<circle cx="7.5" cy="11.5" fill="#00aecd" r="1.5"></circle>' +
+              '<svg fill="none" height="' + preset.icon + '" viewBox="0 0 15 15" width="' + preset.icon + '" xmlns="http://www.w3.org/2000/svg" ' +
+                'style="position:absolute !important;top:0 !important;right:0 !important;height:' + preset.icon + 'px !important;width:' + preset.icon + 'px !important;">' +
+                '<circle cx="7.5" cy="3.5" fill="#00aecd" r="' + preset.dotRadius + '"></circle>' +
+                '<circle cx="7.5" cy="7.5" fill="#00aecd" r="' + preset.dotRadius + '"></circle>' +
+                '<circle cx="7.5" cy="11.5" fill="#00aecd" r="' + preset.dotRadius + '"></circle>' +
               '</svg>';
             cbb.appendChild(ilIconMenu);
 
@@ -1107,10 +1216,10 @@ export class GdnCapture extends BaseChannel {
           const pillEl = badge.querySelector(':scope > [data-injected="admate-badge-pill"]');
           const outerBase = [
             'display: block !important',
-            'height: 15px !important',
+            'height: ' + preset.height + 'px !important',
             'position: absolute !important',
-            'right: 4px !important',
-            'top: 1px !important',
+            'right: ' + preset.right + 'px !important',
+            'top: ' + preset.top + 'px !important',
             'text-rendering: geometricPrecision !important',
             'z-index: 2147483646 !important',
             'cursor: pointer !important',
@@ -1126,11 +1235,11 @@ export class GdnCapture extends BaseChannel {
             rowEl.style.cssText = [
               'display: inline-flex !important',
               'align-items: center !important',
-              'gap: 2px !important',
+              'gap: ' + preset.gap + 'px !important',
               'padding: 0 !important',
               'margin: 0 !important',
-              'background-color: #ffffff !important',
-              'height: 15px !important',
+              'background-color: ' + preset.rowBackground + ' !important',
+              'height: ' + preset.height + 'px !important',
               'white-space: nowrap !important',
               'vertical-align: top !important',
               'border: none !important',
@@ -1138,6 +1247,7 @@ export class GdnCapture extends BaseChannel {
             rowEl.querySelectorAll('[data-injected="admate-adchoices-cell"]').forEach((cell) => {
               cell.style.cssText = cellCss;
             });
+            resizeExistingIcons(badge, preset);
           } else if (pillEl) {
             badge.style.cssText = outerBase.concat([
               'display: inline-block !important',
@@ -1148,26 +1258,28 @@ export class GdnCapture extends BaseChannel {
             pillEl.style.cssText = [
               'display: inline-flex !important',
               'align-items: center !important',
-              'gap: 2px !important',
-              'padding: 2px 4px !important',
+              'gap: ' + preset.gap + 'px !important',
+              'padding: ' + preset.pillPadding + ' !important',
               'margin: 0 !important',
-              'background: #ffffff !important',
-              'background-color: #ffffff !important',
-              'border-radius: 2px !important',
-              'box-shadow: 0 0 0 1px rgba(0,0,0,0.08) !important',
+              'background: ' + preset.rowBackground + ' !important',
+              'background-color: ' + preset.rowBackground + ' !important',
+              'border-radius: ' + preset.pillRadius + 'px !important',
+              'box-shadow: ' + preset.pillShadow + ' !important',
               'border: none !important',
             ].join('; ');
+            resizeExistingIcons(badge, preset);
           } else {
             badge.style.cssText = outerBase.concat([
               'display: inline-flex !important',
               'align-items: center !important',
-              'gap: 2px !important',
-              'padding: 2px 4px !important',
+              'gap: ' + preset.gap + 'px !important',
+              'padding: ' + preset.pillPadding + ' !important',
               'margin: 0 !important',
-              'background: #ffffff !important',
-              'border-radius: 2px !important',
-              'box-shadow: 0 0 0 1px rgba(0,0,0,0.08) !important',
+              'background: ' + preset.rowBackground + ' !important',
+              'border-radius: ' + preset.pillRadius + 'px !important',
+              'box-shadow: ' + preset.pillShadow + ' !important',
             ]).join('; ');
+            resizeExistingIcons(badge, preset);
           }
 
           const img = host.querySelector('img[data-injected="admate"]');
