@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, type ReactNode } from "react";
 
 /** 캡처 레코드 타입 */
 interface CaptureRecord {
@@ -12,6 +12,7 @@ interface CaptureRecord {
   placement_image_url: string | null;
   landing_image_url: string | null;
   landing_final_url: string | null;
+  screenshot_storage_path?: string | null;
   error_message: string | null;
   capture_landing: boolean;
   metadata: Record<string, unknown> | null;
@@ -248,6 +249,90 @@ function getMetadataEventTime(metadata: Record<string, unknown> | null): string 
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
   return formatDate(value);
+}
+
+function formatDurationLabel(durationMs: number | null): string | null {
+  if (durationMs === null) return null;
+  if (durationMs < 1000) return `${durationMs}ms`;
+  return `${(durationMs / 1000).toFixed(1)}초`;
+}
+
+function getHostnameLabel(url: string | null | undefined): string | null {
+  if (!url) return null;
+  try {
+    return new URL(url).hostname;
+  } catch {
+    return truncateUrl(url, 42);
+  }
+}
+
+function getDiagnosticsSummary(metadata: Record<string, unknown> | null): {
+  hasDiagnostics: boolean;
+  flagCount: number | null;
+  score: number | null;
+  needsReview: boolean | null;
+  screenshotMode: string | null;
+  topIssue: string | null;
+  slotSummary: string | null;
+} {
+  const diagnostics = metadata?.diagnostics as Record<string, unknown> | undefined;
+  const quality = diagnostics?.captureQuality as
+    | { flags?: unknown; score?: unknown; needsReview?: unknown }
+    | undefined;
+  const flags = Array.isArray(quality?.flags)
+    ? quality.flags.filter((flag): flag is string => typeof flag === "string")
+    : null;
+  const score =
+    typeof quality?.score === "number"
+      ? quality.score
+      : typeof quality?.score === "string" && !Number.isNaN(Number(quality.score))
+        ? Number(quality.score)
+        : null;
+  const needsReview =
+    typeof quality?.needsReview === "boolean" ? quality.needsReview : null;
+  const screenshotMode =
+    typeof diagnostics?.screenshotMode === "string" ? diagnostics.screenshotMode : null;
+  const slotsDetected =
+    typeof diagnostics?.slotsDetected === "number" ? diagnostics.slotsDetected : null;
+  const slotsInjected =
+    typeof diagnostics?.slotsInjected === "number" ? diagnostics.slotsInjected : null;
+  const slotSummary =
+    slotsDetected !== null || slotsInjected !== null
+      ? `${slotsInjected ?? "-"} / ${slotsDetected ?? "-"}`
+      : null;
+
+  return {
+    hasDiagnostics: Boolean(diagnostics),
+    flagCount: flags ? flags.length : null,
+    score,
+    needsReview,
+    screenshotMode,
+    topIssue: getQualityReviewLabel(metadata),
+    slotSummary,
+  };
+}
+
+function DetailInfoRow({
+  label,
+  children,
+  mono = false,
+}: {
+  label: string;
+  children: ReactNode;
+  mono?: boolean;
+}) {
+  return (
+    <div className="flex items-start justify-between gap-4 text-sm">
+      <span className="shrink-0 text-[var(--color-text-muted)]">{label}</span>
+      <div
+        className={`min-w-0 text-right text-[var(--color-text-secondary)] ${
+          mono ? "font-mono text-xs break-all" : "break-words"
+        }`}
+      >
+        {children}
+      </div>
+    </div>
+  );
 }
 
 export default function CaptureList({ refreshTrigger }: CaptureListProps) {
@@ -707,6 +792,8 @@ function CaptureDetailModal({
   onClose: () => void;
   onDelete: (id: string) => void;
 }) {
+  type OutputId = "placement" | "landing";
+
   const status = STATUS_LABELS[capture.status] || STATUS_LABELS.pending;
   const metadata =
     capture.metadata && typeof capture.metadata === "object" ? capture.metadata : null;
@@ -715,242 +802,443 @@ function CaptureDetailModal({
   const runtimeProviderLabel = getRuntimeProviderLabel(metadata);
   const metadataSurfaceCode = getMetadataSurfaceCode(metadata);
   const metadataEventTime = getMetadataEventTime(metadata);
+  const durationLabel = formatDurationLabel(getDurationMs(metadata));
+  const resultCategoryLabel = getResultCategoryLabel(metadata);
+  const diagnosticsSummary = getDiagnosticsSummary(metadata);
+  const [selectedOutputId, setSelectedOutputId] = useState<OutputId>(
+    capture.placement_image_url ? "placement" : "landing",
+  );
+  const [zoomMode, setZoomMode] = useState<"fit" | "100" | "150" | "200">("fit");
+  const [copiedLabel, setCopiedLabel] = useState<string | null>(null);
+  const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const productLabel =
+    getProductMetaLabel(metadata) ??
+    (() => {
+      const yt = getYoutubeMeta(metadata);
+      return getYoutubeAdTypeLabel(yt.adType);
+    })();
+
+  const outputs = [
+    {
+      id: "placement" as const,
+      label: "게재면",
+      description: "광고 게재 화면",
+      url: capture.placement_image_url,
+      storagePath: capture.screenshot_storage_path ?? null,
+      referenceUrl: capture.source_url,
+      alt: "게재면 캡처 이미지",
+    },
+    {
+      id: "landing" as const,
+      label: "랜딩",
+      description: "랜딩 페이지 화면",
+      url: capture.landing_image_url,
+      storagePath: null,
+      referenceUrl: capture.landing_final_url,
+      alt: "랜딩 페이지 캡처 이미지",
+    },
+  ];
+  const activeOutput =
+    outputs.find((output) => output.id === selectedOutputId && output.url) ??
+    outputs.find((output) => output.url) ??
+    outputs[0];
+  const activeUrl = activeOutput.url;
+  const activeStoragePath = activeOutput.storagePath;
+  const activeReferenceUrl = activeOutput.referenceUrl;
+  const selectedZoomLabel =
+    zoomMode === "fit" ? "맞춤" : zoomMode === "100" ? "100%" : zoomMode === "150" ? "150%" : "200%";
+  const actionButtonClass =
+    "inline-flex items-center justify-center gap-1.5 rounded-md border border-[var(--color-border)] bg-[var(--color-bg-secondary)] px-3 py-1.5 text-xs font-medium text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-bg-tertiary)] disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:bg-[var(--color-bg-secondary)]";
+  const primaryActionClass =
+    "inline-flex items-center justify-center gap-1.5 rounded-md bg-[var(--color-text-primary)] px-3 py-1.5 text-xs font-medium text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-45";
+
+  useEffect(() => {
+    setSelectedOutputId(capture.placement_image_url ? "placement" : "landing");
+    setZoomMode("fit");
+  }, [capture.id, capture.placement_image_url]);
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
+    };
+  }, [onClose]);
+
+  const copyText = useCallback(async (value: string | null | undefined, label: string) => {
+    if (!value) return;
+    try {
+      if (!navigator.clipboard?.writeText) {
+        throw new Error("Clipboard API unavailable");
+      }
+      await navigator.clipboard.writeText(value);
+      setCopiedLabel(`${label} 복사됨`);
+    } catch {
+      setCopiedLabel(`${label} 복사 실패`);
+    }
+    if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
+    copyTimerRef.current = setTimeout(() => setCopiedLabel(null), 1800);
+  }, []);
+
+  const renderPreview = () => {
+    if (capture.status === "pending" || capture.status === "processing") {
+      return (
+        <div className="flex h-full min-h-[320px] flex-col items-center justify-center p-8 text-center">
+          <div className="spinner spinner-lg mb-4" />
+          <p className="text-sm font-medium text-[var(--color-text-secondary)]">
+            {capture.status === "pending" ? "캡처 대기 중입니다" : "캡처를 처리하고 있습니다"}
+          </p>
+          <p className="mt-1 text-xs text-[var(--color-text-muted)]">보통 30초~2분 정도 소요됩니다</p>
+        </div>
+      );
+    }
+
+    if (!activeUrl) {
+      return (
+        <div className="flex h-full min-h-[320px] flex-col items-center justify-center p-8 text-center">
+          <p className="text-sm font-semibold text-[var(--color-text-primary)]">표시할 이미지가 없습니다</p>
+          <p className="mt-2 max-w-sm text-xs leading-5 text-[var(--color-text-muted)]">
+            이미지가 아직 생성되지 않았거나 저장 URL을 확인할 수 없습니다. 메타데이터는 우측에서 계속 확인할 수 있습니다.
+          </p>
+        </div>
+      );
+    }
+
+    return (
+      <div
+        className={
+          zoomMode === "fit"
+            ? "flex h-full min-h-[320px] items-center justify-center overflow-hidden p-4"
+            : "h-full min-h-[320px] overflow-auto p-4"
+        }
+      >
+        <img
+          src={activeUrl}
+          alt={activeOutput.alt}
+          className={
+            zoomMode === "fit"
+              ? "max-h-full max-w-full object-contain"
+              : "h-auto max-w-none object-contain"
+          }
+          style={
+            zoomMode === "fit"
+              ? undefined
+              : {
+                  width:
+                    zoomMode === "100"
+                      ? "auto"
+                      : zoomMode === "150"
+                        ? "150%"
+                        : "200%",
+                }
+          }
+        />
+      </div>
+    );
+  };
+
+  const renderInspectorContent = (compact = false) => (
+    <div className={compact ? "space-y-5" : "space-y-6"}>
+      <section className="space-y-3">
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--color-text-muted)]">상태</p>
+          <span className={`badge ${status.class}`}>{status.icon} {status.label}</span>
+        </div>
+        {qualityStateLabel && (
+          <p className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-primary)] px-3 py-2 text-xs leading-5 text-[var(--color-text-secondary)]">
+            {qualityStateLabel}
+          </p>
+        )}
+        {capture.status === "failed" && capture.error_message && (
+          <div className="rounded-lg border border-[rgba(239,68,68,0.2)] bg-[rgba(239,68,68,0.08)] px-3 py-2">
+            <p className="text-xs font-semibold text-[var(--color-error)]">오류 발생</p>
+            <p className="mt-1 text-xs leading-5 text-[var(--color-text-secondary)]">{capture.error_message}</p>
+          </div>
+        )}
+      </section>
+
+      <section className="space-y-2">
+        <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--color-text-muted)]">캡처 정보</p>
+        <DetailInfoRow label="캡처 ID" mono>{capture.id}</DetailInfoRow>
+        <DetailInfoRow label="채널">{getCaptureChannelLabel(capture)}</DetailInfoRow>
+        {productLabel && <DetailInfoRow label="상품 유형">{productLabel}</DetailInfoRow>}
+        {metadataSurfaceCode && <DetailInfoRow label="Surface" mono>{metadataSurfaceCode}</DetailInfoRow>}
+        <DetailInfoRow label="생성 시각">{formatDate(capture.created_at)}</DetailInfoRow>
+        {metadataEventTime && <DetailInfoRow label="캡처 시각">{metadataEventTime}</DetailInfoRow>}
+        {durationLabel && <DetailInfoRow label="소요 시간">{durationLabel}</DetailInfoRow>}
+        {resultCategoryLabel && <DetailInfoRow label="결과 구분">{resultCategoryLabel}</DetailInfoRow>}
+        <DetailInfoRow label="랜딩 캡처">{capture.capture_landing ? "예" : "아니오"}</DetailInfoRow>
+      </section>
+
+      <section className="space-y-2">
+        <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--color-text-muted)]">URL</p>
+        <DetailInfoRow label="게재면">
+          {capture.source_url ? (
+            <a href={capture.source_url} target="_blank" rel="noopener noreferrer" className="text-[var(--color-accent)] hover:underline">
+              {getHostnameLabel(capture.source_url)}
+            </a>
+          ) : "-"}
+        </DetailInfoRow>
+        <DetailInfoRow label="소재">
+          <a href={capture.creative_url} target="_blank" rel="noopener noreferrer" className="text-[var(--color-accent)] hover:underline">
+            {getHostnameLabel(capture.creative_url) ?? truncateUrl(capture.creative_url, 35)}
+          </a>
+        </DetailInfoRow>
+        <DetailInfoRow label="랜딩">
+          {capture.landing_final_url ? (
+            <a href={capture.landing_final_url} target="_blank" rel="noopener noreferrer" className="text-[var(--color-accent)] hover:underline">
+              {getHostnameLabel(capture.landing_final_url)}
+            </a>
+          ) : "-"}
+        </DetailInfoRow>
+      </section>
+
+      <section className="space-y-2">
+        <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--color-text-muted)]">선택 이미지</p>
+        <DetailInfoRow label="출력">{activeOutput.description}</DetailInfoRow>
+        <DetailInfoRow label="이미지 URL">
+          {activeUrl ? (
+            <button
+              type="button"
+              onClick={() => copyText(activeUrl, "이미지 URL")}
+              className="text-[var(--color-accent)] hover:underline"
+            >
+              {getHostnameLabel(activeUrl) ?? "URL 복사"}
+            </button>
+          ) : "없음"}
+        </DetailInfoRow>
+        <DetailInfoRow label="저장 경로" mono>
+          {activeStoragePath ? (
+            <button
+              type="button"
+              onClick={() => copyText(activeStoragePath, "저장 경로")}
+              className="break-all text-right text-[var(--color-accent)] hover:underline"
+            >
+              {activeStoragePath}
+            </button>
+          ) : "확인 불가"}
+        </DetailInfoRow>
+      </section>
+
+      <section className="space-y-2">
+        <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--color-text-muted)]">진단 요약</p>
+        <DetailInfoRow label="진단 데이터">{diagnosticsSummary.hasDiagnostics ? "있음" : "없음"}</DetailInfoRow>
+        {qualityFlagCountLabel && <DetailInfoRow label="품질 플래그">{qualityFlagCountLabel}</DetailInfoRow>}
+        {diagnosticsSummary.topIssue && <DetailInfoRow label="주요 확인">{diagnosticsSummary.topIssue}</DetailInfoRow>}
+        {diagnosticsSummary.score !== null && <DetailInfoRow label="내부 점수">{diagnosticsSummary.score}</DetailInfoRow>}
+        {diagnosticsSummary.needsReview !== null && (
+          <DetailInfoRow label="검수 필요">{diagnosticsSummary.needsReview ? "예" : "아니오"}</DetailInfoRow>
+        )}
+        {diagnosticsSummary.screenshotMode && <DetailInfoRow label="캡처 모드">{diagnosticsSummary.screenshotMode}</DetailInfoRow>}
+        {diagnosticsSummary.slotSummary && <DetailInfoRow label="GDN 슬롯">{diagnosticsSummary.slotSummary}</DetailInfoRow>}
+        {runtimeProviderLabel && <DetailInfoRow label="런타임">{runtimeProviderLabel}</DetailInfoRow>}
+        <p className="pt-1 text-[11px] leading-5 text-[var(--color-text-muted)]">
+          진단 정보는 운영 검수용 요약이며, golden sample 기반 픽셀 검증 결과가 아닙니다.
+        </p>
+      </section>
+    </div>
+  );
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      className="fixed inset-0 z-50 flex items-stretch justify-center lg:items-center lg:p-4"
       onClick={onClose}
+      role="presentation"
     >
-      {/* 오버레이 */}
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
 
-      {/* 모달 */}
       <div
-        className="relative w-full max-w-2xl max-h-[85vh] overflow-y-auto glass-card-static p-6 animate-slide-up"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="capture-detail-title"
+        className="relative z-10 flex h-[100dvh] w-full flex-col overflow-hidden bg-[var(--color-bg-secondary)] shadow-2xl animate-slide-up lg:h-[92vh] lg:max-h-[960px] lg:max-w-[1440px] lg:rounded-2xl lg:border lg:border-[var(--color-border)]"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* 닫기 버튼 */}
-        <button
-          onClick={onClose}
-          className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-lg
-                     text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]
-                     hover:bg-[var(--color-bg-tertiary)] transition-all"
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="18" y1="6" x2="6" y2="18" />
-            <line x1="6" y1="6" x2="18" y2="18" />
-          </svg>
-        </button>
-
-        {/* 헤더 */}
-        <div className="flex items-center gap-3 mb-6">
-          <span className={`badge ${status.class}`}>
-            {status.icon} {status.label}
-          </span>
-          <span className="text-xs font-semibold px-2 py-0.5 rounded bg-[var(--color-bg-tertiary)] text-[var(--color-text-secondary)]">
-            {getCaptureChannelLabel(capture)}
-          </span>
-          <span className="text-xs text-[var(--color-text-muted)]">
-            {formatDate(capture.created_at)}
-          </span>
-        </div>
-
-        {/* 캡처 결과 이미지 */}
-        {capture.status === "completed" && capture.placement_image_url && (
-          <div className="mb-6">
-            <p className="form-label mb-2">게재면 스크린샷</p>
-            <div className="rounded-xl overflow-hidden border border-[var(--color-border)] bg-[var(--color-bg-primary)] flex justify-center">
-              <img
-                src={capture.placement_image_url}
-                alt="게재면 캡처"
-                className={
-                  capture.channel === "youtube"
-                    ? "w-full max-w-[1920px] h-auto object-contain"
-                    : "w-full h-auto"
-                }
-              />
+        <header className="flex shrink-0 flex-wrap items-center gap-2 border-b border-[var(--color-border)] bg-[var(--color-bg-secondary)] px-4 py-3 lg:flex-nowrap lg:px-5">
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="상세 모달 닫기"
+            className="inline-flex h-8 w-8 items-center justify-center rounded-md text-[var(--color-text-muted)] transition-colors hover:bg-[var(--color-bg-tertiary)] hover:text-[var(--color-text-primary)]"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <h2 id="capture-detail-title" className="truncate text-sm font-semibold text-[var(--color-text-primary)]">
+                {activeOutput.description}
+              </h2>
+              <span className={`badge ${status.class}`}>{status.icon} {status.label}</span>
+              <span className="rounded bg-[var(--color-bg-tertiary)] px-2 py-0.5 text-xs font-semibold text-[var(--color-text-secondary)]">
+                {getCaptureChannelLabel(capture)}
+              </span>
             </div>
-            <div className="mt-2 flex gap-2">
-              <a
-                href={capture.placement_image_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="btn btn-sm btn-secondary"
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-                  <polyline points="15 3 21 3 21 9" />
-                  <line x1="10" y1="14" x2="21" y2="3" />
-                </svg>
-                새 탭에서 보기
-              </a>
-              <a
-                href={capture.placement_image_url}
-                download
-                className="btn btn-sm btn-ghost"
-              >
-                ⬇️ 다운로드
-              </a>
-            </div>
-          </div>
-        )}
-
-        {/* 랜딩 페이지 캡처 */}
-        {capture.status === "completed" && capture.landing_image_url && (
-          <div className="mb-6">
-            <p className="form-label mb-2">랜딩 페이지 스크린샷</p>
-            <div className="rounded-xl overflow-hidden border border-[var(--color-border)] bg-[var(--color-bg-primary)]">
-              <img
-                src={capture.landing_image_url}
-                alt="랜딩 페이지 캡처"
-                className="w-full h-auto"
-              />
-            </div>
-            {capture.landing_final_url && (
-              <p className="text-xs text-[var(--color-text-muted)] mt-2">
-                최종 URL: <a href={capture.landing_final_url} target="_blank" rel="noopener noreferrer" className="text-[var(--color-accent)] hover:underline">{capture.landing_final_url}</a>
-              </p>
-            )}
-          </div>
-        )}
-
-        {/* 에러 메시지 */}
-        {capture.status === "failed" && capture.error_message && (
-          <div className="mb-6 p-4 rounded-xl bg-[rgba(239,68,68,0.08)] border border-[rgba(239,68,68,0.2)]">
-            <p className="text-sm font-semibold text-[var(--color-error)] mb-1">오류 발생</p>
-            <p className="text-sm text-[var(--color-text-secondary)]">{capture.error_message}</p>
-          </div>
-        )}
-
-        {/* 처리 중 */}
-        {(capture.status === "pending" || capture.status === "processing") && (
-          <div className="mb-6 flex flex-col items-center py-8">
-            <div className="spinner spinner-lg mb-4" />
-            <p className="text-sm text-[var(--color-text-secondary)]">
-              {capture.status === "pending" ? "캡처 대기 중입니다..." : "캡처를 처리하고 있습니다..."}
+            <p className="mt-0.5 truncate text-xs text-[var(--color-text-muted)]">
+              {formatDate(capture.created_at)} · 보기 {selectedZoomLabel}
+              {copiedLabel ? ` · ${copiedLabel}` : ""}
             </p>
-            <p className="text-xs text-[var(--color-text-muted)] mt-1">보통 30초~2분 정도 소요됩니다</p>
           </div>
-        )}
-
-        {/* 상세 정보 */}
-        <div className="border-t border-[var(--color-border)] pt-4">
-          <p className="form-label mb-3">상세 정보</p>
-          <div className="space-y-2 text-sm">
-            <div className="flex justify-between">
-              <span className="text-[var(--color-text-muted)]">캡처 ID</span>
-              <span className="text-[var(--color-text-secondary)] font-mono text-xs">{capture.id}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-[var(--color-text-muted)]">게재면 URL</span>
-              <a
-                href={capture.source_url || "#"}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-[var(--color-accent)] hover:underline text-xs max-w-[60%] truncate"
+          <div className="order-3 flex w-full items-center gap-1 overflow-x-auto lg:order-none lg:w-auto">
+            {(["fit", "100", "150", "200"] as const).map((mode) => (
+              <button
+                key={mode}
+                type="button"
+                onClick={() => setZoomMode(mode)}
+                className={`shrink-0 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors ${
+                  zoomMode === mode
+                    ? "bg-[var(--color-text-primary)] text-white"
+                    : "border border-[var(--color-border)] bg-[var(--color-bg-secondary)] text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-tertiary)]"
+                }`}
               >
-                {capture.source_url || "-"}
-              </a>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-[var(--color-text-muted)]">소재 URL</span>
-              <a
-                href={capture.creative_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-[var(--color-accent)] hover:underline text-xs max-w-[60%] truncate"
-              >
-                {truncateUrl(capture.creative_url, 35)}
-              </a>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-[var(--color-text-muted)]">랜딩 캡처</span>
-              <span className="text-[var(--color-text-secondary)]">{capture.capture_landing ? "예" : "아니오"}</span>
-            </div>
-            {metadata && getDurationMs(metadata) !== null && (
-              <div className="flex justify-between">
-                <span className="text-[var(--color-text-muted)]">소요 시간</span>
-                <span className="text-[var(--color-text-secondary)]">
-                  {((getDurationMs(metadata) || 0) / 1000).toFixed(1)}초
-                </span>
-              </div>
-            )}
-            {metadata && qualityStateLabel && (
-              <div className="flex justify-between">
-                <span className="text-[var(--color-text-muted)]">품질 상태</span>
-                <span className="text-[var(--color-text-secondary)]">{qualityStateLabel}</span>
-              </div>
-            )}
-            {metadata && qualityFlagCountLabel && (
-              <div className="flex justify-between">
-                <span className="text-[var(--color-text-muted)]">품질 플래그</span>
-                <span className="text-[var(--color-text-secondary)]">{qualityFlagCountLabel}</span>
-              </div>
-            )}
-            {metadata && runtimeProviderLabel && (
-              <div className="flex justify-between">
-                <span className="text-[var(--color-text-muted)]">렌더링 런타임</span>
-                <span className="text-[var(--color-text-secondary)]">{runtimeProviderLabel}</span>
-              </div>
-            )}
-            {metadata && metadataSurfaceCode && (
-              <div className="flex justify-between">
-                <span className="text-[var(--color-text-muted)]">메타데이터 surface</span>
-                <span className="text-[var(--color-text-secondary)] font-mono text-xs">{metadataSurfaceCode}</span>
-              </div>
-            )}
-            {metadata && metadataEventTime && (
-              <div className="flex justify-between">
-                <span className="text-[var(--color-text-muted)]">메타데이터 시각</span>
-                <span className="text-[var(--color-text-secondary)]">{metadataEventTime}</span>
-              </div>
-            )}
-            {(capture.channel === "youtube" ||
-              capture.channel === "naver" ||
-              capture.channel === "kakao") &&
-              metadata && (
-              <>
-                <div className="flex justify-between">
-                  <span className="text-[var(--color-text-muted)]">상품 유형</span>
-                  <span className="text-[var(--color-text-secondary)]">
-                    {(() => {
-                      const productLabel = getProductMetaLabel(metadata);
-                      if (productLabel) return productLabel;
-                      const yt = getYoutubeMeta(metadata);
-                      return getYoutubeAdTypeLabel(yt.adType) ?? "-";
-                    })()}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-[var(--color-text-muted)]">캡처 시점</span>
-                  <span className="text-[var(--color-text-secondary)]">
-                    {(() => {
-                      const yt = getYoutubeMeta(metadata);
-                      return yt.captureSecond !== undefined ? `${yt.captureSecond}초` : "-";
-                    })()}
-                  </span>
-                </div>
-              </>
-            )}
+                {mode === "fit" ? "맞춤" : `${mode}%`}
+              </button>
+            ))}
           </div>
-        </div>
-
-        {/* 삭제 버튼 */}
-        {CAPTURE_DELETE_ENABLED && (
-          <div className="border-t border-[var(--color-border)] mt-4 pt-4">
-            <button
-              onClick={() => onDelete(capture.id)}
-              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium
-                         text-[var(--color-error)] hover:bg-[rgba(239,68,68,0.08)] border border-[rgba(239,68,68,0.2)] transition-all"
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="3 6 5 6 21 6" />
-                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-              </svg>
-              이 캡처 삭제
+          <div className="ml-auto hidden items-center gap-2 lg:flex">
+            {activeUrl ? (
+              <a href={activeUrl} target="_blank" rel="noopener noreferrer" className={actionButtonClass}>
+                원본 열기
+              </a>
+            ) : (
+              <button type="button" disabled className={actionButtonClass}>원본 열기</button>
+            )}
+            {activeUrl ? (
+              <a href={activeUrl} download className={primaryActionClass}>
+                다운로드
+              </a>
+            ) : (
+              <button type="button" disabled className={primaryActionClass}>다운로드</button>
+            )}
+            <button type="button" disabled={!activeUrl} onClick={() => copyText(activeUrl, "이미지 URL")} className={actionButtonClass}>
+              URL 복사
             </button>
           </div>
-        )}
+        </header>
+
+        <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[minmax(0,1fr)_360px]">
+          <section className="flex min-h-0 flex-col">
+            <div className="flex shrink-0 items-center gap-2 overflow-x-auto border-b border-[var(--color-border)] bg-[var(--color-bg-secondary)] px-4 py-2">
+              {outputs.map((output) => {
+                const isActive = output.id === activeOutput.id;
+                const isAvailable = Boolean(output.url);
+                return (
+                  <button
+                    key={output.id}
+                    type="button"
+                    disabled={!isAvailable}
+                    onClick={() => setSelectedOutputId(output.id)}
+                    aria-pressed={isActive}
+                    className={`shrink-0 rounded-md border px-3 py-1.5 text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-45 ${
+                      isActive
+                        ? "border-[var(--color-text-primary)] bg-[var(--color-text-primary)] text-white"
+                        : "border-[var(--color-border)] bg-[var(--color-bg-secondary)] text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-tertiary)]"
+                    }`}
+                  >
+                    {output.label}
+                    <span className="ml-1 font-normal opacity-75">{isAvailable ? "준비됨" : "없음"}</span>
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="min-h-0 flex-1 bg-[var(--color-bg-primary)]">
+              {renderPreview()}
+            </div>
+            <div className="shrink-0 border-t border-[var(--color-border)] bg-[var(--color-bg-secondary)] px-4 py-2 text-[11px] text-[var(--color-text-muted)]">
+              이미지 표시는 검토용 viewer 상태입니다. 원본 PNG 파일은 crop, filter, overlay 없이 그대로 열기/다운로드됩니다.
+            </div>
+
+            <div className="max-h-[38vh] overflow-y-auto border-t border-[var(--color-border)] bg-[var(--color-bg-secondary)] lg:hidden">
+              <details open className="border-b border-[var(--color-border)] px-4 py-3">
+                <summary className="cursor-pointer text-sm font-semibold text-[var(--color-text-primary)]">메타데이터</summary>
+                <div className="mt-3">{renderInspectorContent(true)}</div>
+              </details>
+            </div>
+          </section>
+
+          <aside className="hidden min-h-0 flex-col border-l border-[var(--color-border)] bg-[var(--color-bg-secondary)] lg:flex">
+            <div className="min-h-0 flex-1 overflow-y-auto p-5">
+              {renderInspectorContent()}
+            </div>
+            <div className="space-y-2 border-t border-[var(--color-border)] p-4">
+              <div className="grid grid-cols-2 gap-2">
+                <button type="button" disabled={!activeUrl} onClick={() => copyText(activeUrl, "이미지 URL")} className={actionButtonClass}>
+                  URL 복사
+                </button>
+                <button
+                  type="button"
+                  disabled={!activeStoragePath}
+                  onClick={() => copyText(activeStoragePath, "저장 경로")}
+                  className={actionButtonClass}
+                >
+                  경로 복사
+                </button>
+                {activeUrl ? (
+                  <a href={activeUrl} target="_blank" rel="noopener noreferrer" className={actionButtonClass}>
+                    원본 열기
+                  </a>
+                ) : (
+                  <button type="button" disabled className={actionButtonClass}>원본 열기</button>
+                )}
+                {activeUrl ? (
+                  <a href={activeUrl} download className={primaryActionClass}>
+                    다운로드
+                  </a>
+                ) : (
+                  <button type="button" disabled className={primaryActionClass}>다운로드</button>
+                )}
+              </div>
+              {activeReferenceUrl && (
+                <button type="button" onClick={() => copyText(activeReferenceUrl, "참조 URL")} className={`${actionButtonClass} w-full`}>
+                  참조 URL 복사
+                </button>
+              )}
+              {CAPTURE_DELETE_ENABLED && (
+                <button
+                  type="button"
+                  onClick={() => onDelete(capture.id)}
+                  className="w-full rounded-md border border-[rgba(239,68,68,0.2)] px-3 py-2 text-xs font-semibold text-[var(--color-error)] transition-colors hover:bg-[rgba(239,68,68,0.08)]"
+                >
+                  이 캡처 삭제
+                </button>
+              )}
+            </div>
+          </aside>
+        </div>
+
+        <div className="grid shrink-0 grid-cols-4 gap-2 border-t border-[var(--color-border)] bg-[var(--color-bg-secondary)] p-3 lg:hidden">
+          {activeUrl ? (
+            <a href={activeUrl} download className={primaryActionClass}>
+              다운로드
+            </a>
+          ) : (
+            <button type="button" disabled className={primaryActionClass}>다운로드</button>
+          )}
+          <button type="button" disabled={!activeUrl} onClick={() => copyText(activeUrl, "이미지 URL")} className={actionButtonClass}>
+            URL 복사
+          </button>
+          {activeUrl ? (
+            <a href={activeUrl} target="_blank" rel="noopener noreferrer" className={actionButtonClass}>
+              원본
+            </a>
+          ) : (
+            <button type="button" disabled className={actionButtonClass}>원본</button>
+          )}
+          <button
+            type="button"
+            disabled={!activeStoragePath}
+            onClick={() => copyText(activeStoragePath, "저장 경로")}
+            className={actionButtonClass}
+          >
+            경로
+          </button>
+        </div>
       </div>
     </div>
   );
