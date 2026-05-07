@@ -4,6 +4,31 @@
 
 AdMate Lens는 다양한 매체(YouTube, Google Ads/GDN, Naver, Kakao 등)에서 광고가 게재된 화면을 **서버리스(Vercel) 환경**에서 초고해상도로 캡처, 합성, 렌더링해주는 자동화 시스템입니다. 퍼페티어(Puppeteer) 엔진을 기반으로, 봇 탐지 우회 및 극사실주의적인 네이티브 앱/웹 UI 합성을 통해 고객사에게 제출하는 **고품질 게재 보고서용 이미지**를 생성합니다.
 
+## Codex / Agent Harness
+
+이 repo는 AdMate Lens 전용 Codex harness와 repo-local skills를 사용합니다.
+
+먼저 읽을 문서:
+
+- `AGENTS.md`
+- `.ai/MEMORY.md`
+- `.ai/RULES.md`
+- `.ai/PLAN.md`
+- `docs/strategy/AdMate_Lens_YouTube_Product_Coverage_Backlog_v1.md`
+- `docs/strategy/AdMate_Lens_Naver_Mobile_Product_Coverage_v1.md`
+- `docs/strategy/AdMate_Lens_Kakao_Mobile_Product_Coverage_v1.md`
+- `docs/design/openclaw-theme-reference.md`
+
+주요 skill:
+
+- `admate-lens-capture`
+- `lens-capture-fidelity-qa`
+- `lens-youtube-capture-builder`
+- `lens-gdn-capture-builder`
+- `lens-mobile-native-capture-builder`
+
+캡처 결과물, 광고 미리보기, 매체 네이티브 synthetic UI는 실제 매체 화면과의 fidelity가 최우선입니다. AdMate/Openclaw 테마는 운영자 화면, 입력 폼, 목록, 작업 이력, 설정 화면에만 적용합니다.
+
 ---
 
 ## 🎯 주요 기능 및 지원 매체
@@ -54,6 +79,13 @@ AdMate Lens는 다양한 매체(YouTube, Google Ads/GDN, Naver, Kakao 등)에서
 ### 시스템 구조 철학
 - **독립적 브랜치 구조**: `youtube-capture.ts`, `gdn-capture.ts`, `mobile-native-capture.ts` 등 매체별로 독립된 Orchestrator가 존재합니다. 매체 내에서도 광고 상품별(Preroll, Infeed, Mobile Native), 디바이스별(Mobile, Desktop) 분기 처리가 명확하여 신규 플랫폼이나 레이아웃 추가 시 기존 코드에 부작용(Side-effect)이 미치지 않습니다.
 - **안티-봇 렌더링 (Stealth/Fallback)**: 퍼페티어가 차단되는 플랫폼(예: YouTube)의 경우, HTML DOM 스크래핑을 통한 자체 UI 렌더링(Synthetic View)으로 실패 없는 시스템 구축.
+
+### 캡처 품질 원칙
+
+- 실제 매체 화면과 구분되지 않는 수준의 결과물 품질을 목표로 합니다.
+- DPR, 해상도, 썸네일 품질, Sharp 합성 품질은 핵심 품질 지표입니다.
+- spacing, typography, CTA, icon, status bar, progress bar, device frame은 reference 기반으로 조정합니다.
+- build 성공만으로 캡처 품질 작업을 완료로 보지 않습니다. 가능한 경우 생성 이미지 또는 screenshot 기준 QA를 함께 수행합니다.
 
 ---
 

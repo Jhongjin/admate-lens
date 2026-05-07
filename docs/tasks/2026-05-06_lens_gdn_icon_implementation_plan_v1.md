@@ -1,9 +1,9 @@
 # Gate Lens-GDN-Icon-2 Implementation Plan v1
 
 Date: 2026-05-06
-Repo: `admate-capture-pro`
+Repo: `admate-lens`
 Product: AdMate Lens
-Status: planning only
+Status: implementation completed in a later gate
 
 ## Guardrails
 
@@ -286,10 +286,12 @@ Suggested future report fields:
 
 ## Gate Result
 
-Lens-GDN-Icon-2 status: implementation plan complete, code not started.
+Lens-GDN-Icon-2 status: implementation plan complete.
 
-Required next input:
+Lens-GDN-Icon-3 status: completed in HEAD via `65d4c66 feat: tune GDN disclosure icon placement`.
 
-- Approved GDN placement PNG with visible native Google/GDN badge.
-- Connected metadata JSON.
-- Decision on first preset target.
+Current freeze note:
+
+- `src/lib/capture/channels/gdn-capture.ts` now includes the latest GDN disclosure presets and badge-to-creative-corner sync logic.
+- Do not perform additional icon tuning without a future approved capture-fidelity gate and reference basis.
+- Golden PNG additions remain blocked until explicitly approved.

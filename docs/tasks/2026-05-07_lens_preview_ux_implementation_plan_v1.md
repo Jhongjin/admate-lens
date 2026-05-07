@@ -1,10 +1,10 @@
 # Gate Lens-Preview-UX-2 Implementation Plan v1
 
 Date: 2026-05-07
-Repo: `admate-capture-pro`
+Repo: `admate-lens`
 Product: AdMate Lens
 Gate: Lens-Preview-UX-2
-Scope: implementation plan only
+Scope: implementation plan; completed in a later gate
 
 ## 1. Guardrails
 
@@ -613,4 +613,12 @@ Gate Lens-Preview-UX-3 minimal implementation을 승인한다.
 
 ## 16. Gate Result
 
-Lens-Preview-UX-2 status: implementation plan prepared, implementation not started.
+Lens-Preview-UX-2 status: implementation plan prepared.
+
+Lens-Preview-UX-3 status: completed in HEAD via `b0bb299 feat: improve Lens capture preview workspace`.
+
+Current freeze note:
+
+- `src/app/components/CaptureList.tsx` now contains the completed preview workspace modal, zoom controls, output selection, actions, and inspector summary.
+- The preview workspace remains an operator review surface and must not crop, filter, recolor, watermark, or mutate original capture output images.
+- Do not perform additional preview UX tuning in this cleanup gate.
