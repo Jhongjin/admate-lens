@@ -1,9 +1,9 @@
 # Gate Lens-UX-1 Google/GDN Icon Fidelity + Capture Preview UX Audit v1
 
 Date: 2026-05-06
-Repo: `admate-capture-pro`
+Repo: `admate-lens`
 Product: AdMate Lens
-Scope: audit and design only
+Scope: audit and design; follow-up implementation completed in later gates
 
 ## Guardrails
 
@@ -295,10 +295,15 @@ Future golden QA actions:
 
 ## Gate Result
 
-Lens-UX-1 status: audit complete, implementation not started.
+Lens-UX-1 status: audit complete.
+
+Follow-up implementation status:
+
+- Lens-GDN-Icon-3 completed in HEAD via `65d4c66 feat: tune GDN disclosure icon placement`.
+- Lens-Preview-UX-3 completed in HEAD via `b0bb299 feat: improve Lens capture preview workspace`.
 
 Next required input:
 
-- Operator-approved GDN placement PNG with native Google badge visible.
-- Connected metadata JSON.
-- Decision on repo-safe vs external-sensitive storage.
+- No additional tuning is required for the current fixed state.
+- Future capture-output tuning still requires operator-approved reference evidence, connected metadata, and explicit approval.
+- Golden PNG additions remain blocked until explicitly approved.
