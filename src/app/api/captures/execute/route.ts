@@ -9,6 +9,7 @@
  */
 
 import { NextResponse, type NextRequest } from "next/server";
+import { requireLensSession } from "@/lib/auth/lens-session";
 import { createServerClient } from "@/lib/supabase/client";
 import { createChannel } from "@/lib/capture";
 import { resolveBatchPerCaptureTimeoutMs } from "@/lib/capture/batch-serverless";
@@ -20,6 +21,11 @@ export const maxDuration = 300; // 5분
 export const dynamic = "force-dynamic";
 
 export async function POST(request: NextRequest) {
+  const auth = await requireLensSession(request);
+  if ("response" in auth) {
+    return auth.response;
+  }
+
   const startTime = Date.now();
 
   try {

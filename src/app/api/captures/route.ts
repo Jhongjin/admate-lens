@@ -8,6 +8,7 @@
 
 import { NextResponse, type NextRequest } from "next/server";
 import { after } from "next/server";
+import { requireLensSession } from "@/lib/auth/lens-session";
 import { createServerClient } from "@/lib/supabase/client";
 import { createChannel } from "@/lib/capture";
 import {
@@ -63,6 +64,11 @@ function isYouTubeUrl(value: string): boolean {
 
 /** POST: 새 캡처 요청 생성 (멀티 사이트 지원) */
 export async function POST(request: NextRequest) {
+  const auth = await requireLensSession(request);
+  if ("response" in auth) {
+    return auth.response;
+  }
+
   try {
     const body = await request.json();
 
@@ -1068,6 +1074,11 @@ async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
 
 /** GET: 캡처 목록 조회 */
 export async function GET(request: NextRequest) {
+  const auth = await requireLensSession(request);
+  if ("response" in auth) {
+    return auth.response;
+  }
+
   try {
     const supabase = createServerClient();
     const { searchParams } = new URL(request.url);
@@ -1117,6 +1128,11 @@ export async function GET(request: NextRequest) {
 
 /** DELETE: 캡처 이력 삭제 (단일/다중/전체) */
 export async function DELETE(request: NextRequest) {
+  const auth = await requireLensSession(request);
+  if ("response" in auth) {
+    return auth.response;
+  }
+
   try {
     const body = await request.json();
     const { id, ids, all } = body as {
