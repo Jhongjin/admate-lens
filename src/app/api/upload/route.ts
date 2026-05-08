@@ -5,6 +5,7 @@
  */
 
 import { NextResponse, type NextRequest } from "next/server";
+import { requireLensSession } from "@/lib/auth/lens-session";
 import { createServerClient } from "@/lib/supabase/client";
 import {
   getStorageFilename,
@@ -16,6 +17,11 @@ import {
 export const dynamic = "force-dynamic";
 
 export async function POST(request: NextRequest) {
+  const auth = await requireLensSession(request);
+  if ("response" in auth) {
+    return auth.response;
+  }
+
   try {
     const formData = await request.formData();
     const file = formData.get("file") as File | null;
