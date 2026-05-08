@@ -1,6 +1,11 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef, type ReactNode } from "react";
+import {
+  buildLensLoginPath,
+  isLensAuthRequiredResponse,
+  LENS_AUTH_EXPIRED_MESSAGE,
+} from "@/lib/auth/lens-session-client";
 
 /** 캡처 레코드 타입 */
 interface CaptureRecord {
@@ -342,6 +347,7 @@ export default function CaptureList({ refreshTrigger }: CaptureListProps) {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [deleteConfirm, setDeleteConfirm] = useState<{ type: "single" | "all"; id?: string } | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [authExpiredMessage, setAuthExpiredMessage] = useState<string | null>(null);
 
   // 🔑 폴링 안정화를 위한 ref — captures 변경에 의한 무한 재렌더 방지
   const capturesRef = useRef<CaptureRecord[]>([]);
@@ -360,7 +366,15 @@ export default function CaptureList({ refreshTrigger }: CaptureListProps) {
       });
       const result = await res.json();
 
+      if (isLensAuthRequiredResponse(res, result)) {
+        setAuthExpiredMessage(result?.error || LENS_AUTH_EXPIRED_MESSAGE);
+        setCaptures([]);
+        setSelectedCapture(null);
+        return;
+      }
+
       if (res.ok && result.data) {
+        setAuthExpiredMessage(null);
         setCaptures(result.data);
       }
     } catch (err) {
@@ -378,6 +392,7 @@ export default function CaptureList({ refreshTrigger }: CaptureListProps) {
   /** 처리중인 캡처가 있으면 3초마다 폴링 (안정화) */
   useEffect(() => {
     const interval = setInterval(() => {
+      if (authExpiredMessage) return;
       const hasActive = capturesRef.current.some(
         (c) => c.status === "pending" || c.status === "processing"
       );
@@ -386,7 +401,7 @@ export default function CaptureList({ refreshTrigger }: CaptureListProps) {
       }
     }, 3000);
     return () => clearInterval(interval);
-  }, [fetchCaptures]);
+  }, [authExpiredMessage, fetchCaptures]);
 
   /** 모달이 열린 상태에서 캡처 상태 변경 시 자동 동기화 */
   useEffect(() => {
@@ -422,7 +437,14 @@ export default function CaptureList({ refreshTrigger }: CaptureListProps) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id: captureId }),
       });
+      const result = await res.json().catch(() => null);
+      if (isLensAuthRequiredResponse(res, result)) {
+        setAuthExpiredMessage(result?.error || LENS_AUTH_EXPIRED_MESSAGE);
+        setSelectedCapture(null);
+        return;
+      }
       if (res.ok) {
+        setAuthExpiredMessage(null);
         setCaptures((prev) => prev.filter((c) => c.id !== captureId));
         setSelectedCapture(null);
       }
@@ -443,7 +465,14 @@ export default function CaptureList({ refreshTrigger }: CaptureListProps) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ all: true }),
       });
+      const result = await res.json().catch(() => null);
+      if (isLensAuthRequiredResponse(res, result)) {
+        setAuthExpiredMessage(result?.error || LENS_AUTH_EXPIRED_MESSAGE);
+        setSelectedCapture(null);
+        return;
+      }
       if (res.ok) {
+        setAuthExpiredMessage(null);
         setCaptures([]);
         setSelectedCapture(null);
       }
@@ -457,6 +486,28 @@ export default function CaptureList({ refreshTrigger }: CaptureListProps) {
 
   return (
     <div className="animate-fade-in delay-200">
+      {authExpiredMessage && (
+        <div className="mb-4 rounded-xl border border-[rgba(239,68,68,0.22)] bg-[rgba(239,68,68,0.08)] p-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-sm font-semibold text-[var(--color-error)]">결과 검수 세션 만료</p>
+              <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+                {authExpiredMessage}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() =>
+                window.location.assign(buildLensLoginPath("/#result-review"))
+              }
+              className="inline-flex items-center justify-center rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-secondary)] px-3 py-2 text-sm font-medium text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-bg-tertiary)]"
+            >
+              다시 로그인
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* 헤더 + 필터 */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4">
         <div className="flex items-center gap-3">

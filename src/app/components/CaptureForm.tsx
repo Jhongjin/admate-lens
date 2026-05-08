@@ -1,6 +1,13 @@
 "use client";
 
 import { useState, useCallback, useRef, useEffect, useMemo } from "react";
+import {
+  buildLensLoginPath,
+  createLensAuthExpiredError,
+  isLensAuthExpiredError,
+  isLensAuthRequiredResponse,
+  LENS_AUTH_EXPIRED_MESSAGE,
+} from "@/lib/auth/lens-session-client";
 import type { ExecutableYouTubeAdType } from "@/lib/capture/youtube-ad-types";
 
 const MEDIA_SELECT_OPTIONS: Array<{ value: MediaMenu; label: string; enabled: boolean }> = [
@@ -645,6 +652,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
   const [persistentlyFailedPresetUrls, setPersistentlyFailedPresetUrls] = useState<string[]>([]);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [authExpiredMessage, setAuthExpiredMessage] = useState<string | null>(null);
   const [toast, setToast] = useState<{
     type: "success" | "error" | "info";
     message: string;
@@ -659,6 +667,14 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
     [],
   );
 
+  const markAuthExpired = useCallback(
+    (message = LENS_AUTH_EXPIRED_MESSAGE) => {
+      setAuthExpiredMessage(message);
+      showToast("error", message);
+    },
+    [showToast],
+  );
+
   // 실패 이력(metadata.shouldRemoveFromPresetList=true) 기반으로 강차단 사이트 프리셋 자동 제외
   useEffect(() => {
     let mounted = true;
@@ -668,6 +684,12 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
           cache: "no-store",
         });
         const json = await res.json();
+        if (isLensAuthRequiredResponse(res, json)) {
+          if (mounted) {
+            setAuthExpiredMessage(json?.error || LENS_AUTH_EXPIRED_MESSAGE);
+          }
+          return;
+        }
         if (!res.ok || !Array.isArray(json?.data) || !mounted) return;
         const blocked = new Set<string>();
         for (const row of json.data as Array<{ source_url?: string | null; metadata?: Record<string, unknown> | null }>) {
@@ -693,6 +715,12 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
           cache: "no-store",
         });
         const json = await res.json();
+        if (isLensAuthRequiredResponse(res, json)) {
+          if (mounted) {
+            setAuthExpiredMessage(json?.error || LENS_AUTH_EXPIRED_MESSAGE);
+          }
+          return;
+        }
         if (!res.ok || !Array.isArray(json?.data) || !mounted) return;
 
         const stats = new Map<string, { ok: number; fail: number }>();
@@ -785,17 +813,27 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
       });
       const result = await res.json();
 
+      if (isLensAuthRequiredResponse(res, result)) {
+        throw createLensAuthExpiredError(result);
+      }
+
       if (!res.ok) {
         throw new Error(result.error || "업로드에 실패했습니다.");
       }
 
       // 업로드 성공 → creativeUrl 설정
+      setAuthExpiredMessage(null);
       setForm((prev) => ({ ...prev, creativeUrl: result.url }));
       showToast(
         "success",
         `소재 이미지 업로드 완료! (${dimensions.width}×${dimensions.height})`,
       );
     } catch (err) {
+      if (isLensAuthExpiredError(err)) {
+        markAuthExpired(err.message);
+        setUploadedFile(null);
+        return;
+      }
       const msg = err instanceof Error ? err.message : "업로드 실패";
       showToast("error", msg);
       setUploadedFile(null);
@@ -839,9 +877,13 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
         body: formData,
       });
       const result = await res.json();
+      if (isLensAuthRequiredResponse(res, result)) {
+        throw createLensAuthExpiredError(result);
+      }
       if (!res.ok || !result.url) {
         throw new Error(result.error || "이미지 업로드 실패");
       }
+      setAuthExpiredMessage(null);
       return result.url as string;
     },
     [],
@@ -883,6 +925,10 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
       }));
       showToast("success", "컴패니언 배너 이미지 업로드 완료");
     } catch (err) {
+      if (isLensAuthExpiredError(err)) {
+        markAuthExpired(err.message);
+        return;
+      }
       showToast("error", err instanceof Error ? err.message : "컴패니언 업로드 실패");
     } finally {
       setIsCompanionUploading(false);
@@ -899,6 +945,10 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
       setForm((prev) => ({ ...prev, instreamLogoImageUrl: url }));
       showToast("success", "로고 이미지 업로드 완료");
     } catch (err) {
+      if (isLensAuthExpiredError(err)) {
+        markAuthExpired(err.message);
+        return;
+      }
       showToast("error", err instanceof Error ? err.message : "로고 업로드 실패");
     } finally {
       setIsLogoUploading(false);
@@ -1367,11 +1417,17 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
 
       const result = await res.json();
 
+      if (isLensAuthRequiredResponse(res, result)) {
+        markAuthExpired(result?.error || LENS_AUTH_EXPIRED_MESSAGE);
+        return;
+      }
+
       if (!res.ok) {
         throw new Error(result.error || "캡처 요청에 실패했습니다.");
       }
 
       const siteCount = result.count || 1;
+      setAuthExpiredMessage(null);
       showToast("success", `${siteCount}개 사이트 캡처 요청이 생성되었습니다!`);
 
       if (onCaptureCreated && result.data) {
@@ -1428,6 +1484,28 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
         onSubmit={handleSubmit}
         className="glass-card-static p-6 animate-fade-in"
       >
+        {authExpiredMessage && (
+          <div className="mb-5 rounded-xl border border-[rgba(239,68,68,0.22)] bg-[rgba(239,68,68,0.08)] p-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-sm font-semibold text-[var(--color-error)]">세션 확인 필요</p>
+                <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+                  {authExpiredMessage}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() =>
+                  window.location.assign(buildLensLoginPath("/#capture-studio"))
+                }
+                className="inline-flex items-center justify-center rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-secondary)] px-3 py-2 text-sm font-medium text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-bg-tertiary)]"
+              >
+                다시 로그인
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* 헤더 */}
         <div className="flex items-center gap-3 mb-6">
           <div className="ops-icon-tile">요청</div>
