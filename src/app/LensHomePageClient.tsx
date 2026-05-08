@@ -215,6 +215,8 @@ export default function Home() {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [activeNav, setActiveNav] = useState<PrimaryNavId>("home");
   const [dashboardStats, setDashboardStats] = useState(initialDashboardStats);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [logoutError, setLogoutError] = useState<string | null>(null);
 
   /** 새 캡처가 생성되면 리스트 갱신 */
   const handleCaptureCreated = useCallback(() => {
@@ -235,6 +237,28 @@ export default function Home() {
     },
     [scrollToSection],
   );
+
+  const handleLogout = useCallback(async () => {
+    setIsLoggingOut(true);
+    setLogoutError(null);
+
+    try {
+      const response = await fetch("/api/auth/logout", {
+        method: "POST",
+      });
+      const payload = (await response.json().catch(() => null)) as
+        | { success?: boolean }
+        | null;
+      if (!response.ok || payload?.success !== true) {
+        throw new Error("로그아웃에 실패했습니다.");
+      }
+      window.location.assign("/login");
+    } catch {
+      setLogoutError("로그아웃 중 오류가 발생했습니다. 다시 시도해 주세요.");
+    } finally {
+      setIsLoggingOut(false);
+    }
+  }, []);
 
   useEffect(() => {
     let isMounted = true;
@@ -335,6 +359,9 @@ export default function Home() {
               <p className="text-[13px] font-semibold text-[var(--color-text-primary)]">
                 {viewLabels[activeNav].title}
               </p>
+              {logoutError && (
+                <p className="mt-1 text-xs text-[var(--color-error)]">{logoutError}</p>
+              )}
             </div>
 
             <div className="flex items-center gap-2">
@@ -343,6 +370,14 @@ export default function Home() {
                 엔진 정상
               </span>
               <span className="badge badge-processing">{viewLabels[activeNav].status}</span>
+              <button
+                type="button"
+                onClick={handleLogout}
+                disabled={isLoggingOut}
+                className="inline-flex items-center justify-center rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-secondary)] px-3 py-1.5 text-xs font-medium text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-bg-tertiary)] disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {isLoggingOut ? "로그아웃 중..." : "로그아웃"}
+              </button>
             </div>
           </div>
         </header>
