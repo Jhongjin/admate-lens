@@ -3,142 +3,189 @@
 Date: 2026-05-09
 Repo: `admate-lens`
 Product: AdMate Lens
-Scope: authenticated execution QA attempt result
-Outcome: `blocked`
+Scope: one-time authenticated execution QA
+Outcome: `pass`
+
+## 0. Attempt Lineage
+
+This document records the successful authenticated QA run performed through an isolated remote-debug browser session.
+
+It supersedes the earlier blocked attempt that could not safely attach to the user's existing authenticated browser context.
 
 ## 1. Goal
 
-Attempt one authenticated AdMate Lens capture flow QA run using the confirmed Auth-11A target values, without exposing password, token, cookie, signed URL, or raw provider response data.
+Verify one authenticated AdMate Lens capture flow using the confirmed Auth-11A target values, while keeping password, token, cookie, signed URL, and raw provider response data out of the QA record.
 
 ## 2. Auth-11A Confirmed Inputs
 
-### 2.1 Account
+### 2.1 Account Scope
 
-- login account email: `woolela@nasmedia.co.kr`
-- account basis: current AdMate operating `super_admin`
-- purpose: one authenticated Lens flow verification only
-- note: this does **not** validate general-user permission UX
+- account email used by the human operator: `woolela@nasmedia.co.kr`
+- account class: approved `super_admin`
+- purpose: authenticated Lens flow verification only
+
+Important note:
+
+- this gate validates authenticated execution with a `super_admin` session
+- it does **not** validate general-user permission UX
 
 ### 2.2 Safe Fixture
 
 - publisher URL: `https://www.yna.co.kr/`
-- creative input fallback rule: if needed, use only public/internal validation input that is not real advertiser or sensitive campaign data
-- approved candidate noted before execution attempt: `https://lens.admate.ai.kr/frames/pixel8-frame.png`
+- creative input method: URL input only
+- creative URL class: internal/public validation asset
+- upload path was intentionally avoided
 
-### 2.3 Execution Constraints
+## 3. Execution Boundary
 
-- login: once
-- capture execution: once
-- repeated upload: prohibited
-- cleanup/delete: prohibited
-- output handling: sanitized id/path only
-- secret/token/cookie/signed URL/raw provider response output: prohibited
+The run followed the approved minimal scope:
 
-## 3. What Was Verified Before Execution
+- authenticated Lens home access confirmed
+- one capture request submitted
+- one capture execution path observed
+- no repeated capture execution
+- no upload performed
+- no cleanup/delete performed
 
-The following implementation facts were confirmed locally before attempting execution:
+## 4. Authentication Confirmation
 
-- Lens login is email/password based through `POST /api/auth/login`
-- authenticated capture creation is guarded through `/api/captures`
-- the requested flow would create real artifacts if executed:
-  - capture DB row
-  - capture status transitions
-  - possible storage objects
-  - runtime logs
+Authenticated Lens workspace access was confirmed through the isolated QA browser session.
 
-## 4. Execution Attempt Boundary
+Observed signs of active authenticated state:
 
-No login request was submitted by the agent.
+- Lens home opened directly instead of the login shell
+- top-bar `로그아웃` entry point was visible
+- capture workspace and result-review surfaces were accessible
+- no auth-expired banner appeared during the active session
 
-No upload request was submitted by the agent.
+## 5. Fixture And Submission Summary
 
-No capture request was created by the agent.
+Submission profile:
 
-No capture execution was triggered by the agent.
+- channel family: GDN / Google Ads
+- publisher preset target: `연합뉴스`
+- publisher URL host: `www.yna.co.kr`
+- creative input mode: URL input
+- creative value class: non-sensitive public/internal validation asset
 
-No storage object was created by the agent.
+No advertiser-sensitive, campaign-sensitive, or client-confidential input was used in the recorded QA result.
 
-## 5. Blocking Reason
+## 6. One-Time Execution Result
 
-The user stated that direct login had already been completed in Chrome, and local process inspection showed an open Chrome window titled:
+Observed submission feedback:
 
 ```text
-AdMate Lens - Chrome
+완료: 1개 사이트 캡처 요청이 생성되었습니다!
 ```
 
-However, the agent could not safely attach to the already authenticated browser session with the available execution tools.
+Observed authenticated execution result:
 
-### 5.1 Browser Automation Constraint
+- capture row created: yes
+- final status observed: `completed`
+- placement result visible in preview/history flow: yes
+- error state observed: no
 
-The recommended `agent-browser` command-line tool was not available in the current shell environment.
+## 7. Sanitized Artifact Record
 
-### 5.2 Session Attachment Constraint
+The following identifiers are intentionally sanitized.
 
-Fallback browser automation through local Chromium control was also blocked:
+- capture id: `10a66262...fed7`
+- capture source host: `www.yna.co.kr`
+- storage path: `captures/.../placement_1778253810071.png`
 
-- Edge profile launch failed
-- Chrome profile was already locked by the running browser process
-- no remote debugging endpoint was available for attachment
+No signed storage URL is recorded in this document.
 
-Because of that, the agent could not confirm or reuse the active authenticated session without requesting credentials, reading cookies, or using unsafe session workarounds.
+No token, cookie, or raw session value is recorded in this document.
 
-## 6. Why The Gate Was Stopped
+## 8. Preview / History Confirmation
 
-The execution instruction explicitly required:
+Authenticated preview/history behavior was confirmed at a basic operator level.
 
-- stop immediately if an Auth-11A confirmed condition does not match at execution time
-- do not read, print, or store password/token/cookie/session values
+Observed:
 
-At execution time, the confirmed account and fixture values were valid, but the active authenticated session was not programmatically reachable from the available tool path.
+- new capture row appeared in authenticated history
+- result state advanced to `completed`
+- preview/detail surface was openable from the result-review area
+- detail/preview text markers were present for the capture detail flow
 
-Proceeding beyond that point would have required one of the following disallowed or unsupported paths:
+This gate confirms the protected history/preview workflow is usable after authentication for the approved one-time QA case.
 
-- asking for password entry through the agent
-- reading session/token material directly
-- re-authenticating in a new browser context without user-supplied credentials
-- using unapproved browser-session workarounds
+## 9. Logout / Session UX Basic Check
 
-Therefore the correct result was `blocked`.
+This gate performed only the approved basic-path check.
 
-## 7. Artifacts Created
+Confirmed:
 
-None by the agent.
+- `로그아웃` entry point visible in the authenticated shell
+- no session-expired banner shown during the active authenticated run
 
-Specifically:
+Not exercised in this gate:
 
-- no capture row created
-- no upload object created
-- no output object created
-- no sanitized capture id available
-- no sanitized storage path available
+- actual logout click
+- forced session expiry
+- re-login recovery flow
 
-## 8. Visual QA Handoff Status
+Those remain separate UX follow-up scope if needed.
 
-No authenticated execution evidence was produced in this gate.
+## 10. API / Side-Effect Notes
 
-That means:
+Observed effect classes:
 
-- no safe capture record was generated for visual QA
-- no preview/history result from a new authenticated run was captured
-- no output image was produced for downstream review
+- authenticated capture listing reflected the new row
+- capture execution completed through the normal Lens flow
+- storage-backed capture output exists for the completed run
+- runtime/server-side effects are implied by the successful completed capture path
 
-## 9. General User UX Note
+Not exercised in this gate:
 
-This gate was scoped to `super_admin` authenticated execution readiness only.
+- direct standalone `/api/upload` call
+- repeated `/api/captures` submission
+- any cleanup or deletion path
 
-General-user permission UX remains a separate future gate and was not validated here.
+## 11. Security / Compliance Notes
 
-## 10. Recommended Next Step
+The QA run respected the following restrictions:
+
+- no password was read, printed, or stored
+- no cookie or token was read, printed, or stored
+- no signed URL was recorded
+- no raw provider response was recorded
+- no browser-profile copying was used
+- no existing personal/default Chrome profile was reused for automation
+
+## 12. Visual QA Handoff Scope
+
+This gate produced one authenticated safe capture result that can support the next visual QA discussion.
+
+Allowed handoff scope from this run:
+
+- sanitized capture id reference
+- sanitized storage path reference
+- result status (`completed`)
+- statement that preview/history surfaced the result
+
+This gate does not convert the produced output into a golden PNG or permanent baseline asset.
+
+## 13. Remaining Scope
+
+Still out of scope after this gate:
+
+- general-user permission UX validation
+- forced session-expiry recovery validation
+- logout completion UX validation
+- golden PNG creation
+- visual baseline creation
+
+## 14. Recommended Next Gate
 
 Recommended next gate:
 
 ```text
-Gate Lens-Auth-11B authenticated execution with attachable browser session
+Gate Lens-Visual-QA-2 authenticated result visual QA
 ```
 
-Recommended precondition for that gate:
+Recommended focus:
 
-- provide an attachable authenticated browser context, or
-- provide an approved execution method that does not require exposing credentials to the agent
-
-Only after that precondition is satisfied should the one-time authenticated capture flow be executed.
+- inspect the completed authenticated safe capture result visually
+- verify GDN output placement against the approved visual QA criteria
+- keep using sanitized references only
