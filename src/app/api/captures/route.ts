@@ -169,9 +169,11 @@ export async function POST(request: NextRequest) {
         : [];
 
     // 인스트림 광고는 creativeUrl 대신 videoUrl 사용 (PC/모바일 공통)
-    const normalizedUrls = urls
-      .map((u) => (u.trim() ? normalizeHttpUrl(u) : ""))
-      .filter((url) => isValidHttpUrl(url));
+    const normalizedUrls = dedupeNormalizedUrls(
+      urls
+        .map((u) => (u.trim() ? normalizeHttpUrl(u) : ""))
+        .filter((url) => isValidHttpUrl(url))
+    );
     let resolvedYoutubeAdType: PublicYouTubeAdType | undefined;
     if (channel === "youtube") {
       const rawYoutubeAdType =
@@ -656,6 +658,11 @@ async function executeBatchCaptures(captureIds: string[]): Promise<void> {
           }
         }
 
+        if (!(await isCaptureStillProcessing(supabase, captureId))) {
+          console.log(`[BatchCapture] ⏹️ 결과 저장 스킵 (중단/상태 변경): ${captureId}`);
+          continue;
+        }
+
         // 6) Storage 업로드
         const timestamp = Date.now();
         const placementUpload = await uploadStorageObject(
@@ -687,6 +694,11 @@ async function executeBatchCaptures(captureIds: string[]): Promise<void> {
         const durationMs = Date.now() - captureStart;
         const diagnostics = (channel as any).getDiagnostics?.() ?? null;
         const successCategory = classifySuccessCategory(diagnostics);
+
+        if (!(await isCaptureStillProcessing(supabase, captureId))) {
+          console.log(`[BatchCapture] ⏹️ 완료 업데이트 스킵 (중단/상태 변경): ${captureId}`);
+          continue;
+        }
 
         await supabase
           .from("vision_da_captures")
@@ -724,6 +736,11 @@ async function executeBatchCaptures(captureIds: string[]): Promise<void> {
             ? ((captureError as any).fallbackRuntime as Record<string, unknown> | undefined)
             : undefined;
         const host = getHostname(sourceUrlForFailure);
+
+        if (!(await isCapturePendingOrProcessing(supabase, captureId))) {
+          console.log(`[BatchCapture] ⏹️ 실패 업데이트 스킵 (중단/상태 변경): ${captureId}`);
+          continue;
+        }
 
         await supabase
           .from("vision_da_captures")
@@ -1072,6 +1089,57 @@ async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   }
 }
 
+const USER_CANCELLED_CAPTURE_MESSAGE = "사용자가 캡처를 중단했습니다.";
+
+function dedupeNormalizedUrls(urls: string[]): string[] {
+  const seen = new Set<string>();
+  const deduped: string[] = [];
+  for (const url of urls) {
+    const key = url.trim().replace(/\/+$/, "").toLowerCase();
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    deduped.push(url);
+  }
+  return deduped;
+}
+
+async function isCaptureStillProcessing(
+  supabase: ReturnType<typeof createServerClient>,
+  captureId: string
+): Promise<boolean> {
+  const { data, error } = await supabase
+    .from("vision_da_captures")
+    .select("status")
+    .eq("id", captureId)
+    .single();
+
+  if (error || !data) {
+    console.warn(`[BatchCapture] 상태 재확인 실패: ${captureId}`, error);
+    return false;
+  }
+
+  return (data as { status?: string }).status === "processing";
+}
+
+async function isCapturePendingOrProcessing(
+  supabase: ReturnType<typeof createServerClient>,
+  captureId: string
+): Promise<boolean> {
+  const { data, error } = await supabase
+    .from("vision_da_captures")
+    .select("status")
+    .eq("id", captureId)
+    .single();
+
+  if (error || !data) {
+    console.warn(`[BatchCapture] 상태 재확인 실패: ${captureId}`, error);
+    return false;
+  }
+
+  const status = (data as { status?: string }).status;
+  return status === "pending" || status === "processing";
+}
+
 /** GET: 캡처 목록 조회 */
 export async function GET(request: NextRequest) {
   const auth = await requireLensSession(request);
@@ -1119,6 +1187,63 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ data, total: count });
   } catch (err) {
     console.error("[API] GET /captures error:", err);
+    return NextResponse.json(
+      { error: "서버 오류가 발생했습니다." },
+      { status: 500 }
+    );
+  }
+}
+
+/** PATCH: 대기/처리 중인 캡처 중단 */
+export async function PATCH(request: NextRequest) {
+  const auth = await requireLensSession(request);
+  if ("response" in auth) {
+    return auth.response;
+  }
+
+  try {
+    const body = await request.json().catch(() => null);
+    const action = typeof body?.action === "string" ? body.action : "";
+    const ids: string[] = Array.isArray(body?.ids)
+      ? body.ids.filter((id: unknown): id is string => typeof id === "string" && id.trim().length > 0)
+      : [];
+    const targetIds = Array.from(new Set(ids.map((id: string) => id.trim()))).slice(0, 50);
+
+    if (action !== "cancel" || targetIds.length === 0) {
+      return NextResponse.json(
+        { error: "중단할 캡처 ids를 지정하세요." },
+        { status: 400 }
+      );
+    }
+
+    const supabase = createServerClient();
+    const { data, error } = await supabase
+      .from("vision_da_captures")
+      .update({
+        status: "failed",
+        error_message: USER_CANCELLED_CAPTURE_MESSAGE,
+        updated_at: new Date().toISOString(),
+      })
+      .in("id", targetIds)
+      .in("status", ["pending", "processing"])
+      .select("id");
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    const cancelled = data?.length ?? 0;
+    console.log(`[API] 캡처 중단 요청 처리: ${cancelled}/${targetIds.length}건`);
+    return NextResponse.json({
+      success: true,
+      cancelled,
+      message:
+        cancelled > 0
+          ? USER_CANCELLED_CAPTURE_MESSAGE
+          : "중단 가능한 대기/처리 중 캡처가 없습니다.",
+    });
+  } catch (err) {
+    console.error("[API] PATCH /captures error:", err);
     return NextResponse.json(
       { error: "서버 오류가 발생했습니다." },
       { status: 500 }

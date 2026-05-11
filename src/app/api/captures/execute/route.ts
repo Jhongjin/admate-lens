@@ -205,6 +205,16 @@ export async function POST(request: NextRequest) {
             perCaptureTimeoutMs
           );
 
+          if (!(await isCaptureStillProcessing(supabase, captureId))) {
+            console.log(`[Execute] ⏹️ 결과 저장 스킵 (중단/상태 변경): ${captureId}`);
+            results.push({
+              captureId,
+              success: false,
+              error: "캡처가 중단되었거나 상태가 변경되었습니다.",
+            });
+            continue;
+          }
+
           // 6) Supabase Storage에 업로드
           const timestamp = Date.now();
           const basePath = `captures/${captureId}`;
@@ -251,6 +261,16 @@ export async function POST(request: NextRequest) {
           const diagnostics = (channel as any).getDiagnostics?.() ?? null;
           const successCategory = classifySuccessCategory(diagnostics);
 
+          if (!(await isCaptureStillProcessing(supabase, captureId))) {
+            console.log(`[Execute] ⏹️ 완료 업데이트 스킵 (중단/상태 변경): ${captureId}`);
+            results.push({
+              captureId,
+              success: false,
+              error: "캡처가 중단되었거나 상태가 변경되었습니다.",
+            });
+            continue;
+          }
+
           await supabase
             .from("vision_da_captures")
             .update({
@@ -283,6 +303,16 @@ export async function POST(request: NextRequest) {
           const errorMessage = captureError instanceof Error ? captureError.message : "알 수 없는 오류";
           const failureInfo = classifyFailureReason(captureError);
           const host = getHostname(sourceUrlForFailure);
+
+          if (!(await isCapturePendingOrProcessing(supabase, captureId))) {
+            console.log(`[Execute] ⏹️ 실패 업데이트 스킵 (중단/상태 변경): ${captureId}`);
+            results.push({
+              captureId,
+              success: false,
+              error: "캡처가 중단되었거나 상태가 변경되었습니다.",
+            });
+            continue;
+          }
 
           await supabase
             .from("vision_da_captures")
@@ -421,6 +451,43 @@ async function markRemainingPendingAsBudgetSkipped(
     })
     .in("id", captureIds)
     .eq("status", "pending");
+}
+
+async function isCaptureStillProcessing(
+  supabase: ReturnType<typeof createServerClient>,
+  captureId: string
+): Promise<boolean> {
+  const { data, error } = await supabase
+    .from("vision_da_captures")
+    .select("status")
+    .eq("id", captureId)
+    .single();
+
+  if (error || !data) {
+    console.warn(`[Execute] 상태 재확인 실패: ${captureId}`, error);
+    return false;
+  }
+
+  return (data as { status?: string }).status === "processing";
+}
+
+async function isCapturePendingOrProcessing(
+  supabase: ReturnType<typeof createServerClient>,
+  captureId: string
+): Promise<boolean> {
+  const { data, error } = await supabase
+    .from("vision_da_captures")
+    .select("status")
+    .eq("id", captureId)
+    .single();
+
+  if (error || !data) {
+    console.warn(`[Execute] 상태 재확인 실패: ${captureId}`, error);
+    return false;
+  }
+
+  const status = (data as { status?: string }).status;
+  return status === "pending" || status === "processing";
 }
 
 function isBrowserSessionClosedError(err: unknown): boolean {

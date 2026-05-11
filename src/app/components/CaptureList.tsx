@@ -347,6 +347,7 @@ export default function CaptureList({ refreshTrigger }: CaptureListProps) {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [deleteConfirm, setDeleteConfirm] = useState<{ type: "single" | "all"; id?: string } | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [cancellingIds, setCancellingIds] = useState<Set<string>>(new Set());
   const [authExpiredMessage, setAuthExpiredMessage] = useState<string | null>(null);
 
   // 🔑 폴링 안정화를 위한 ref — captures 변경에 의한 무한 재렌더 방지
@@ -417,6 +418,8 @@ export default function CaptureList({ refreshTrigger }: CaptureListProps) {
   const filteredCaptures = captures;
   const activeCount = captures.filter((c) => c.status === "pending" || c.status === "processing").length;
   const latestCompleted = captures.find((c) => c.status === "completed" && !!c.placement_image_url) || null;
+  const isCaptureActive = (capture: CaptureRecord) =>
+    capture.status === "pending" || capture.status === "processing";
 
   /** 상태별 카운트 */
   const statusCounts = captures.reduce(
@@ -481,6 +484,60 @@ export default function CaptureList({ refreshTrigger }: CaptureListProps) {
     } finally {
       setIsDeleting(false);
       setDeleteConfirm(null);
+    }
+  };
+
+  /** 대기/처리 중인 캡처 중단 */
+  const handleCancelCapture = async (captureId: string) => {
+    setCancellingIds((prev) => new Set(prev).add(captureId));
+    try {
+      const res = await fetch("/api/captures", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "cancel", ids: [captureId] }),
+      });
+      const result = await res.json().catch(() => null);
+      if (isLensAuthRequiredResponse(res, result)) {
+        setAuthExpiredMessage(result?.error || LENS_AUTH_EXPIRED_MESSAGE);
+        setSelectedCapture(null);
+        return;
+      }
+      if (!res.ok) {
+        throw new Error(result?.error || "캡처 중단 요청에 실패했습니다.");
+      }
+
+      setAuthExpiredMessage(null);
+      setCaptures((prev) =>
+        prev.map((capture) =>
+          capture.id === captureId
+            ? {
+                ...capture,
+                status: "failed",
+                error_message: result?.message || "사용자가 캡처를 중단했습니다.",
+                updated_at: new Date().toISOString(),
+              }
+            : capture,
+        ),
+      );
+      setSelectedCapture((current) =>
+        current?.id === captureId
+          ? {
+              ...current,
+              status: "failed",
+              error_message: result?.message || "사용자가 캡처를 중단했습니다.",
+              updated_at: new Date().toISOString(),
+            }
+          : current,
+      );
+      await fetchCaptures();
+    } catch (err) {
+      console.error("[CaptureList] 캡처 중단 실패:", err);
+    } finally {
+      setCancellingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(captureId);
+        return next;
+      });
     }
   };
 
@@ -644,7 +701,8 @@ export default function CaptureList({ refreshTrigger }: CaptureListProps) {
           <div className="divide-y divide-[var(--color-border)]">
             {filteredCaptures.map((capture) => {
               const status = STATUS_LABELS[capture.status] || STATUS_LABELS.pending;
-              const isActive = capture.status === "processing";
+              const isActive = isCaptureActive(capture);
+              const isCancelling = cancellingIds.has(capture.id);
 
               return (
                 <div
@@ -733,6 +791,19 @@ export default function CaptureList({ refreshTrigger }: CaptureListProps) {
 
                   {/* 삭제 버튼 + 화살표 */}
                   <div className="flex items-center gap-1 flex-shrink-0">
+                    {isActive && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleCancelCapture(capture.id);
+                        }}
+                        disabled={isCancelling}
+                        className="inline-flex h-8 items-center justify-center rounded-lg border border-[rgba(239,68,68,0.22)] px-2 text-xs font-semibold text-[var(--color-error)] transition-all hover:bg-[rgba(239,68,68,0.08)] disabled:cursor-not-allowed disabled:opacity-50"
+                        title="캡처 중단"
+                      >
+                        {isCancelling ? "중단 중" : "중단"}
+                      </button>
+                    )}
                     {CAPTURE_DELETE_ENABLED && (
                       <button
                         onClick={(e) => {
@@ -769,6 +840,8 @@ export default function CaptureList({ refreshTrigger }: CaptureListProps) {
           capture={selectedCapture}
           onClose={() => setSelectedCapture(null)}
           onDelete={(id) => setDeleteConfirm({ type: "single", id })}
+          onCancel={handleCancelCapture}
+          isCancelling={cancellingIds.has(selectedCapture.id)}
         />
       )}
 
@@ -838,10 +911,14 @@ function CaptureDetailModal({
   capture,
   onClose,
   onDelete,
+  onCancel,
+  isCancelling,
 }: {
   capture: CaptureRecord;
   onClose: () => void;
   onDelete: (id: string) => void;
+  onCancel: (id: string) => void;
+  isCancelling: boolean;
 }) {
   type OutputId = "placement" | "landing";
 
@@ -943,6 +1020,14 @@ function CaptureDetailModal({
             {capture.status === "pending" ? "캡처 대기 중입니다" : "캡처를 처리하고 있습니다"}
           </p>
           <p className="mt-1 text-xs text-[var(--color-text-muted)]">보통 30초~2분 정도 소요됩니다</p>
+          <button
+            type="button"
+            onClick={() => onCancel(capture.id)}
+            disabled={isCancelling}
+            className="mt-4 rounded-md border border-[rgba(239,68,68,0.22)] px-4 py-2 text-xs font-semibold text-[var(--color-error)] transition-colors hover:bg-[rgba(239,68,68,0.08)] disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {isCancelling ? "중단 요청 중..." : "캡처 중단"}
+          </button>
         </div>
       );
     }
@@ -1248,6 +1333,16 @@ function CaptureDetailModal({
               {activeReferenceUrl && (
                 <button type="button" onClick={() => copyText(activeReferenceUrl, "참조 URL")} className={`${actionButtonClass} w-full`}>
                   참조 URL 복사
+                </button>
+              )}
+              {(capture.status === "pending" || capture.status === "processing") && (
+                <button
+                  type="button"
+                  onClick={() => onCancel(capture.id)}
+                  disabled={isCancelling}
+                  className="w-full rounded-md border border-[rgba(239,68,68,0.22)] px-3 py-2 text-xs font-semibold text-[var(--color-error)] transition-colors hover:bg-[rgba(239,68,68,0.08)] disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {isCancelling ? "중단 요청 중..." : "캡처 중단"}
                 </button>
               )}
               {CAPTURE_DELETE_ENABLED && (

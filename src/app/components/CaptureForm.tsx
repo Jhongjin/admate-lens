@@ -570,6 +570,19 @@ function isValidHttpSource(raw: string): boolean {
   }
 }
 
+function dedupeHttpUrls(urls: string[]): string[] {
+  const seen = new Set<string>();
+  const deduped: string[] = [];
+  for (const raw of urls) {
+    const normalized = normalizeHttpUrl(raw);
+    const key = normalized.trim().replace(/\/+$/, "").toLowerCase();
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    deduped.push(normalized);
+  }
+  return deduped;
+}
+
 /** 파일 크기 포맷 */
 function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes}B`;
@@ -1259,13 +1272,14 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
         : isMobileNativeChannel
           ? mobileNativePublisherUrls
           : form.selectedPublishers;
+      const dedupedPublisherUrls = dedupeHttpUrls(publisherUrls);
 
       const res = await fetch("/api/captures", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           channel: form.channel,
-          publisherUrls,
+          publisherUrls: dedupedPublisherUrls,
           creativeUrl: form.creativeUrl,
           clickUrl: form.clickUrl || undefined,
           captureLanding: form.captureLanding,
