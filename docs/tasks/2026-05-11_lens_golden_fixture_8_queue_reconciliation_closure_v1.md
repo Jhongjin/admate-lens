@@ -113,4 +113,3 @@ Expected result:
 - golden verification remains green
 - no secret, token, credential, cookie, signed URL, private URL, raw provider
   response, or raw capture payload is present in this note
-
