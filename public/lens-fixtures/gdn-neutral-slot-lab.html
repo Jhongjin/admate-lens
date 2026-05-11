@@ -1,0 +1,431 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Lens Fixture - Neutral Slot Lab</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --ink: #202124;
+        --muted: #5f6368;
+        --line: #dadce0;
+        --paper: #ffffff;
+        --wash: #f1f4f8;
+        --accent: #2f6f73;
+        --warm: #f6c35b;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-width: 1180px;
+        background: var(--wash);
+        color: var(--ink);
+        font-family: Arial, Helvetica, sans-serif;
+      }
+
+      .page {
+        width: 1180px;
+        min-height: 1420px;
+        margin: 0 auto;
+        background: var(--paper);
+      }
+
+      .utility {
+        height: 40px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 34px;
+        border-bottom: 1px solid var(--line);
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .masthead {
+        height: 112px;
+        display: grid;
+        place-items: center;
+        border-bottom: 3px solid var(--ink);
+      }
+
+      h1,
+      h2,
+      h3,
+      p {
+        margin: 0;
+      }
+
+      h1 {
+        font-size: 42px;
+        letter-spacing: 0;
+      }
+
+      .nav {
+        display: flex;
+        gap: 26px;
+        padding: 17px 34px;
+        border-bottom: 1px solid var(--line);
+        font-size: 15px;
+        font-weight: 700;
+      }
+
+      .leaderboard-wrap {
+        display: grid;
+        place-items: center;
+        padding: 22px 0 8px;
+      }
+
+      .hero {
+        display: grid;
+        grid-template-columns: 1.36fr 0.92fr 300px;
+        gap: 26px;
+        padding: 26px 34px 36px;
+      }
+
+      .visual {
+        height: 276px;
+        border: 1px solid var(--line);
+        background:
+          linear-gradient(135deg, rgba(47, 111, 115, 0.22), rgba(246, 195, 91, 0.28)),
+          linear-gradient(90deg, #f8fafc, #e3e8ef);
+      }
+
+      .lead h2 {
+        margin-top: 18px;
+        font-size: 32px;
+        line-height: 1.22;
+        letter-spacing: 0;
+      }
+
+      .summary {
+        margin-top: 10px;
+        color: var(--muted);
+        font-size: 16px;
+        line-height: 1.58;
+      }
+
+      .stack {
+        display: grid;
+        gap: 17px;
+      }
+
+      .brief {
+        display: grid;
+        grid-template-columns: 86px minmax(0, 1fr);
+        gap: 14px;
+        padding-bottom: 16px;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .thumb {
+        height: 64px;
+        border: 1px solid var(--line);
+        background: linear-gradient(135deg, #eef2f7, #d7dee8);
+      }
+
+      .brief strong {
+        display: block;
+        font-size: 16px;
+        line-height: 1.42;
+      }
+
+      .brief span {
+        display: block;
+        margin-top: 7px;
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .ad-column {
+        display: grid;
+        gap: 20px;
+        align-content: start;
+      }
+
+      .ad-slot {
+        position: relative;
+        display: grid;
+        place-items: center;
+        overflow: hidden;
+        background: #f8fafc;
+        border: 1px solid #cfd6df;
+      }
+
+      .ad-slot::before {
+        content: "SPONSOR SLOT";
+        position: absolute;
+        top: 8px;
+        left: 50%;
+        transform: translateX(-50%);
+        color: #6b7280;
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 0;
+      }
+
+      .ad-300 {
+        width: 300px;
+        height: 250px;
+      }
+
+      .ad-728 {
+        width: 728px;
+        height: 90px;
+      }
+
+      .creative-box {
+        width: calc(100% - 38px);
+        min-height: 55%;
+        display: grid;
+        align-content: center;
+        gap: 8px;
+        padding: 18px;
+        text-align: center;
+        background:
+          linear-gradient(135deg, rgba(47, 111, 115, 0.16), rgba(246, 195, 91, 0.3)),
+          #ffffff;
+        border: 1px solid rgba(32, 33, 36, 0.14);
+      }
+
+      .creative-kicker {
+        color: var(--accent);
+        font-size: 12px;
+        font-weight: 800;
+      }
+
+      .creative-title {
+        font-size: 22px;
+        line-height: 1.12;
+        font-weight: 800;
+      }
+
+      .creative-copy {
+        color: #475569;
+        font-size: 13px;
+        line-height: 1.4;
+      }
+
+      .ad-728 .creative-box {
+        width: calc(100% - 54px);
+        min-height: 50px;
+        grid-template-columns: 120px minmax(0, 1fr) 120px;
+        align-items: center;
+        text-align: left;
+      }
+
+      .section-heading {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin: 0 34px;
+        padding: 18px 0 12px;
+        border-top: 4px solid var(--accent);
+      }
+
+      .section-heading h2 {
+        font-size: 24px;
+        letter-spacing: 0;
+      }
+
+      .section-heading span {
+        color: var(--muted);
+        font-size: 13px;
+        font-weight: 700;
+      }
+
+      .below {
+        display: grid;
+        grid-template-columns: 1fr 1fr 300px;
+        gap: 26px;
+        padding: 20px 34px 64px;
+      }
+
+      .tile {
+        min-width: 0;
+        border-bottom: 1px solid var(--line);
+        padding-bottom: 18px;
+      }
+
+      .tile .visual {
+        height: 188px;
+      }
+
+      .label {
+        margin-top: 14px;
+        color: var(--accent);
+        font-size: 13px;
+        font-weight: 800;
+      }
+
+      .tile h3 {
+        margin-top: 7px;
+        font-size: 22px;
+        line-height: 1.34;
+        letter-spacing: 0;
+      }
+
+      .footer-band {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 300px;
+        gap: 32px;
+        align-items: start;
+        padding: 36px 34px 70px;
+        background: #f7f9fb;
+        border-top: 1px solid var(--line);
+      }
+
+      .footer-copy {
+        display: grid;
+        gap: 14px;
+        color: var(--muted);
+        font-size: 15px;
+        line-height: 1.55;
+      }
+
+      .low-priority {
+        opacity: 0.74;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="page">
+      <div class="utility">
+        <span>Fixture Date</span>
+        <span>Static local page for slot contract checks</span>
+      </div>
+
+      <header class="masthead">
+        <h1>Sample Publisher</h1>
+      </header>
+
+      <nav class="nav" aria-label="Sample sections">
+        <span>Front</span>
+        <span>Markets</span>
+        <span>Culture</span>
+        <span>Research</span>
+        <span>Opinion</span>
+      </nav>
+
+      <div class="leaderboard-wrap">
+        <aside class="ad-slot ad-728" id="fixture-neutral-leaderboard" data-ad-slot="neutral-728x90">
+          <div class="creative-box">
+            <p class="creative-kicker">FIXTURE SPONSOR</p>
+            <p class="creative-title">Neutral leaderboard area</p>
+            <p class="creative-copy">728 x 90</p>
+          </div>
+        </aside>
+      </div>
+
+      <section class="hero">
+        <article class="lead">
+          <div class="visual"></div>
+          <h2>Neutral layout lab keeps slot discovery deterministic</h2>
+          <p class="summary">
+            This static page uses generic labels, CSS-only shapes, and local
+            markup so fixture contract checks do not depend on live content.
+          </p>
+        </article>
+
+        <div class="stack">
+          <article class="brief">
+            <div class="thumb" aria-hidden="true"></div>
+            <div>
+              <strong>Sample desk compares stable article modules</strong>
+              <span>Layout Lab</span>
+            </div>
+          </article>
+          <article class="brief">
+            <div class="thumb" aria-hidden="true"></div>
+            <div>
+              <strong>Research note reviews synthetic placement order</strong>
+              <span>Testing Desk</span>
+            </div>
+          </article>
+          <article class="brief">
+            <div class="thumb" aria-hidden="true"></div>
+            <div>
+              <strong>Generic feature block preserves scroll context</strong>
+              <span>Sample Desk</span>
+            </div>
+          </article>
+          <article class="brief">
+            <div class="thumb" aria-hidden="true"></div>
+            <div>
+              <strong>Fixture copy avoids real campaigns and private data</strong>
+              <span>Review Desk</span>
+            </div>
+          </article>
+        </div>
+
+        <aside class="ad-column" aria-label="Sponsor placements">
+          <div class="ad-slot ad-300" id="fixture-neutral-primary-300" data-ad-slot="neutral-primary-300x250">
+            <div class="creative-box">
+              <p class="creative-kicker">FIXTURE SPONSOR</p>
+              <p class="creative-title">Primary 300 x 250 slot</p>
+              <p class="creative-copy">Above-fold contract marker</p>
+            </div>
+          </div>
+          <article class="brief">
+            <div class="thumb" aria-hidden="true"></div>
+            <div>
+              <strong>Side rail story keeps the page rhythm stable</strong>
+              <span>Fixture Notes</span>
+            </div>
+          </article>
+        </aside>
+      </section>
+
+      <div class="section-heading">
+        <h2>Sample Desk</h2>
+        <span>No external assets or scripts</span>
+      </div>
+
+      <section class="below">
+        <article class="tile">
+          <div class="visual"></div>
+          <p class="label">Operations</p>
+          <h3>Article card creates context before the secondary placement</h3>
+          <p class="summary">All visible content is synthetic and repo-safe.</p>
+        </article>
+        <article class="tile">
+          <div class="visual"></div>
+          <p class="label">Analysis</p>
+          <h3>Stable spacing helps offline checks reason about slot order</h3>
+          <p class="summary">No real publisher, platform, or advertiser names are used.</p>
+        </article>
+        <aside class="ad-slot ad-300" id="fixture-neutral-secondary-300" data-ad-slot="neutral-secondary-300x250">
+          <div class="creative-box">
+            <p class="creative-kicker">FIXTURE SPONSOR</p>
+            <p class="creative-title">Secondary 300 x 250 slot</p>
+            <p class="creative-copy">Below-fold contract marker</p>
+          </div>
+        </aside>
+      </section>
+
+      <section class="footer-band">
+        <div class="footer-copy">
+          <p>
+            Footer content intentionally sits after the main article grid to
+            exercise lower-priority placement ordering without sticky behavior.
+          </p>
+          <p>
+            The page contains only local static markup, neutral labels, CSS
+            shapes, and deterministic sample copy.
+          </p>
+        </div>
+        <aside class="ad-slot ad-300 low-priority" id="fixture-neutral-footer-300" data-ad-slot="neutral-low-priority-footer-300x250">
+          <div class="creative-box">
+            <p class="creative-kicker">FIXTURE SPONSOR</p>
+            <p class="creative-title">Low-priority footer slot</p>
+            <p class="creative-copy">Negative ordering marker</p>
+          </div>
+        </aside>
+      </section>
+    </main>
+  </body>
+</html>
