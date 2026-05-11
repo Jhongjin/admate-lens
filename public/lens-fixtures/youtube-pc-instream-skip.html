@@ -1,0 +1,310 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Lens Golden Fixture - Video In-Stream</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --ink: #111827;
+        --muted: #6b7280;
+        --line: #e5e7eb;
+        --panel: #f9fafb;
+        --accent: #2563eb;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: #ffffff;
+        color: var(--ink);
+        font-family: Arial, Helvetica, sans-serif;
+      }
+
+      .topbar {
+        height: 72px;
+        display: grid;
+        grid-template-columns: 210px 1fr 240px;
+        align-items: center;
+        gap: 22px;
+        padding: 0 30px;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .brand {
+        font-size: 23px;
+        font-weight: 800;
+      }
+
+      .search {
+        height: 42px;
+        border: 1px solid #cfd4dc;
+        border-radius: 21px;
+        display: flex;
+        align-items: center;
+        padding: 0 20px;
+        color: var(--muted);
+      }
+
+      .account {
+        justify-self: end;
+        color: var(--muted);
+        font-size: 14px;
+      }
+
+      .layout {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 420px;
+        gap: 28px;
+        padding: 28px 30px 60px;
+      }
+
+      .player {
+        position: relative;
+        aspect-ratio: 16 / 9;
+        background:
+          radial-gradient(circle at 28% 34%, rgba(255, 255, 255, 0.24), transparent 22%),
+          linear-gradient(135deg, #111827, #334155 45%, #0f172a);
+        border-radius: 10px;
+        overflow: hidden;
+      }
+
+      .player::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background:
+          linear-gradient(90deg, transparent 0 48%, rgba(255, 255, 255, 0.16) 49% 51%, transparent 52%),
+          linear-gradient(0deg, transparent 0 58%, rgba(255, 255, 255, 0.10) 59% 61%, transparent 62%);
+        opacity: 0.7;
+      }
+
+      .ad-label {
+        position: absolute;
+        left: 18px;
+        top: 18px;
+        color: rgba(255, 255, 255, 0.86);
+        font-size: 13px;
+      }
+
+      .sponsor-card {
+        position: absolute;
+        left: 24px;
+        bottom: 78px;
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        min-width: 330px;
+        padding: 12px 14px;
+        border-radius: 8px;
+        background: rgba(17, 24, 39, 0.82);
+        color: #ffffff;
+      }
+
+      .logo {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background: #42b883;
+      }
+
+      .sponsor-card strong {
+        display: block;
+        font-size: 15px;
+      }
+
+      .sponsor-card span {
+        color: rgba(255, 255, 255, 0.72);
+        font-size: 12px;
+      }
+
+      .skip {
+        position: absolute;
+        right: 24px;
+        bottom: 78px;
+        border-radius: 20px;
+        background: rgba(17, 24, 39, 0.82);
+        color: #ffffff;
+        padding: 10px 18px;
+        font-weight: 700;
+      }
+
+      .caption {
+        position: absolute;
+        left: 50%;
+        bottom: 86px;
+        transform: translateX(-50%);
+        width: min(680px, 58%);
+        padding: 10px 18px;
+        background: rgba(17, 24, 39, 0.78);
+        color: #ffffff;
+        text-align: center;
+        border-radius: 4px;
+        font-size: 24px;
+        font-weight: 700;
+      }
+
+      .progress {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        height: 5px;
+        background: rgba(255, 255, 255, 0.28);
+      }
+
+      .progress span {
+        display: block;
+        width: 64%;
+        height: 100%;
+        background: #f59e0b;
+      }
+
+      .meta {
+        padding-top: 20px;
+      }
+
+      .meta h1 {
+        margin: 0 0 14px;
+        font-size: 27px;
+        letter-spacing: 0;
+      }
+
+      .channel {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        color: var(--muted);
+      }
+
+      .subscribe {
+        border: 0;
+        border-radius: 20px;
+        background: #111827;
+        color: #ffffff;
+        padding: 10px 18px;
+        font-weight: 700;
+      }
+
+      .description {
+        margin-top: 18px;
+        padding: 18px;
+        border-radius: 10px;
+        background: var(--panel);
+        color: #374151;
+        line-height: 1.6;
+      }
+
+      .rail {
+        display: grid;
+        gap: 14px;
+      }
+
+      .recommendation {
+        display: grid;
+        grid-template-columns: 168px 1fr;
+        gap: 12px;
+      }
+
+      .recommendation .thumb {
+        height: 94px;
+        border-radius: 8px;
+        background: linear-gradient(135deg, #dbeafe, #fef3c7);
+      }
+
+      .recommendation strong {
+        display: block;
+        font-size: 15px;
+        line-height: 1.35;
+      }
+
+      .recommendation span {
+        display: block;
+        margin-top: 5px;
+        color: var(--muted);
+        font-size: 13px;
+      }
+    </style>
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">Sample Video</div>
+      <div class="search">Search sample videos</div>
+      <div class="account">Create · Notifications · Profile</div>
+    </header>
+
+    <main class="layout">
+      <section>
+        <div class="player" data-ad-slot="video-instream-skip">
+          <div class="ad-label">Ad</div>
+          <div class="sponsor-card">
+            <div class="logo"></div>
+            <div>
+              <strong>Test Sponsor</strong>
+              <span>sample-video.local</span>
+            </div>
+          </div>
+          <div class="caption">A neutral fixture message for capture QA.</div>
+          <div class="skip">Skip Ad</div>
+          <div class="progress"><span></span></div>
+        </div>
+
+        <div class="meta">
+          <h1>Sample episode explains a stable fixture workflow</h1>
+          <div class="channel">
+            <div class="logo"></div>
+            <strong>Fixture Channel</strong>
+            <button class="subscribe" type="button">Subscribe</button>
+          </div>
+          <div class="description">
+            This page is a deterministic Lens golden fixture. It contains only
+            synthetic copy and CSS shapes, with no real platform, brand,
+            account, campaign, or private URL content.
+          </div>
+        </div>
+      </section>
+
+      <aside class="rail" aria-label="Sample recommendations">
+        <article class="recommendation">
+          <div class="thumb"></div>
+          <div>
+            <strong>Recommendation card with neutral title one</strong>
+            <span>Fixture Channel · 12K views</span>
+          </div>
+        </article>
+        <article class="recommendation">
+          <div class="thumb"></div>
+          <div>
+            <strong>Stable layout reference for capture comparison</strong>
+            <span>Sample Studio · 8K views</span>
+          </div>
+        </article>
+        <article class="recommendation">
+          <div class="thumb"></div>
+          <div>
+            <strong>How deterministic surfaces help QA review</strong>
+            <span>Testing Desk · 5K views</span>
+          </div>
+        </article>
+        <article class="recommendation">
+          <div class="thumb"></div>
+          <div>
+            <strong>Neutral visual rhythm without real thumbnails</strong>
+            <span>Mock Media · 3K views</span>
+          </div>
+        </article>
+        <article class="recommendation">
+          <div class="thumb"></div>
+          <div>
+            <strong>Fixture-only content for repo-safe baselines</strong>
+            <span>AdMate Test · 1K views</span>
+          </div>
+        </article>
+      </aside>
+    </main>
+  </body>
+</html>

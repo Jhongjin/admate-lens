@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="300" height="250" viewBox="0 0 300 250" role="img" aria-labelledby="title desc">
+  <title id="title">AdMate Test Creative 300x250</title>
+  <desc id="desc">Neutral test creative for Lens golden fixture captures.</desc>
+  <rect width="300" height="250" rx="0" fill="#f7f4ec"/>
+  <rect x="14" y="14" width="272" height="222" fill="#ffffff" stroke="#151515" stroke-width="2"/>
+  <circle cx="72" cy="76" r="34" fill="#42b883"/>
+  <rect x="126" y="48" width="104" height="14" fill="#1f2937"/>
+  <rect x="126" y="75" width="136" height="10" fill="#6b7280"/>
+  <rect x="126" y="96" width="118" height="10" fill="#9ca3af"/>
+  <path d="M48 165h204" stroke="#111827" stroke-width="3"/>
+  <rect x="48" y="184" width="86" height="18" fill="#2563eb"/>
+  <rect x="148" y="184" width="104" height="18" fill="#f59e0b"/>
+  <text x="48" y="145" font-family="Arial, sans-serif" font-size="20" font-weight="700" fill="#111827">AdMate Test</text>
+  <text x="48" y="222" font-family="Arial, sans-serif" font-size="12" fill="#4b5563">Repo-safe fixture creative</text>
+</svg>

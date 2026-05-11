@@ -1,0 +1,283 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Lens Golden Fixture - GDN PC Display</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --ink: #161616;
+        --muted: #6b7280;
+        --line: #dedede;
+        --paper: #ffffff;
+        --wash: #f4f1ea;
+        --accent: #2563eb;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-width: 1180px;
+        background: var(--wash);
+        color: var(--ink);
+        font-family: Arial, Helvetica, sans-serif;
+      }
+
+      .page {
+        width: 1180px;
+        margin: 0 auto;
+        background: var(--paper);
+        min-height: 1200px;
+      }
+
+      .top-strip {
+        height: 42px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        border-bottom: 1px solid var(--line);
+        color: var(--muted);
+        font-size: 13px;
+        padding: 0 32px;
+      }
+
+      .brand {
+        height: 104px;
+        display: grid;
+        place-items: center;
+        border-bottom: 3px solid var(--ink);
+      }
+
+      .brand h1 {
+        margin: 0;
+        font-size: 38px;
+        letter-spacing: 0;
+      }
+
+      .nav {
+        display: flex;
+        gap: 24px;
+        padding: 18px 32px;
+        border-bottom: 1px solid var(--line);
+        font-size: 15px;
+        font-weight: 700;
+      }
+
+      .hero {
+        display: grid;
+        grid-template-columns: 1.45fr 0.9fr 300px;
+        gap: 26px;
+        padding: 34px 32px;
+      }
+
+      .lead-card {
+        min-height: 390px;
+      }
+
+      .image-block {
+        height: 270px;
+        background:
+          linear-gradient(135deg, rgba(37, 99, 235, 0.18), rgba(66, 184, 131, 0.28)),
+          linear-gradient(90deg, #f7f7f7, #e5e7eb);
+        border: 1px solid var(--line);
+      }
+
+      h2 {
+        margin: 18px 0 10px;
+        font-size: 31px;
+        line-height: 1.25;
+      }
+
+      .summary {
+        color: var(--muted);
+        font-size: 16px;
+        line-height: 1.6;
+      }
+
+      .story-list {
+        display: grid;
+        gap: 18px;
+      }
+
+      .story {
+        display: grid;
+        grid-template-columns: 88px 1fr;
+        gap: 14px;
+        border-bottom: 1px solid var(--line);
+        padding-bottom: 16px;
+      }
+
+      .thumb {
+        height: 64px;
+        background: linear-gradient(135deg, #e5e7eb, #cbd5e1);
+        border: 1px solid var(--line);
+      }
+
+      .story strong {
+        display: block;
+        font-size: 16px;
+        line-height: 1.45;
+      }
+
+      .ad-column {
+        display: grid;
+        gap: 20px;
+        align-content: start;
+      }
+
+      .ad-slot {
+        display: grid;
+        place-items: center;
+        background: #f7f7f7;
+        border: 1px solid #d7d7d7;
+        position: relative;
+        overflow: hidden;
+      }
+
+      .ad-slot::before {
+        content: "ADVERTISEMENT";
+        position: absolute;
+        top: 7px;
+        left: 50%;
+        transform: translateX(-50%);
+        color: #777;
+        font-size: 10px;
+        letter-spacing: 0;
+      }
+
+      .ad-slot-300 {
+        width: 300px;
+        height: 250px;
+      }
+
+      .ad-slot-728 {
+        width: 728px;
+        height: 90px;
+        margin: 0 auto;
+      }
+
+      .ad-slot img {
+        display: block;
+        max-width: 100%;
+        max-height: 100%;
+      }
+
+      .section-rule {
+        height: 4px;
+        background: #d71920;
+        margin: 20px 32px;
+      }
+
+      .below {
+        display: grid;
+        grid-template-columns: 1fr 1fr 300px;
+        gap: 26px;
+        padding: 28px 32px 60px;
+      }
+
+      .tile {
+        border-bottom: 1px solid var(--line);
+        padding-bottom: 18px;
+      }
+
+      .tile .image-block {
+        height: 190px;
+      }
+
+      .tile h3 {
+        margin: 14px 0 8px;
+        font-size: 22px;
+        line-height: 1.35;
+      }
+
+      .label {
+        color: #d71920;
+        font-weight: 700;
+        font-size: 13px;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="page">
+      <div class="top-strip">
+        <span>Monday Edition</span>
+        <span>Sample Weather 24C</span>
+      </div>
+      <header class="brand">
+        <h1>Sample Publisher</h1>
+      </header>
+      <nav class="nav" aria-label="Sample sections">
+        <span>Latest</span>
+        <span>Business</span>
+        <span>Culture</span>
+        <span>Technology</span>
+        <span>Opinion</span>
+      </nav>
+
+      <section class="hero">
+        <article class="lead-card">
+          <div class="image-block"></div>
+          <h2>Sample headline explains a neutral product update</h2>
+          <p class="summary">This fixture page uses deterministic text, colors, and layout blocks for capture regression checks.</p>
+        </article>
+
+        <div class="story-list">
+          <article class="story">
+            <div class="thumb"></div>
+            <strong>Research team shares a calm operational benchmark</strong>
+          </article>
+          <article class="story">
+            <div class="thumb"></div>
+            <strong>Planning desk reviews seasonal demand patterns</strong>
+          </article>
+          <article class="story">
+            <div class="thumb"></div>
+            <strong>Design group publishes a reusable layout standard</strong>
+          </article>
+          <article class="story">
+            <div class="thumb"></div>
+            <strong>Editorial lab tests a more readable page module</strong>
+          </article>
+        </div>
+
+        <aside class="ad-column" aria-label="Advertising">
+          <div class="ad-slot ad-slot-300" id="fixture-gdn-slot-300" data-ad-slot="gdn-300x250">
+            <img src="/lens-fixtures/assets/mock-creative-300x250.svg" width="300" height="250" alt="AdMate test creative" />
+          </div>
+          <div class="story">
+            <div class="thumb"></div>
+            <strong>Briefing note keeps sample content neutral</strong>
+          </div>
+        </aside>
+      </section>
+
+      <div class="ad-slot ad-slot-728" id="fixture-gdn-slot-728" data-ad-slot="gdn-728x90">
+        <img src="/lens-fixtures/assets/mock-creative-728x90.svg" width="728" height="90" alt="AdMate leaderboard test creative" />
+      </div>
+
+      <div class="section-rule"></div>
+
+      <section class="below">
+        <article class="tile">
+          <div class="image-block"></div>
+          <p class="label">Sample Desk</p>
+          <h3>Fixture module preserves a stable article-card rhythm</h3>
+          <p class="summary">All content here is synthetic and repo-safe.</p>
+        </article>
+        <article class="tile">
+          <div class="image-block"></div>
+          <p class="label">Analysis</p>
+          <h3>Neutral page blocks help compare capture output safely</h3>
+          <p class="summary">The page avoids real brands, real people, and live feeds.</p>
+        </article>
+        <aside class="ad-slot ad-slot-300" id="fixture-gdn-slot-secondary" data-ad-slot="gdn-300x250-secondary">
+          <img src="/lens-fixtures/assets/mock-creative-300x250.svg" width="300" height="250" alt="AdMate secondary test creative" />
+        </aside>
+      </section>
+    </main>
+  </body>
+</html>
