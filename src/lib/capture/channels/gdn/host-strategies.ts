@@ -31,6 +31,12 @@ export interface GdnSlotHostContext {
 /** Lazy-load 강제: full은 data-src 일괄 복원+스크롤, light는 loading만+짧은 스크롤(대형 뉴스지면 OOM 방지) */
 export type GdnLazyLoadMode = "full" | "light";
 
+export interface GdnGotoTimeoutContext {
+  relaxed?: boolean;
+  batchFastMode?: boolean;
+  mobileViewport?: boolean;
+}
+
 // --- 정책 제외: 캡처 시도 안 함(API에서 즉시 failed, 직접 URL도 차단) ---
 const GDN_EXCLUDED_HOSTS = new Set<string>([
   "news.kbs.co.kr",
@@ -125,11 +131,22 @@ export function getGdnLazyLoadMode(host: string): GdnLazyLoadMode {
   if (host === "news.sbs.co.kr") return "light";
   // Bloter는 이미지/스크립트가 많아 full lazy 복원 시 배치 후반 타임아웃이 잦음
   if (isBloterHost(host)) return "light";
+  // Donga는 뉴스/광고 DOM이 길어 단건에서도 full lazy 복원 비용이 커지기 쉬움
+  if (isDongaHost(host)) return "light";
   return "full";
 }
 
 export function isGdnExcludedHost(host: string): boolean {
   return GDN_EXCLUDED_HOSTS.has(host);
+}
+
+export function getGdnGotoTimeoutMs(host: string, ctx: GdnGotoTimeoutContext = {}): number {
+  if (isDongaHost(host)) {
+    if (ctx.relaxed) return 35_000;
+    return ctx.mobileViewport ? 42_000 : 35_000;
+  }
+  if (ctx.relaxed) return 60_000;
+  return ctx.mobileViewport ? 55_000 : 45_000;
 }
 
 // --- 스크린샷(인젝션 후 뷰포트 정책, gdn-capture safeCaptureScreenshot 경로) ---

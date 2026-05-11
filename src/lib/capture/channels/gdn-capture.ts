@@ -19,6 +19,7 @@ import { BaseChannel, type CaptureRequest } from "./base-channel";
 import { detectAdSlots, type DetectedSlot } from "../injection/ad-slot-detector";
 import { injectCreative, type InjectionResult } from "../injection/creative-injector";
 import {
+  getGdnGotoTimeoutMs,
   getGdnLazyLoadMode,
   getGdnScreenshotPolicy,
   isChosunHost,
@@ -162,12 +163,17 @@ export class GdnCapture extends BaseChannel {
     // 모바일: networkidle2는 지연·타임아웃·광고 미로드 빈번 → domcontentloaded + 정적 대기
     const gotoRelaxed = Boolean(request.options?.publisherGotoRelaxed);
     const mobileSurface = gdnViewportMode === "mobile";
+    const host = this.getHostnameSafe(request.publisherUrl);
     const gotoWaitUntil = gotoRelaxed
       ? "domcontentloaded"
       : mobileSurface
         ? "domcontentloaded"
         : "networkidle2";
-    const gotoTimeoutMs = gotoRelaxed ? 60000 : mobileSurface ? 55000 : 45000;
+    const gotoTimeoutMs = getGdnGotoTimeoutMs(host, {
+      relaxed: gotoRelaxed,
+      batchFastMode,
+      mobileViewport: mobileSurface,
+    });
     if (gotoRelaxed) {
       console.log("[GDN] 게재면 로드: 완화 모드(domcontentloaded, 배치/느린 지면 대응)");
     } else if (mobileSurface) {
@@ -215,7 +221,6 @@ export class GdnCapture extends BaseChannel {
       console.warn(`[GDN] ⚠️ Cloudflare 챌린지 통과 실패 — 그래도 진행 시도`);
     }
 
-    const host = this.getHostnameSafe(request.publisherUrl);
     if (isChosunHost(host)) {
       await this.dismissChosunPromoLayer(page);
     }
