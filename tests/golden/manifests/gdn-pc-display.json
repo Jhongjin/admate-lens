@@ -4,8 +4,8 @@
   "channel": "gdn",
   "productFamily": "gdn",
   "productSurface": "pc-display",
-  "sampleState": "pending-sample",
-  "sensitivity": "repo-safe-placeholder",
+  "sampleState": "external-only",
+  "sensitivity": "external-sensitive",
   "golden": {
     "imagePath": "tests/golden/images/gdn-pc-display/golden.png",
     "metadataPath": "tests/golden/metadata/gdn-pc-display.json",
@@ -42,5 +42,5 @@
     "gdnViewportMode": "pc",
     "resultCategory": "ad_capture_ok"
   },
-  "notes": "Pending until a repo-safe GDN PC display capture is approved as golden."
+  "notes": "Operator-approved external-sensitive GDN PC display baseline. PNG is not committed; local pixel diff remains skipped."
 }

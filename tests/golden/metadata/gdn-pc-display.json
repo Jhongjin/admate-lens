@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "surface": "gdn-pc-display",
-  "sampleState": "pending-sample",
+  "sampleState": "external-only",
   "fixtureKind": "placeholder",
   "metadata": {
     "capturedAt": "2026-05-05T00:00:00.000Z",
