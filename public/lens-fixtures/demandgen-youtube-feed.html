@@ -20,15 +20,20 @@
         box-sizing: border-box;
       }
 
+      html {
+        overflow-x: hidden;
+      }
+
       body {
         margin: 0;
         background: #eef2f7;
         color: var(--ink);
         font-family: Arial, Helvetica, sans-serif;
+        overflow-x: hidden;
       }
 
       .phone {
-        width: 390px;
+        width: min(390px, 100vw);
         min-height: 844px;
         margin: 0 auto;
         background: var(--paper);
@@ -78,9 +83,11 @@
       .tabs span {
         display: grid;
         place-items: center;
+        min-width: 0;
         min-height: 30px;
         border-radius: 15px;
         background: var(--panel);
+        text-align: center;
       }
 
       .tabs .active {
@@ -119,9 +126,11 @@
         color: var(--muted);
         font-size: 12px;
         font-weight: 700;
+        min-width: 0;
       }
 
       .source-mark {
+        flex: 0 0 auto;
         width: 22px;
         height: 22px;
         border-radius: 6px;
@@ -134,9 +143,17 @@
         margin: 0;
       }
 
+      h1,
+      h2,
+      p,
+      span,
+      strong {
+        overflow-wrap: anywhere;
+      }
+
       h1 {
         margin-top: 10px;
-        font-size: 22px;
+        font-size: 21px;
         line-height: 1.22;
         letter-spacing: 0;
       }
@@ -157,12 +174,18 @@
 
       .actions {
         display: flex;
+        flex-wrap: wrap;
         justify-content: space-between;
+        gap: 8px;
         padding: 12px 14px;
         border-top: 1px solid var(--line);
         color: var(--muted);
         font-size: 12px;
         font-weight: 700;
+      }
+
+      .actions span {
+        min-width: 0;
       }
 
       .ad-card {
@@ -212,8 +235,8 @@
       }
 
       .creative-title {
-        max-width: 280px;
-        font-size: 27px;
+        max-width: 100%;
+        font-size: 25px;
         line-height: 1.08;
         font-weight: 800;
       }
@@ -230,7 +253,7 @@
 
       .sponsor {
         display: grid;
-        grid-template-columns: 40px 1fr;
+        grid-template-columns: 40px minmax(0, 1fr);
         gap: 10px;
         align-items: center;
       }
@@ -254,8 +277,8 @@
 
       .cta-row {
         display: grid;
-        grid-template-columns: 1fr 104px;
-        gap: 10px;
+        grid-template-columns: minmax(0, 1fr) 96px;
+        gap: 8px;
         align-items: center;
         margin-top: 14px;
       }
@@ -270,11 +293,13 @@
         display: grid;
         place-items: center;
         min-height: 38px;
+        min-width: 0;
         border-radius: 19px;
         background: var(--accent);
         color: #ffffff;
-        font-size: 13px;
+        font-size: 12px;
         font-weight: 800;
+        text-align: center;
       }
 
       .compact-list {
@@ -284,7 +309,7 @@
 
       .compact-item {
         display: grid;
-        grid-template-columns: 86px 1fr;
+        grid-template-columns: 76px minmax(0, 1fr);
         gap: 11px;
         padding: 12px;
       }
