@@ -15,6 +15,12 @@ import { createChannel } from "@/lib/capture";
 import { resolveBatchPerCaptureTimeoutMs } from "@/lib/capture/batch-serverless";
 import type { VisionDaCaptureRow, ChannelType } from "@/lib/supabase/types";
 import { PuppeteerEngine } from "@/lib/capture/engine/puppeteer-engine";
+import {
+  DUPLICATE_CAPTURE_SOURCE_MESSAGE,
+  SLOW_GDN_BATCH_SKIP_MESSAGE,
+  normalizeCaptureSourceUrlKey,
+  shouldSkipSlowGdnBatchCapture,
+} from "@/lib/capture/batch-execution-guards";
 import { isGdnExcludedHost } from "@/lib/capture/channels/gdn/host-strategies";
 
 export const maxDuration = 300; // 5분
@@ -46,6 +52,7 @@ export async function POST(request: NextRequest) {
     const results: Array<{ captureId: string; success: boolean; error?: string; durationMs?: number }> = [];
     const isolatedHosts = new Map<string, string>();
     const hostFailureCounts = new Map<string, number>();
+    const seenPendingSourceKeys = new Set<string>();
     const multiBatch = captureIds.length > 1;
 
     // 🔑 핵심: 순차 실행. 다건도 성공 건 사이에서는 Chromium을 재사용
@@ -81,6 +88,32 @@ export async function POST(request: NextRequest) {
           if (capture.status !== "pending") {
             results.push({ captureId, success: false, error: `이미 처리된 요청입니다 (status: ${capture.status})` });
             continue;
+          }
+
+          const sourceKey = normalizeCaptureSourceUrlKey(capture.source_url);
+          if (sourceKey && seenPendingSourceKeys.has(sourceKey)) {
+            await supabase
+              .from("vision_da_captures")
+              .update({
+                status: "failed",
+                error_message: DUPLICATE_CAPTURE_SOURCE_MESSAGE,
+                metadata: {
+                  ...captureMetadata,
+                  failureCategory: "validation",
+                  failureCode: "duplicate_source_url_in_batch",
+                  duplicateSourceSkipped: true,
+                  failedAt: new Date().toISOString(),
+                },
+                updated_at: new Date().toISOString(),
+              })
+              .eq("id", captureId)
+              .eq("status", "pending");
+            results.push({ captureId, success: false, error: DUPLICATE_CAPTURE_SOURCE_MESSAGE });
+            console.warn(`[Execute] ⏭️ 중복 요청 스킵: ${capture.source_url} (${captureId})`);
+            continue;
+          }
+          if (sourceKey) {
+            seenPendingSourceKeys.add(sourceKey);
           }
 
           // 운영 제외 호스트: 캡처 시도하지 않고 즉시 실패 처리 + 프리셋 제거 플래그
@@ -143,6 +176,38 @@ export async function POST(request: NextRequest) {
               `[Execute] ⏭️ 서버 시간 예산 부족 — 남은 ${remainingIds.length}건 실패 처리 후 배치 종료`
             );
             break;
+          }
+
+          if (
+            shouldSkipSlowGdnBatchCapture({
+              channel: capture.channel,
+              host,
+              multiBatch,
+              perCaptureTimeoutMs,
+              mobileViewport: captureMetadata.gdnViewportMode === "mobile",
+            })
+          ) {
+            await supabase
+              .from("vision_da_captures")
+              .update({
+                status: "failed",
+                error_message: host
+                  ? `${SLOW_GDN_BATCH_SKIP_MESSAGE} (${host})`
+                  : SLOW_GDN_BATCH_SKIP_MESSAGE,
+                metadata: {
+                  ...captureMetadata,
+                  failureCategory: "timeout",
+                  failureCode: "slow_gdn_host_batch_time_guard",
+                  slowHost: host,
+                  failedAt: new Date().toISOString(),
+                },
+                updated_at: new Date().toISOString(),
+              })
+              .eq("id", captureId)
+              .eq("status", "pending");
+            results.push({ captureId, success: false, error: SLOW_GDN_BATCH_SKIP_MESSAGE });
+            console.warn(`[Execute] ⏭️ 느린 GDN 사이트 시간 가드 스킵: ${host} (${captureId})`);
+            continue;
           }
 
           // 2) 상태 업데이트 → processing
