@@ -1,0 +1,278 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Lens Golden Fixture - Mobile Bizboard</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --ink: #171717;
+        --muted: #667085;
+        --line: #e5e7eb;
+        --paper: #ffffff;
+        --panel: #f8fafc;
+        --accent: #2563eb;
+        --sun: #facc15;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        margin: 0;
+        overflow-x: hidden;
+        background: #eef2f7;
+        color: var(--ink);
+        font-family: Arial, Helvetica, sans-serif;
+      }
+
+      .phone {
+        width: min(393px, 100vw);
+        min-height: 852px;
+        margin: 0 auto;
+        overflow: hidden;
+        background: var(--paper);
+      }
+
+      .status {
+        height: 34px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 18px;
+        font-size: 12px;
+        font-weight: 700;
+      }
+
+      .topbar {
+        display: grid;
+        grid-template-columns: 36px minmax(0, 1fr) 36px;
+        align-items: center;
+        gap: 10px;
+        min-height: 52px;
+        padding: 0 14px;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .circle {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        background: var(--panel);
+        border: 1px solid var(--line);
+      }
+
+      .title {
+        text-align: center;
+        font-size: 18px;
+        font-weight: 800;
+        overflow-wrap: anywhere;
+      }
+
+      .bizboard {
+        margin: 12px;
+        overflow: hidden;
+        border-radius: 8px;
+        border: 1px solid #d9dee8;
+        background: #fffdf0;
+      }
+
+      .ad-label {
+        padding: 10px 14px 0;
+        color: var(--muted);
+        font-size: 11px;
+        font-weight: 800;
+      }
+
+      .ad-creative {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 96px;
+        gap: 12px;
+        align-items: center;
+        min-height: 150px;
+        padding: 12px 14px 16px;
+        background:
+          radial-gradient(circle at 90% 14%, rgba(250, 204, 21, 0.44), transparent 32%),
+          linear-gradient(135deg, #fef9c3, #eff6ff 72%);
+      }
+
+      .ad-copy {
+        min-width: 0;
+      }
+
+      .kicker {
+        margin: 0 0 6px;
+        color: var(--accent);
+        font-size: 12px;
+        font-weight: 800;
+        overflow-wrap: anywhere;
+      }
+
+      h1,
+      h2,
+      p,
+      span,
+      strong {
+        margin: 0;
+        overflow-wrap: anywhere;
+      }
+
+      h1 {
+        font-size: 23px;
+        line-height: 1.12;
+        letter-spacing: 0;
+      }
+
+      .ad-copy p {
+        margin-top: 8px;
+        color: #374151;
+        font-size: 13px;
+        line-height: 1.42;
+      }
+
+      .ad-art {
+        height: 92px;
+        border-radius: 18px;
+        background:
+          linear-gradient(135deg, rgba(37, 99, 235, 0.9), rgba(66, 184, 131, 0.92)),
+          linear-gradient(90deg, #dbeafe, #dcfce7);
+        box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.34);
+      }
+
+      .cta {
+        display: grid;
+        place-items: center;
+        min-height: 38px;
+        margin: 0 14px 14px;
+        border-radius: 19px;
+        background: #111827;
+        color: #ffffff;
+        font-size: 13px;
+        font-weight: 800;
+        text-align: center;
+      }
+
+      .quick-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 10px;
+        padding: 14px 12px;
+      }
+
+      .quick {
+        display: grid;
+        place-items: center;
+        gap: 7px;
+        min-width: 0;
+        color: #374151;
+        font-size: 11px;
+        font-weight: 700;
+        text-align: center;
+      }
+
+      .quick::before {
+        content: "";
+        width: 42px;
+        height: 42px;
+        border-radius: 15px;
+        background: var(--panel);
+        border: 1px solid var(--line);
+      }
+
+      .feed {
+        display: grid;
+        gap: 10px;
+        padding: 0 12px 28px;
+      }
+
+      .card {
+        display: grid;
+        grid-template-columns: 72px minmax(0, 1fr);
+        gap: 12px;
+        padding: 12px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #ffffff;
+      }
+
+      .thumb {
+        height: 72px;
+        border-radius: 8px;
+        background: linear-gradient(135deg, #dbeafe, #e5e7eb);
+      }
+
+      .card h2 {
+        font-size: 17px;
+        line-height: 1.26;
+        letter-spacing: 0;
+      }
+
+      .card p {
+        margin-top: 6px;
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.42;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="phone">
+      <div class="status">
+        <span>09:41</span>
+        <span>Sample Network</span>
+      </div>
+      <header class="topbar">
+        <div class="circle" aria-hidden="true"></div>
+        <div class="title">Sample Talk Home</div>
+        <div class="circle" aria-hidden="true"></div>
+      </header>
+
+      <section class="bizboard" data-ad-slot="kakao-bizboard">
+        <div class="ad-label">Sponsored</div>
+        <div class="ad-creative">
+          <div class="ad-copy">
+            <p class="kicker">TEST BIZBOARD</p>
+            <h1>Organize safer campaign reviews</h1>
+            <p>Controlled fixture creative for mobile board capture QA.</p>
+          </div>
+          <div class="ad-art" aria-hidden="true"></div>
+        </div>
+        <div class="cta">Open Sample Offer</div>
+      </section>
+
+      <nav class="quick-grid" aria-label="Sample shortcut grid">
+        <span class="quick">Updates</span>
+        <span class="quick">Friends</span>
+        <span class="quick">Wallet</span>
+        <span class="quick">More</span>
+      </nav>
+
+      <section class="feed">
+        <article class="card">
+          <div class="thumb"></div>
+          <div>
+            <h2>Neutral module keeps the mobile shell deterministic</h2>
+            <p>All visible copy is synthetic and safe for repo fixtures.</p>
+          </div>
+        </article>
+        <article class="card">
+          <div class="thumb"></div>
+          <div>
+            <h2>Reusable board placement checks right-edge wrapping</h2>
+            <p>No real user, account, advertiser, platform, or private data.</p>
+          </div>
+        </article>
+        <article class="card">
+          <div class="thumb"></div>
+          <div>
+            <h2>Fixture card provides stable scroll context</h2>
+            <p>CSS blocks replace live thumbnails and external assets.</p>
+          </div>
+        </article>
+      </section>
+    </main>
+  </body>
+</html>

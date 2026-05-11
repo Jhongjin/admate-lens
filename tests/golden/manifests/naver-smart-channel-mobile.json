@@ -4,12 +4,12 @@
   "channel": "naver",
   "productFamily": "naver",
   "productSurface": "naver-smart-channel-mobile",
-  "sampleState": "pending-sample",
-  "sensitivity": "repo-safe-placeholder",
+  "sampleState": "approved",
+  "sensitivity": "repo-safe",
   "golden": {
     "imagePath": "tests/golden/images/naver-smart-channel-mobile/golden.png",
     "metadataPath": "tests/golden/metadata/naver-smart-channel-mobile.json",
-    "sha256": null,
+    "sha256": "42260169928072efe9da003d3eafe2d5641a527a171cec7cb51fe3cd61488f9f",
     "width": 1179,
     "height": 2556
   },
@@ -44,5 +44,5 @@
     "productSurface": "naver-smart-channel-mobile",
     "resultCategory": "ad_capture_ok"
   },
-  "notes": "Pending until a repo-safe Naver Smart Channel Mobile capture is approved as golden."
+  "notes": "Operator-approved repo-safe smart channel mobile fixture baseline generated from controlled static local fixture content."
 }

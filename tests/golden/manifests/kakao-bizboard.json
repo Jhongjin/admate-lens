@@ -4,12 +4,12 @@
   "channel": "kakao",
   "productFamily": "kakao",
   "productSurface": "kakao-bizboard",
-  "sampleState": "pending-sample",
-  "sensitivity": "repo-safe-placeholder",
+  "sampleState": "approved",
+  "sensitivity": "repo-safe",
   "golden": {
     "imagePath": "tests/golden/images/kakao-bizboard/golden.png",
     "metadataPath": "tests/golden/metadata/kakao-bizboard.json",
-    "sha256": null,
+    "sha256": "fb0baac036575b8d9a6f7fb04f32766cb0b8a8ebc2bb9005bba0e1697338a532",
     "width": 1179,
     "height": 2556
   },
@@ -44,5 +44,5 @@
     "productSurface": "kakao-bizboard",
     "resultCategory": "ad_capture_ok"
   },
-  "notes": "Pending until a repo-safe Kakao Bizboard capture is approved as golden."
+  "notes": "Operator-approved repo-safe mobile bizboard fixture baseline generated from controlled static local fixture content."
 }

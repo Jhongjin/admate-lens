@@ -1,0 +1,284 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Lens Golden Fixture - Smart Channel Mobile</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --ink: #111827;
+        --muted: #64748b;
+        --line: #e2e8f0;
+        --paper: #ffffff;
+        --panel: #f8fafc;
+        --accent: #16a34a;
+        --blue: #2563eb;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        margin: 0;
+        overflow-x: hidden;
+        background: #edf2f7;
+        color: var(--ink);
+        font-family: Arial, Helvetica, sans-serif;
+      }
+
+      .phone {
+        width: min(393px, 100vw);
+        min-height: 852px;
+        margin: 0 auto;
+        overflow: hidden;
+        background: var(--paper);
+      }
+
+      .searchbar {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 34px;
+        gap: 10px;
+        align-items: center;
+        padding: 14px 14px 10px;
+      }
+
+      .search {
+        min-width: 0;
+        min-height: 42px;
+        display: flex;
+        align-items: center;
+        padding: 0 16px;
+        border: 2px solid var(--accent);
+        border-radius: 22px;
+        color: var(--muted);
+        font-size: 14px;
+        font-weight: 700;
+        overflow-wrap: anywhere;
+      }
+
+      .avatar {
+        width: 34px;
+        height: 34px;
+        border-radius: 50%;
+        background: var(--panel);
+        border: 1px solid var(--line);
+      }
+
+      .shortcut-row {
+        display: grid;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        gap: 8px;
+        padding: 10px 12px 14px;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .shortcut {
+        display: grid;
+        place-items: center;
+        gap: 6px;
+        min-width: 0;
+        color: #334155;
+        font-size: 11px;
+        font-weight: 700;
+        text-align: center;
+        overflow-wrap: anywhere;
+      }
+
+      .shortcut::before {
+        content: "";
+        width: 38px;
+        height: 38px;
+        border-radius: 14px;
+        background: linear-gradient(135deg, #dcfce7, #dbeafe);
+        border: 1px solid var(--line);
+      }
+
+      .channel-card {
+        margin: 12px;
+        overflow: hidden;
+        border: 1px solid #cbd5e1;
+        border-radius: 8px;
+        background: #f8fffb;
+      }
+
+      .ad-label {
+        padding: 10px 14px 0;
+        color: var(--muted);
+        font-size: 11px;
+        font-weight: 800;
+      }
+
+      .ad-body {
+        display: grid;
+        grid-template-columns: 86px minmax(0, 1fr);
+        gap: 12px;
+        align-items: center;
+        padding: 12px 14px 14px;
+      }
+
+      .brand-mark {
+        width: 86px;
+        height: 86px;
+        border-radius: 22px;
+        background:
+          radial-gradient(circle at 30% 28%, rgba(255, 255, 255, 0.42), transparent 32%),
+          linear-gradient(135deg, var(--accent), var(--blue));
+      }
+
+      h1,
+      h2,
+      p,
+      span,
+      strong {
+        margin: 0;
+        overflow-wrap: anywhere;
+      }
+
+      .kicker {
+        color: var(--accent);
+        font-size: 12px;
+        font-weight: 800;
+      }
+
+      h1 {
+        margin-top: 6px;
+        font-size: 22px;
+        line-height: 1.14;
+        letter-spacing: 0;
+      }
+
+      .ad-body p {
+        margin-top: 7px;
+        color: #475569;
+        font-size: 13px;
+        line-height: 1.4;
+      }
+
+      .cta-row {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+        padding: 0 14px 14px;
+      }
+
+      .cta {
+        display: grid;
+        place-items: center;
+        min-height: 36px;
+        border-radius: 18px;
+        background: #111827;
+        color: #ffffff;
+        font-size: 12px;
+        font-weight: 800;
+        text-align: center;
+      }
+
+      .cta.secondary {
+        background: #e2e8f0;
+        color: #0f172a;
+      }
+
+      .content {
+        display: grid;
+        gap: 10px;
+        padding: 0 12px 28px;
+      }
+
+      .section-title {
+        color: #334155;
+        font-size: 13px;
+        font-weight: 800;
+        padding: 4px 2px 0;
+      }
+
+      .story {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 88px;
+        gap: 12px;
+        padding: 12px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #ffffff;
+      }
+
+      .story h2 {
+        font-size: 17px;
+        line-height: 1.28;
+        letter-spacing: 0;
+      }
+
+      .story p {
+        margin-top: 6px;
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.42;
+      }
+
+      .thumb {
+        height: 72px;
+        border-radius: 8px;
+        background: linear-gradient(135deg, #dbeafe, #dcfce7);
+      }
+    </style>
+  </head>
+  <body>
+    <main class="phone">
+      <header class="searchbar">
+        <div class="search">Search sample services and safe inventory</div>
+        <div class="avatar" aria-hidden="true"></div>
+      </header>
+
+      <nav class="shortcut-row" aria-label="Sample service shortcuts">
+        <span class="shortcut">Mail</span>
+        <span class="shortcut">Cafe</span>
+        <span class="shortcut">Pay</span>
+        <span class="shortcut">Map</span>
+        <span class="shortcut">More</span>
+      </nav>
+
+      <section class="channel-card" data-ad-slot="smart-channel-mobile">
+        <div class="ad-label">Sponsored Channel</div>
+        <div class="ad-body">
+          <div class="brand-mark" aria-hidden="true"></div>
+          <div>
+            <p class="kicker">TEST CHANNEL</p>
+            <h1>Measure mobile placement stability</h1>
+            <p>Repo-safe fixture card using only local CSS shapes.</p>
+          </div>
+        </div>
+        <div class="cta-row">
+          <div class="cta">View Sample</div>
+          <div class="cta secondary">Save Later</div>
+        </div>
+      </section>
+
+      <section class="content">
+        <p class="section-title">Sample Updates</p>
+        <article class="story">
+          <div>
+            <h2>Controlled feed block keeps the viewport predictable</h2>
+            <p>No live publisher, platform, user, account, or private data.</p>
+          </div>
+          <div class="thumb"></div>
+        </article>
+        <article class="story">
+          <div>
+            <h2>Static service module confirms right-edge wrapping</h2>
+            <p>All copy is synthetic and safe for long-lived fixtures.</p>
+          </div>
+          <div class="thumb"></div>
+        </article>
+        <article class="story">
+          <div>
+            <h2>Neutral recommendation card supplies scroll context</h2>
+            <p>CSS gradients replace thumbnails and external images.</p>
+          </div>
+          <div class="thumb"></div>
+        </article>
+      </section>
+    </main>
+  </body>
+</html>

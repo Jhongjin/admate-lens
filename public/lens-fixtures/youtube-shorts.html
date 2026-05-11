@@ -1,0 +1,257 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Lens Golden Fixture - Short Video Feed</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --ink: #ffffff;
+        --muted: rgba(255, 255, 255, 0.72);
+        --panel: rgba(15, 23, 42, 0.76);
+        --line: rgba(255, 255, 255, 0.18);
+        --accent: #38bdf8;
+        --pink: #f472b6;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        margin: 0;
+        overflow-x: hidden;
+        background: #0f172a;
+        color: var(--ink);
+        font-family: Arial, Helvetica, sans-serif;
+      }
+
+      .phone {
+        position: relative;
+        width: min(390px, 100vw);
+        min-height: 844px;
+        margin: 0 auto;
+        overflow: hidden;
+        background:
+          radial-gradient(circle at 24% 18%, rgba(56, 189, 248, 0.36), transparent 30%),
+          radial-gradient(circle at 74% 64%, rgba(244, 114, 182, 0.30), transparent 34%),
+          linear-gradient(160deg, #111827, #020617 70%);
+      }
+
+      .topbar {
+        position: relative;
+        z-index: 2;
+        display: grid;
+        grid-template-columns: 42px minmax(0, 1fr) 42px;
+        align-items: center;
+        min-height: 58px;
+        padding: 0 14px;
+      }
+
+      .icon {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        border: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.10);
+      }
+
+      .title {
+        text-align: center;
+        font-size: 18px;
+        font-weight: 800;
+        letter-spacing: 0;
+        overflow-wrap: anywhere;
+      }
+
+      .stage {
+        position: absolute;
+        inset: 58px 0 0;
+      }
+
+      .safe-video {
+        position: absolute;
+        inset: 0;
+        background:
+          linear-gradient(90deg, rgba(255, 255, 255, 0.06) 0 1px, transparent 1px 100%),
+          linear-gradient(0deg, rgba(255, 255, 255, 0.06) 0 1px, transparent 1px 100%);
+        background-size: 42px 42px;
+        opacity: 0.45;
+      }
+
+      .ad-card {
+        position: absolute;
+        left: 16px;
+        right: 78px;
+        bottom: 96px;
+        z-index: 2;
+        display: grid;
+        gap: 10px;
+        min-width: 0;
+      }
+
+      h1,
+      p,
+      span,
+      strong {
+        margin: 0;
+        overflow-wrap: anywhere;
+      }
+
+      .sponsor {
+        display: grid;
+        grid-template-columns: 42px minmax(0, 1fr);
+        gap: 10px;
+        align-items: center;
+      }
+
+      .logo {
+        width: 42px;
+        height: 42px;
+        border-radius: 12px;
+        background: linear-gradient(135deg, var(--accent), var(--pink));
+      }
+
+      .sponsor strong {
+        display: block;
+        font-size: 14px;
+      }
+
+      .sponsor span {
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      h1 {
+        max-width: 265px;
+        font-size: 24px;
+        line-height: 1.12;
+        letter-spacing: 0;
+      }
+
+      .copy {
+        max-width: 265px;
+        color: var(--muted);
+        font-size: 14px;
+        line-height: 1.42;
+      }
+
+      .cta {
+        display: inline-grid;
+        place-items: center;
+        width: 132px;
+        min-height: 38px;
+        border-radius: 19px;
+        background: #ffffff;
+        color: #0f172a;
+        font-size: 13px;
+        font-weight: 800;
+        text-align: center;
+      }
+
+      .rail {
+        position: absolute;
+        right: 14px;
+        bottom: 100px;
+        z-index: 2;
+        display: grid;
+        gap: 18px;
+      }
+
+      .rail-item {
+        display: grid;
+        place-items: center;
+        gap: 6px;
+        color: var(--ink);
+        font-size: 11px;
+        font-weight: 800;
+        text-align: center;
+      }
+
+      .rail-icon {
+        width: 42px;
+        height: 42px;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.14);
+        border: 1px solid var(--line);
+      }
+
+      .caption {
+        position: absolute;
+        left: 18px;
+        right: 18px;
+        top: 88px;
+        z-index: 1;
+        padding: 14px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: rgba(15, 23, 42, 0.38);
+        color: rgba(255, 255, 255, 0.82);
+        font-size: 14px;
+        line-height: 1.45;
+        overflow-wrap: anywhere;
+      }
+
+      .progress {
+        position: absolute;
+        left: 16px;
+        right: 16px;
+        bottom: 58px;
+        z-index: 2;
+        height: 4px;
+        overflow: hidden;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.18);
+      }
+
+      .progress span {
+        display: block;
+        width: 58%;
+        height: 100%;
+        background: #ffffff;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="phone">
+      <header class="topbar">
+        <div class="icon" aria-hidden="true"></div>
+        <div class="title">Sample Short Feed</div>
+        <div class="icon" aria-hidden="true"></div>
+      </header>
+
+      <section class="stage" data-ad-slot="short-video-feed">
+        <div class="safe-video" aria-hidden="true"></div>
+        <p class="caption">
+          Controlled short-form fixture using local CSS shapes only. No real
+          creator, platform, advertiser, account, or private URL content.
+        </p>
+
+        <div class="ad-card">
+          <div class="sponsor">
+            <div class="logo" aria-hidden="true"></div>
+            <div>
+              <strong>Fixture Studio</strong>
+              <span>sample-short.test</span>
+            </div>
+          </div>
+          <h1>Review vertical placements safely</h1>
+          <p class="copy">
+            Synthetic creative for mobile short-feed golden QA.
+          </p>
+          <div class="cta">Learn More</div>
+        </div>
+
+        <aside class="rail" aria-label="Sample actions">
+          <div class="rail-item"><div class="rail-icon"></div><span>Like</span></div>
+          <div class="rail-item"><div class="rail-icon"></div><span>Save</span></div>
+          <div class="rail-item"><div class="rail-icon"></div><span>Share</span></div>
+        </aside>
+
+        <div class="progress"><span></span></div>
+      </section>
+    </main>
+  </body>
+</html>
