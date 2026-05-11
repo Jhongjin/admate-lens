@@ -8,6 +8,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "tsc --noEmit",
+    "check:abort-registry": "node scripts/check-capture-abort-registry.mjs",
     "check:surface-registry": "node scripts/check-surface-registry.mjs",
     "check:capture-metadata": "node scripts/check-capture-output-metadata.mjs scripts/fixtures/capture-metadata-smoke.json",
     "check:capture-dimensions": "node scripts/check-capture-dimensions.mjs",
