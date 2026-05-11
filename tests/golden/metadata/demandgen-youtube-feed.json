@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "surface": "demandgen-youtube-feed",
-  "sampleState": "pending-sample",
-  "fixtureKind": "placeholder",
+  "sampleState": "approved",
+  "fixtureKind": "approved",
   "metadata": {
     "capturedAt": "2026-05-05T00:00:00.000Z",
     "durationMs": 1,

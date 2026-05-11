@@ -4,12 +4,12 @@
   "channel": "youtube",
   "productFamily": "demand-gen",
   "productSurface": "youtube-feed",
-  "sampleState": "pending-sample",
-  "sensitivity": "repo-safe-placeholder",
+  "sampleState": "approved",
+  "sensitivity": "repo-safe",
   "golden": {
     "imagePath": "tests/golden/images/demandgen-youtube-feed/golden.png",
     "metadataPath": "tests/golden/metadata/demandgen-youtube-feed.json",
-    "sha256": null,
+    "sha256": "9cea2367d4f5b2400d0cafb702a8cc071d35ec0c94e2f4604a5baeeb2c5940d2",
     "width": 1170,
     "height": 2532
   },
@@ -46,5 +46,5 @@
     "youtubeAdType": "mobile-infeed-home",
     "resultCategory": "ad_capture_ok"
   },
-  "notes": "Pending until a repo-safe Demand Gen YouTube Feed capture is approved as golden."
+  "notes": "Operator-approved repo-safe Demand Gen YouTube Feed fixture baseline generated from controlled static local fixture content."
 }
