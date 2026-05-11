@@ -1,0 +1,397 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Lens Golden Fixture - Demand Gen Mobile Feed</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --ink: #171717;
+        --muted: #6b7280;
+        --line: #e5e7eb;
+        --paper: #ffffff;
+        --panel: #f8fafc;
+        --accent: #2563eb;
+        --warm: #f59e0b;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: #eef2f7;
+        color: var(--ink);
+        font-family: Arial, Helvetica, sans-serif;
+      }
+
+      .phone {
+        width: 390px;
+        min-height: 844px;
+        margin: 0 auto;
+        background: var(--paper);
+        overflow: hidden;
+      }
+
+      .topbar {
+        position: sticky;
+        top: 0;
+        z-index: 2;
+        display: grid;
+        grid-template-columns: 42px 1fr 42px;
+        align-items: center;
+        height: 58px;
+        padding: 0 14px;
+        background: rgba(255, 255, 255, 0.96);
+        border-bottom: 1px solid var(--line);
+      }
+
+      .icon-button,
+      .avatar {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        background: var(--panel);
+        border: 1px solid var(--line);
+      }
+
+      .brand {
+        justify-self: center;
+        font-size: 18px;
+        font-weight: 800;
+        letter-spacing: 0;
+      }
+
+      .tabs {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 8px;
+        padding: 12px 14px;
+        border-bottom: 1px solid var(--line);
+        font-size: 13px;
+        font-weight: 700;
+        color: var(--muted);
+      }
+
+      .tabs span {
+        display: grid;
+        place-items: center;
+        min-height: 30px;
+        border-radius: 15px;
+        background: var(--panel);
+      }
+
+      .tabs .active {
+        background: #111827;
+        color: #ffffff;
+      }
+
+      .feed {
+        display: grid;
+        gap: 12px;
+        padding: 12px 12px 28px;
+      }
+
+      .card {
+        background: var(--paper);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        overflow: hidden;
+      }
+
+      .story-media {
+        height: 178px;
+        background:
+          linear-gradient(135deg, rgba(37, 99, 235, 0.18), rgba(245, 158, 11, 0.22)),
+          linear-gradient(90deg, #f8fafc, #dbeafe);
+      }
+
+      .story-body {
+        padding: 14px;
+      }
+
+      .source-row {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 700;
+      }
+
+      .source-mark {
+        width: 22px;
+        height: 22px;
+        border-radius: 6px;
+        background: linear-gradient(135deg, var(--accent), #42b883);
+      }
+
+      h1,
+      h2,
+      p {
+        margin: 0;
+      }
+
+      h1 {
+        margin-top: 10px;
+        font-size: 22px;
+        line-height: 1.22;
+        letter-spacing: 0;
+      }
+
+      h2 {
+        margin-top: 8px;
+        font-size: 18px;
+        line-height: 1.28;
+        letter-spacing: 0;
+      }
+
+      .summary {
+        margin-top: 8px;
+        color: var(--muted);
+        font-size: 14px;
+        line-height: 1.5;
+      }
+
+      .actions {
+        display: flex;
+        justify-content: space-between;
+        padding: 12px 14px;
+        border-top: 1px solid var(--line);
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 700;
+      }
+
+      .ad-card {
+        position: relative;
+        min-height: 520px;
+        background: #fbfdff;
+      }
+
+      .ad-label {
+        position: absolute;
+        top: 12px;
+        left: 14px;
+        z-index: 1;
+        color: var(--muted);
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0;
+      }
+
+      .creative {
+        height: 318px;
+        display: grid;
+        place-items: center;
+        padding: 34px 22px 18px;
+        background:
+          radial-gradient(circle at 22% 20%, rgba(37, 99, 235, 0.22), transparent 28%),
+          linear-gradient(145deg, #eff6ff, #fef3c7 72%);
+      }
+
+      .creative-panel {
+        width: 100%;
+        min-height: 214px;
+        display: grid;
+        align-content: center;
+        gap: 10px;
+        padding: 22px;
+        background: rgba(255, 255, 255, 0.82);
+        border: 1px solid rgba(17, 24, 39, 0.12);
+        border-radius: 8px;
+        box-shadow: 0 14px 34px rgba(17, 24, 39, 0.14);
+      }
+
+      .creative-kicker {
+        color: var(--accent);
+        font-size: 12px;
+        font-weight: 800;
+      }
+
+      .creative-title {
+        max-width: 280px;
+        font-size: 27px;
+        line-height: 1.08;
+        font-weight: 800;
+      }
+
+      .creative-copy {
+        color: #374151;
+        font-size: 14px;
+        line-height: 1.45;
+      }
+
+      .ad-body {
+        padding: 15px 14px 16px;
+      }
+
+      .sponsor {
+        display: grid;
+        grid-template-columns: 40px 1fr;
+        gap: 10px;
+        align-items: center;
+      }
+
+      .sponsor-logo {
+        width: 40px;
+        height: 40px;
+        border-radius: 9px;
+        background: linear-gradient(135deg, #111827, var(--accent));
+      }
+
+      .sponsor strong {
+        display: block;
+        font-size: 14px;
+      }
+
+      .sponsor span {
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .cta-row {
+        display: grid;
+        grid-template-columns: 1fr 104px;
+        gap: 10px;
+        align-items: center;
+        margin-top: 14px;
+      }
+
+      .cta-copy {
+        color: #374151;
+        font-size: 14px;
+        line-height: 1.42;
+      }
+
+      .cta {
+        display: grid;
+        place-items: center;
+        min-height: 38px;
+        border-radius: 19px;
+        background: var(--accent);
+        color: #ffffff;
+        font-size: 13px;
+        font-weight: 800;
+      }
+
+      .compact-list {
+        display: grid;
+        gap: 10px;
+      }
+
+      .compact-item {
+        display: grid;
+        grid-template-columns: 86px 1fr;
+        gap: 11px;
+        padding: 12px;
+      }
+
+      .compact-thumb {
+        height: 72px;
+        border-radius: 6px;
+        background: linear-gradient(135deg, #e0f2fe, #e5e7eb);
+      }
+    </style>
+  </head>
+  <body>
+    <main class="phone">
+      <header class="topbar">
+        <div class="icon-button" aria-hidden="true"></div>
+        <div class="brand">Sample Feed</div>
+        <div class="avatar" aria-hidden="true"></div>
+      </header>
+
+      <nav class="tabs" aria-label="Sample feed sections">
+        <span class="active">For You</span>
+        <span>Local</span>
+        <span>Clips</span>
+        <span>Saved</span>
+      </nav>
+
+      <section class="feed">
+        <article class="card">
+          <div class="story-media"></div>
+          <div class="story-body">
+            <div class="source-row">
+              <span class="source-mark"></span>
+              <span>Sample Desk</span>
+            </div>
+            <h1>Neutral mobile feed card keeps capture review deterministic</h1>
+            <p class="summary">
+              Synthetic media inventory uses generic copy, CSS shapes, and no
+              external assets.
+            </p>
+          </div>
+          <div class="actions">
+            <span>Like</span>
+            <span>Comment</span>
+            <span>Share</span>
+          </div>
+        </article>
+
+        <article class="card ad-card" data-ad-slot="demandgen-mobile-feed">
+          <div class="ad-label">Sponsored</div>
+          <div class="creative">
+            <div class="creative-panel">
+              <p class="creative-kicker">TEST CREATIVE</p>
+              <p class="creative-title">Plan clearer media checks</p>
+              <p class="creative-copy">
+                A repo-safe fixture message for mobile feed capture QA.
+              </p>
+            </div>
+          </div>
+          <div class="ad-body">
+            <div class="sponsor">
+              <div class="sponsor-logo" aria-hidden="true"></div>
+              <div>
+                <strong>Fixture Sponsor</strong>
+                <span>sample-feed.test</span>
+              </div>
+            </div>
+            <h2>Controlled mobile feed placement for Lens golden samples</h2>
+            <div class="cta-row">
+              <p class="cta-copy">
+                This card avoids real publishers, real thumbnails, platform
+                branding, campaign data, and private URLs.
+              </p>
+              <div class="cta">Learn More</div>
+            </div>
+          </div>
+          <div class="actions">
+            <span>Save</span>
+            <span>Hide</span>
+            <span>Report</span>
+          </div>
+        </article>
+
+        <article class="card compact-list">
+          <div class="compact-item">
+            <div class="compact-thumb"></div>
+            <div>
+              <div class="source-row">
+                <span class="source-mark"></span>
+                <span>Testing Desk</span>
+              </div>
+              <h2>Fixture list item repeats safe mobile inventory rhythm</h2>
+              <p class="summary">No live feed, no tracking, no remote media.</p>
+            </div>
+          </div>
+          <div class="compact-item">
+            <div class="compact-thumb"></div>
+            <div>
+              <div class="source-row">
+                <span class="source-mark"></span>
+                <span>Layout Lab</span>
+              </div>
+              <h2>Generic recommendation block stabilizes scroll context</h2>
+              <p class="summary">All visible data is synthetic and repo-safe.</p>
+            </div>
+          </div>
+        </article>
+      </section>
+    </main>
+  </body>
+</html>
