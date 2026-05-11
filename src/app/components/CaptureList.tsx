@@ -30,10 +30,17 @@ interface CaptureListProps {
   refreshTrigger?: number;
 }
 
+type CaptureDisplayStatus = CaptureRecord["status"] | "cancel-requested" | "canceled";
+type StatusDescriptor = { label: string; class: string; icon: string };
+
+const USER_CANCELLED_CAPTURE_MESSAGE = "사용자가 캡처를 중단했습니다.";
+
 /** 상태 라벨 매핑 */
-const STATUS_LABELS: Record<string, { label: string; class: string; icon: string }> = {
+const STATUS_LABELS: Record<CaptureDisplayStatus, StatusDescriptor> = {
   pending: { label: "대기중", class: "badge-pending", icon: "•" },
   processing: { label: "처리중", class: "badge-processing", icon: "•" },
+  "cancel-requested": { label: "중단 요청됨", class: "badge-processing", icon: "•" },
+  canceled: { label: "중단됨", class: "badge-pending", icon: "•" },
   completed: { label: "완료", class: "badge-completed", icon: "•" },
   failed: { label: "실패", class: "badge-failed", icon: "•" },
 };
@@ -80,6 +87,48 @@ function formatDate(dateStr: string): string {
 function truncateUrl(url: string, maxLength = 40): string {
   if (url.length <= maxLength) return url;
   return url.substring(0, maxLength) + "…";
+}
+
+function isUserCancelledCapture(capture: CaptureRecord): boolean {
+  return (
+    capture.status === "failed" &&
+    capture.error_message?.trim() === USER_CANCELLED_CAPTURE_MESSAGE
+  );
+}
+
+function getCaptureDisplayStatus(
+  capture: CaptureRecord,
+  isCancelling = false,
+): CaptureDisplayStatus {
+  if (isCancelling) return "cancel-requested";
+  if (isUserCancelledCapture(capture)) return "canceled";
+  return capture.status;
+}
+
+function getCaptureStatusDescriptor(
+  capture: CaptureRecord,
+  isCancelling = false,
+): StatusDescriptor {
+  return STATUS_LABELS[getCaptureDisplayStatus(capture, isCancelling)];
+}
+
+function getCancelButtonLabel(capture: CaptureRecord, isCancelling: boolean): string {
+  if (isCancelling) return "중단 요청 중...";
+  if (capture.status === "pending") return "대기 취소";
+  return "캡처 중단";
+}
+
+function getCancelButtonAriaLabel(capture: CaptureRecord, isCancelling: boolean): string {
+  if (isCancelling) return "캡처 중단 요청 처리 중";
+  if (capture.status === "pending") return "대기 중인 캡처 취소";
+  return "처리 중인 캡처 중단";
+}
+
+function getActiveCaptureHelper(capture: CaptureRecord): string {
+  if (capture.status === "pending") {
+    return "아직 브라우저 작업이 시작되지 않은 대기 항목입니다.";
+  }
+  return "중단 요청 후에도 현재 브라우저 작업이 잠시 이어질 수 있습니다.";
 }
 
 function getDurationMs(metadata: Record<string, unknown> | null): number | null {
@@ -507,28 +556,33 @@ export default function CaptureList({ refreshTrigger }: CaptureListProps) {
       }
 
       setAuthExpiredMessage(null);
-      setCaptures((prev) =>
-        prev.map((capture) =>
-          capture.id === captureId
+      const cancelledCount =
+        typeof result?.cancelled === "number" ? result.cancelled : 0;
+      if (cancelledCount > 0) {
+        const cancelledAt = new Date().toISOString();
+        setCaptures((prev) =>
+          prev.map((capture) =>
+            capture.id === captureId
+              ? {
+                  ...capture,
+                  status: "failed",
+                  error_message: USER_CANCELLED_CAPTURE_MESSAGE,
+                  updated_at: cancelledAt,
+                }
+              : capture,
+          ),
+        );
+        setSelectedCapture((current) =>
+          current?.id === captureId
             ? {
-                ...capture,
+                ...current,
                 status: "failed",
-                error_message: result?.message || "사용자가 캡처를 중단했습니다.",
-                updated_at: new Date().toISOString(),
+                error_message: USER_CANCELLED_CAPTURE_MESSAGE,
+                updated_at: cancelledAt,
               }
-            : capture,
-        ),
-      );
-      setSelectedCapture((current) =>
-        current?.id === captureId
-          ? {
-              ...current,
-              status: "failed",
-              error_message: result?.message || "사용자가 캡처를 중단했습니다.",
-              updated_at: new Date().toISOString(),
-            }
-          : current,
-      );
+            : current,
+        );
+      }
       await fetchCaptures();
     } catch (err) {
       console.error("[CaptureList] 캡처 중단 실패:", err);
@@ -700,9 +754,12 @@ export default function CaptureList({ refreshTrigger }: CaptureListProps) {
           /* 캡처 리스트 */
           <div className="divide-y divide-[var(--color-border)]">
             {filteredCaptures.map((capture) => {
-              const status = STATUS_LABELS[capture.status] || STATUS_LABELS.pending;
-              const isActive = isCaptureActive(capture);
               const isCancelling = cancellingIds.has(capture.id);
+              const status = getCaptureStatusDescriptor(capture, isCancelling);
+              const displayStatus = getCaptureDisplayStatus(capture, isCancelling);
+              const isActive = isCaptureActive(capture);
+              const isCanceled = displayStatus === "canceled";
+              const cancelButtonLabel = getCancelButtonLabel(capture, isCancelling);
 
               return (
                 <div
@@ -744,8 +801,10 @@ export default function CaptureList({ refreshTrigger }: CaptureListProps) {
                       <span className="text-xs font-semibold px-2 py-0.5 rounded bg-[var(--color-bg-tertiary)] text-[var(--color-text-secondary)]">
                         {getCaptureChannelLabel(capture)}
                       </span>
-                      <span className={`badge ${status.class}`}>
-                        {isActive && <span className="spinner" style={{ width: 10, height: 10, borderWidth: 1.5 }} />}
+                      <span className={`badge ${status.class}`} aria-live="polite">
+                        {(isActive || displayStatus === "cancel-requested") && (
+                          <span className="spinner" style={{ width: 10, height: 10, borderWidth: 1.5 }} />
+                        )}
                         {status.label}
                       </span>
                     </div>
@@ -773,8 +832,13 @@ export default function CaptureList({ refreshTrigger }: CaptureListProps) {
                       </p>
                     )}
                     {capture.status === "failed" && capture.error_message && (
-                      <p className="text-xs text-[var(--color-error)] mt-1 truncate">
+                      <p className={`mt-1 truncate text-xs ${isCanceled ? "text-[var(--color-text-muted)]" : "text-[var(--color-error)]"}`}>
                         {capture.error_message}
+                      </p>
+                    )}
+                    {isCancelling && (
+                      <p className="mt-1 text-[11px] text-[var(--color-text-muted)]">
+                        요청을 보냈습니다. 목록 갱신 후 최종 상태를 확인합니다.
                       </p>
                     )}
                     {capture.status === "completed" && capture.metadata && typeof capture.metadata === "object" && (
@@ -782,7 +846,7 @@ export default function CaptureList({ refreshTrigger }: CaptureListProps) {
                         {getQualityStateLabel(capture.metadata)}
                       </p>
                     )}
-                    {capture.status === "failed" && capture.metadata && typeof capture.metadata === "object" && (
+                    {capture.status === "failed" && !isCanceled && capture.metadata && typeof capture.metadata === "object" && (
                       <p className="text-[11px] text-[var(--color-text-muted)] mt-1">
                         {getFailureCategoryLabel(capture.metadata)}
                       </p>
@@ -798,10 +862,12 @@ export default function CaptureList({ refreshTrigger }: CaptureListProps) {
                           handleCancelCapture(capture.id);
                         }}
                         disabled={isCancelling}
-                        className="inline-flex h-8 items-center justify-center rounded-lg border border-[rgba(239,68,68,0.22)] px-2 text-xs font-semibold text-[var(--color-error)] transition-all hover:bg-[rgba(239,68,68,0.08)] disabled:cursor-not-allowed disabled:opacity-50"
-                        title="캡처 중단"
+                        aria-label={getCancelButtonAriaLabel(capture, isCancelling)}
+                        aria-busy={isCancelling}
+                        className="inline-flex h-8 min-w-[6.5rem] items-center justify-center rounded-lg border border-[rgba(239,68,68,0.22)] px-2 text-xs font-semibold text-[var(--color-error)] transition-all hover:bg-[rgba(239,68,68,0.08)] disabled:cursor-not-allowed disabled:opacity-50"
+                        title={cancelButtonLabel}
                       >
-                        {isCancelling ? "중단 중" : "중단"}
+                        {cancelButtonLabel}
                       </button>
                     )}
                     {CAPTURE_DELETE_ENABLED && (
@@ -922,7 +988,11 @@ function CaptureDetailModal({
 }) {
   type OutputId = "placement" | "landing";
 
-  const status = STATUS_LABELS[capture.status] || STATUS_LABELS.pending;
+  const status = getCaptureStatusDescriptor(capture, isCancelling);
+  const displayStatus = getCaptureDisplayStatus(capture, isCancelling);
+  const isCanceled = displayStatus === "canceled";
+  const cancelButtonLabel = getCancelButtonLabel(capture, isCancelling);
+  const cancelButtonAriaLabel = getCancelButtonAriaLabel(capture, isCancelling);
   const metadata =
     capture.metadata && typeof capture.metadata === "object" ? capture.metadata : null;
   const qualityStateLabel = getQualityStateLabel(metadata);
@@ -1017,16 +1087,24 @@ function CaptureDetailModal({
         <div className="flex h-full min-h-[320px] flex-col items-center justify-center p-8 text-center">
           <div className="spinner spinner-lg mb-4" />
           <p className="text-sm font-medium text-[var(--color-text-secondary)]">
-            {capture.status === "pending" ? "캡처 대기 중입니다" : "캡처를 처리하고 있습니다"}
+            {isCancelling
+              ? "중단 요청을 보내고 있습니다"
+              : capture.status === "pending"
+                ? "캡처 대기 중입니다"
+                : "캡처를 처리하고 있습니다"}
           </p>
-          <p className="mt-1 text-xs text-[var(--color-text-muted)]">보통 30초~2분 정도 소요됩니다</p>
+          <p className="mt-1 text-xs text-[var(--color-text-muted)]">
+            {isCancelling ? "목록이 갱신되면 최종 상태를 확인할 수 있습니다." : getActiveCaptureHelper(capture)}
+          </p>
           <button
             type="button"
             onClick={() => onCancel(capture.id)}
             disabled={isCancelling}
-            className="mt-4 rounded-md border border-[rgba(239,68,68,0.22)] px-4 py-2 text-xs font-semibold text-[var(--color-error)] transition-colors hover:bg-[rgba(239,68,68,0.08)] disabled:cursor-not-allowed disabled:opacity-50"
+            aria-label={cancelButtonAriaLabel}
+            aria-busy={isCancelling}
+            className="mt-4 inline-flex min-w-[8rem] items-center justify-center rounded-md border border-[rgba(239,68,68,0.22)] px-4 py-2 text-xs font-semibold text-[var(--color-error)] transition-colors hover:bg-[rgba(239,68,68,0.08)] disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {isCancelling ? "중단 요청 중..." : "캡처 중단"}
+            {cancelButtonLabel}
           </button>
         </div>
       );
@@ -1081,7 +1159,14 @@ function CaptureDetailModal({
       <section className="space-y-3">
         <div className="flex items-center justify-between gap-3">
           <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--color-text-muted)]">상태</p>
-          <span className={`badge ${status.class}`}>{status.icon} {status.label}</span>
+          <span className={`badge ${status.class}`} aria-live="polite">
+            {displayStatus === "cancel-requested" ? (
+              <span className="spinner" style={{ width: 10, height: 10, borderWidth: 1.5 }} />
+            ) : (
+              status.icon
+            )}
+            {status.label}
+          </span>
         </div>
         {qualityStateLabel && (
           <p className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-primary)] px-3 py-2 text-xs leading-5 text-[var(--color-text-secondary)]">
@@ -1089,8 +1174,16 @@ function CaptureDetailModal({
           </p>
         )}
         {capture.status === "failed" && capture.error_message && (
-          <div className="rounded-lg border border-[rgba(239,68,68,0.2)] bg-[rgba(239,68,68,0.08)] px-3 py-2">
-            <p className="text-xs font-semibold text-[var(--color-error)]">오류 발생</p>
+          <div
+            className={`rounded-lg border px-3 py-2 ${
+              isCanceled
+                ? "border-[var(--color-border)] bg-[var(--color-bg-primary)]"
+                : "border-[rgba(239,68,68,0.2)] bg-[rgba(239,68,68,0.08)]"
+            }`}
+          >
+            <p className={`text-xs font-semibold ${isCanceled ? "text-[var(--color-text-secondary)]" : "text-[var(--color-error)]"}`}>
+              {isCanceled ? "운영자 중단" : "오류 발생"}
+            </p>
             <p className="mt-1 text-xs leading-5 text-[var(--color-text-secondary)]">{capture.error_message}</p>
           </div>
         )}
@@ -1340,9 +1433,11 @@ function CaptureDetailModal({
                   type="button"
                   onClick={() => onCancel(capture.id)}
                   disabled={isCancelling}
-                  className="w-full rounded-md border border-[rgba(239,68,68,0.22)] px-3 py-2 text-xs font-semibold text-[var(--color-error)] transition-colors hover:bg-[rgba(239,68,68,0.08)] disabled:cursor-not-allowed disabled:opacity-50"
+                  aria-label={cancelButtonAriaLabel}
+                  aria-busy={isCancelling}
+                  className="inline-flex min-h-9 w-full items-center justify-center rounded-md border border-[rgba(239,68,68,0.22)] px-3 py-2 text-xs font-semibold text-[var(--color-error)] transition-colors hover:bg-[rgba(239,68,68,0.08)] disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  {isCancelling ? "중단 요청 중..." : "캡처 중단"}
+                  {cancelButtonLabel}
                 </button>
               )}
               {CAPTURE_DELETE_ENABLED && (
