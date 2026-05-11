@@ -4,12 +4,12 @@
   "channel": "gdn",
   "productFamily": "gdn",
   "productSurface": "pc-display",
-  "sampleState": "external-only",
-  "sensitivity": "external-sensitive",
+  "sampleState": "approved",
+  "sensitivity": "repo-safe",
   "golden": {
     "imagePath": "tests/golden/images/gdn-pc-display/golden.png",
     "metadataPath": "tests/golden/metadata/gdn-pc-display.json",
-    "sha256": null,
+    "sha256": "e5f249d48790467b58957a59ba0ddb3226fcd13d219da128d556cb94693efb6e",
     "width": 1920,
     "height": 1080
   },
@@ -42,5 +42,5 @@
     "gdnViewportMode": "pc",
     "resultCategory": "ad_capture_ok"
   },
-  "notes": "Operator-approved external-sensitive GDN PC display baseline. PNG is not committed; local pixel diff remains skipped."
+  "notes": "Operator-approved repo-safe GDN PC display fixture baseline generated from static local fixture content."
 }
