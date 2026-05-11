@@ -12,11 +12,16 @@ const SLOW_GDN_BATCH_MIN_CAPTURE_MS = 45_000;
 export function normalizeCaptureSourceUrlKey(value: string | null | undefined): string | null {
   const raw = value?.trim();
   if (!raw) return null;
+  const maybeHttpUrl = /^https?:\/\//i.test(raw) ? raw : `https://${raw.replace(/^\/+/, "")}`;
 
   try {
-    const url = new URL(raw);
+    const url = new URL(maybeHttpUrl);
+    if (url.protocol !== "http:" && url.protocol !== "https:") {
+      return raw.replace(/\/+$/, "").toLowerCase();
+    }
     const pathname = (url.pathname || "/").replace(/\/+$/, "") || "/";
-    return `${url.protocol.toLowerCase()}//${url.hostname.toLowerCase()}${pathname}${url.search}`;
+    const host = `${url.hostname.toLowerCase()}${url.port ? `:${url.port}` : ""}`;
+    return `${url.protocol.toLowerCase()}//${host}${pathname}${url.search}`;
   } catch {
     return raw.replace(/\/+$/, "").toLowerCase();
   }

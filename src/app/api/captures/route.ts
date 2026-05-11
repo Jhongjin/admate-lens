@@ -1220,7 +1220,7 @@ function dedupeNormalizedUrls(urls: string[]): string[] {
   const seen = new Set<string>();
   const deduped: string[] = [];
   for (const url of urls) {
-    const key = url.trim().replace(/\/+$/, "").toLowerCase();
+    const key = normalizeCaptureSourceUrlKey(url);
     if (!key || seen.has(key)) continue;
     seen.add(key);
     deduped.push(url);
