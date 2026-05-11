@@ -42,15 +42,25 @@ try {
     '--rootDir',
     root,
     'src/lib/capture/abort-registry.ts',
+    'src/lib/capture/abort-route-helpers.ts',
+    'src/lib/capture/capture-execution-retry.ts',
     'tests/capture/fake-engine-abort.test.ts',
+    'tests/capture/fake-route-abort.test.ts',
   ])
 
   if (compiled) {
-    run(
+    const engineOk = run(
       'fake engine assertions',
       process.execPath,
       [path.join(outDir, 'tests', 'capture', 'fake-engine-abort.test.js')],
     )
+    if (engineOk) {
+      run(
+        'fake route assertions',
+        process.execPath,
+        [path.join(outDir, 'tests', 'capture', 'fake-route-abort.test.js')],
+      )
+    }
   }
 } finally {
   fs.rmSync(outDir, { force: true, recursive: true })
