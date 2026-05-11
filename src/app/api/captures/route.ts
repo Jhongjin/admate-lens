@@ -15,6 +15,15 @@ import {
   resolveBatchPerCaptureTimeoutMs,
   SERVERLESS_BATCH_BUDGET_MS,
 } from "@/lib/capture/batch-serverless";
+import { CaptureAbortError } from "@/lib/capture/abort-registry";
+import {
+  cancelCaptureCandidates,
+  captureRouteAbortRegistry,
+  persistCaptureResultWithAbortGuard,
+  runWithCaptureAbortRegistration,
+  USER_CANCELLED_CAPTURE_MESSAGE,
+} from "@/lib/capture/abort-route-helpers";
+import { executeCaptureWithRetry } from "@/lib/capture/capture-execution-retry";
 import {
   isBrowserbaseConfigured,
   PuppeteerEngine,
@@ -583,215 +592,299 @@ async function executeBatchCaptures(captureIds: string[]): Promise<void> {
         }
 
         // 2) 상태 → processing
-        await supabase
+        const { data: processingRows, error: processingError } = await supabase
           .from("vision_da_captures")
           .update({ status: "processing", updated_at: new Date().toISOString() })
-          .eq("id", captureId);
+          .eq("id", captureId)
+          .eq("status", "pending")
+          .select("id");
 
-        // 3) 브라우저 엔진 초기화 (최초 1회만)
-        if (!engineLaunched) {
-          await sharedEngine.launch();
-          engineLaunched = true;
-          console.log(`[BatchCapture] 🚀 Chromium 시작 (배치: ${captureIds.length}건)`);
+        if (processingError) {
+          throw new Error(`processing 상태 업데이트 실패: ${processingError.message}`);
         }
-
-        // 4) 채널 생성 (공유 엔진)
-        let channel = createChannel(capture.channel as ChannelType, sharedEngine);
-        const storedYoutubeAdType =
-          (typeof captureMetadata.youtubeAdType === "string" &&
-            captureMetadata.youtubeAdType) ||
-          (typeof captureMetadata["youtube_ad_type"] === "string" &&
-            captureMetadata["youtube_ad_type"]) ||
-          "preroll";
-        if (capture.channel === "youtube" && !isExecutableYouTubeAdType(storedYoutubeAdType)) {
-          throw new Error(`지원하지 않는 YouTube 광고 유형입니다: ${storedYoutubeAdType}`);
-        }
-        const captureRequest = {
-          publisherUrl: capture.source_url ?? "",
-          creativeUrl: capture.creative_url,
-          captureLanding: capture.capture_landing,
-          clickUrl: capture.click_url ?? undefined,
-          options: {
-            injectionMode: captureMetadata.injectionMode ?? "single",
-            slotCount: captureMetadata.slotCount ?? 1,
-            creativeDimensions: captureMetadata.creativeDimensions ?? undefined,
-            adSizeMode: captureMetadata.adSizeMode ?? "auto",
-            targetAdSizes: captureMetadata.targetAdSizes ?? [],
-            creativeObjectFit:
-              captureMetadata.creativeObjectFit === "cover" ? "cover" : "contain",
-            youtubeAdType: capture.channel === "youtube" ? storedYoutubeAdType : undefined,
-            instreamOpts: captureMetadata.instreamOpts,
-            infeedOpts: captureMetadata.infeedOpts,
-            mobileNativeOpts: captureMetadata.mobileNativeOpts,
-            publisherGotoRelaxed: multiBatch && capture.channel === "gdn",
-            gdnBatchFastMode: multiBatch && capture.channel === "gdn",
-            gdnViewportMode:
-              capture.channel === "gdn"
-                ? captureMetadata.gdnViewportMode === "mobile"
-                  ? "mobile"
-                  : "pc"
-                : undefined,
-          },
-        };
-
-        // 5) 캡처 실행
-        let runtimeProvider = "vercel-chromium";
-        let fallbackRuntime: Record<string, unknown> | null = null;
-        let result: Awaited<ReturnType<typeof channel.execute>>;
-        try {
-          result = await executeWithRetry(
-            () => channel.execute(captureRequest),
-            1,
-            perCaptureTimeoutMs
-          );
-        } catch (primaryError) {
-          const fallbackTimeoutMs = resolveBrowserbaseFallbackTimeoutMs(
-            perCaptureTimeoutMs,
-            multiBatch,
-            startTime
-          );
-          if (
-            !shouldAttemptBrowserbaseFallback(
-              capture.channel,
-              primaryError,
-              fallbackTimeoutMs
-            )
-          ) {
-            throw primaryError;
-          }
-
-          console.warn(
-            `[BatchCapture] Browserbase fallback 시도: ${captureId} (${classifyFailureReason(primaryError).code})`
-          );
-          if (engineLaunched) {
-            try {
-              await sharedEngine.close();
-            } catch {
-              /* ignore */
-            }
-            engineLaunched = false;
-          }
-
-          const browserbaseEngine = new PuppeteerEngine({
-            provider: "browserbase",
-            browserbase: {
-              timeoutSeconds: Math.ceil((fallbackTimeoutMs ?? 60_000) / 1000),
-            },
-          });
-          try {
-            await browserbaseEngine.launch();
-            channel = createChannel(capture.channel as ChannelType, browserbaseEngine);
-            result = await executeWithRetry(
-              () =>
-                channel.execute({
-                  ...captureRequest,
-                  options: {
-                    ...captureRequest.options,
-                    runtimeProvider: "browserbase",
-                    fallbackFrom: "vercel-chromium",
-                  },
-                }),
-              1,
-              fallbackTimeoutMs ?? 60_000
-            );
-            runtimeProvider = "browserbase";
-            const primaryFailure = classifyFailureReason(primaryError);
-            fallbackRuntime = {
-              used: true,
-              from: "vercel-chromium",
-              provider: "browserbase",
-              primaryFailureCategory: primaryFailure.category,
-              primaryFailureCode: primaryFailure.code,
-            };
-          } catch (fallbackError) {
-            const err = new Error(
-              `Browserbase fallback 실패: ${
-                fallbackError instanceof Error ? fallbackError.message : String(fallbackError)
-              }`
-            );
-            (err as any).fallbackRuntime = {
-              attempted: true,
-              provider: "browserbase",
-              primaryFailure: classifyFailureReason(primaryError),
-              fallbackFailure: classifyFailureReason(fallbackError),
-            };
-            throw err;
-          } finally {
-            await browserbaseEngine.close().catch(() => {});
-          }
-        }
-
-        if (!(await isCaptureStillProcessing(supabase, captureId))) {
-          console.log(`[BatchCapture] ⏹️ 결과 저장 스킵 (중단/상태 변경): ${captureId}`);
+        if (!processingRows?.length) {
+          console.log(`[BatchCapture] ⏭️ processing 전환 스킵 (상태 변경): ${captureId}`);
           continue;
         }
 
-        // 6) Storage 업로드
-        const timestamp = Date.now();
-        const placementUpload = await uploadStorageObject(
-          supabase,
-          makeCaptureStoragePath(captureId, "placement", timestamp),
-          result.placementScreenshot,
-          {
-            contentType: "image/png",
-            label: "게재면 이미지",
+        const executionOutcome = await runWithCaptureAbortRegistration(
+          captureRouteAbortRegistry,
+          captureId,
+          async (abortHandle) => {
+            // 3) 브라우저 엔진 초기화 (최초 1회만)
+            abortHandle.throwIfAborted();
+            if (!engineLaunched) {
+              abortHandle.setPhase("launching");
+              await sharedEngine.launch();
+              engineLaunched = true;
+              console.log(`[BatchCapture] 🚀 Chromium 시작 (배치: ${captureIds.length}건)`);
+            }
+
+            // 4) 채널 생성 (공유 엔진)
+            let channel = createChannel(capture.channel as ChannelType, sharedEngine);
+            const storedYoutubeAdType =
+              (typeof captureMetadata.youtubeAdType === "string" &&
+                captureMetadata.youtubeAdType) ||
+              (typeof captureMetadata["youtube_ad_type"] === "string" &&
+                captureMetadata["youtube_ad_type"]) ||
+              "preroll";
+            if (capture.channel === "youtube" && !isExecutableYouTubeAdType(storedYoutubeAdType)) {
+              throw new Error(`지원하지 않는 YouTube 광고 유형입니다: ${storedYoutubeAdType}`);
+            }
+            const captureRequest = {
+              publisherUrl: capture.source_url ?? "",
+              creativeUrl: capture.creative_url,
+              captureLanding: capture.capture_landing,
+              clickUrl: capture.click_url ?? undefined,
+              options: {
+                injectionMode: captureMetadata.injectionMode ?? "single",
+                slotCount: captureMetadata.slotCount ?? 1,
+                creativeDimensions: captureMetadata.creativeDimensions ?? undefined,
+                adSizeMode: captureMetadata.adSizeMode ?? "auto",
+                targetAdSizes: captureMetadata.targetAdSizes ?? [],
+                creativeObjectFit:
+                  captureMetadata.creativeObjectFit === "cover" ? "cover" : "contain",
+                youtubeAdType: capture.channel === "youtube" ? storedYoutubeAdType : undefined,
+                instreamOpts: captureMetadata.instreamOpts,
+                infeedOpts: captureMetadata.infeedOpts,
+                mobileNativeOpts: captureMetadata.mobileNativeOpts,
+                publisherGotoRelaxed: multiBatch && capture.channel === "gdn",
+                gdnBatchFastMode: multiBatch && capture.channel === "gdn",
+                gdnViewportMode:
+                  capture.channel === "gdn"
+                    ? captureMetadata.gdnViewportMode === "mobile"
+                      ? "mobile"
+                      : "pc"
+                    : undefined,
+              },
+            };
+
+            // 5) 캡처 실행
+            let runtimeProvider = "vercel-chromium";
+            let fallbackRuntime: Record<string, unknown> | null = null;
+            let result: Awaited<ReturnType<typeof channel.execute>>;
+            try {
+              result = await executeCaptureWithRetry(
+                () => channel.execute(captureRequest, abortHandle),
+                {
+                  maxAttempts: 1,
+                  timeoutMs: perCaptureTimeoutMs,
+                  shouldRetry: isCaptureTimeoutError,
+                }
+              );
+            } catch (primaryError) {
+              if (abortHandle.signal.aborted) {
+                throw new CaptureAbortError(
+                  "Capture aborted",
+                  typeof abortHandle.signal.reason === "string"
+                    ? abortHandle.signal.reason
+                    : undefined
+                );
+              }
+              if (primaryError instanceof CaptureAbortError) {
+                throw primaryError;
+              }
+
+              const fallbackTimeoutMs = resolveBrowserbaseFallbackTimeoutMs(
+                perCaptureTimeoutMs,
+                multiBatch,
+                startTime
+              );
+              if (
+                !shouldAttemptBrowserbaseFallback(
+                  capture.channel,
+                  primaryError,
+                  fallbackTimeoutMs
+                )
+              ) {
+                throw primaryError;
+              }
+
+              console.warn(
+                `[BatchCapture] Browserbase fallback 시도: ${captureId} (${classifyFailureReason(primaryError).code})`
+              );
+              if (engineLaunched) {
+                try {
+                  await sharedEngine.close();
+                } catch {
+                  /* ignore */
+                }
+                engineLaunched = false;
+              }
+
+              const browserbaseEngine = new PuppeteerEngine({
+                provider: "browserbase",
+                browserbase: {
+                  timeoutSeconds: Math.ceil((fallbackTimeoutMs ?? 60_000) / 1000),
+                },
+              });
+              try {
+                await browserbaseEngine.launch();
+                channel = createChannel(capture.channel as ChannelType, browserbaseEngine);
+                result = await executeCaptureWithRetry(
+                  () =>
+                    channel.execute(
+                      {
+                        ...captureRequest,
+                        options: {
+                          ...captureRequest.options,
+                          runtimeProvider: "browserbase",
+                          fallbackFrom: "vercel-chromium",
+                        },
+                      },
+                      abortHandle
+                    ),
+                  {
+                    maxAttempts: 1,
+                    timeoutMs: fallbackTimeoutMs ?? 60_000,
+                    shouldRetry: isCaptureTimeoutError,
+                  }
+                );
+                runtimeProvider = "browserbase";
+                const primaryFailure = classifyFailureReason(primaryError);
+                fallbackRuntime = {
+                  used: true,
+                  from: "vercel-chromium",
+                  provider: "browserbase",
+                  primaryFailureCategory: primaryFailure.category,
+                  primaryFailureCode: primaryFailure.code,
+                };
+              } catch (fallbackError) {
+                if (abortHandle.signal.aborted) {
+                  throw new CaptureAbortError(
+                    "Capture aborted",
+                    typeof abortHandle.signal.reason === "string"
+                      ? abortHandle.signal.reason
+                      : undefined
+                  );
+                }
+                if (fallbackError instanceof CaptureAbortError) {
+                  throw fallbackError;
+                }
+                const err = new Error(
+                  `Browserbase fallback 실패: ${
+                    fallbackError instanceof Error ? fallbackError.message : String(fallbackError)
+                  }`
+                );
+                (err as any).fallbackRuntime = {
+                  attempted: true,
+                  provider: "browserbase",
+                  primaryFailure: classifyFailureReason(primaryError),
+                  fallbackFailure: classifyFailureReason(fallbackError),
+                };
+                throw err;
+              } finally {
+                await browserbaseEngine.close().catch(() => {});
+              }
+            }
+
+            abortHandle.throwIfAborted();
+
+            if (!(await isCaptureStillProcessing(supabase, captureId))) {
+              console.log(`[BatchCapture] ⏹️ 결과 저장 스킵 (중단/상태 변경): ${captureId}`);
+              return { completed: false, durationMs: Date.now() - captureStart };
+            }
+
+            // 6) Storage 업로드 + 7) DB → completed
+            const timestamp = Date.now();
+            const durationMs = Date.now() - captureStart;
+            const diagnostics = (channel as any).getDiagnostics?.() ?? null;
+            const successCategory = classifySuccessCategory(diagnostics);
+            const persistOutcome = await persistCaptureResultWithAbortGuard(
+              abortHandle,
+              result,
+              {
+                uploadPlacement: (screenshot) =>
+                  uploadStorageObject(
+                    supabase,
+                    makeCaptureStoragePath(captureId, "placement", timestamp),
+                    screenshot,
+                    {
+                      contentType: "image/png",
+                      label: "게재면 이미지",
+                    }
+                  ),
+                uploadLanding: (screenshot) =>
+                  uploadStorageObject(
+                    supabase,
+                    makeCaptureStoragePath(captureId, "landing", timestamp),
+                    screenshot,
+                    {
+                      contentType: "image/png",
+                      label: "랜딩 이미지",
+                    }
+                  ),
+                markCompleted: async ({ placementUpload, landingUpload, capturedAt, landingUrl }) => {
+                  const { data: completedRows, error: completedError } = await supabase
+                    .from("vision_da_captures")
+                    .update({
+                      status: "completed",
+                      placement_image_url: placementUpload.publicUrl,
+                      screenshot_storage_path: placementUpload.path,
+                      landing_image_url: landingUpload?.publicUrl ?? null,
+                      landing_final_url: landingUrl ?? null,
+                      metadata: {
+                        ...captureMetadata,
+                        capturedAt,
+                        durationMs,
+                        resultCategory: successCategory,
+                        diagnostics,
+                        runtime: {
+                          provider: runtimeProvider,
+                          capturedAt,
+                          durationMs,
+                          diagnostics,
+                          fallback: fallbackRuntime ?? undefined,
+                        },
+                      },
+                      updated_at: new Date().toISOString(),
+                    })
+                    .eq("id", captureId)
+                    .eq("status", "processing")
+                    .select("id");
+
+                  if (completedError) {
+                    throw new Error(`completed 상태 업데이트 실패: ${completedError.message}`);
+                  }
+                  if (!completedRows?.length) {
+                    if (abortHandle.signal.aborted) {
+                      throw new CaptureAbortError(
+                        "Capture aborted",
+                        typeof abortHandle.signal.reason === "string"
+                          ? abortHandle.signal.reason
+                          : undefined
+                      );
+                    }
+                    throw new Error("캡처가 중단되었거나 상태가 변경되었습니다.");
+                  }
+                },
+              }
+            );
+
+            if (!persistOutcome.completed) {
+              console.log(
+                `[BatchCapture] ⏹️ 완료 업데이트 스킵 (${persistOutcome.skippedReason}): ${captureId}`
+              );
+              return { completed: false, durationMs };
+            }
+
+            return { completed: true, durationMs };
           }
         );
 
-        let landingPublicUrl: string | null = null;
-        if (result.landingScreenshot) {
-          const landingUpload = await uploadStorageObject(
-            supabase,
-            makeCaptureStoragePath(captureId, "landing", timestamp),
-            result.landingScreenshot,
-            {
-              contentType: "image/png",
-              label: "랜딩 이미지",
-            }
-          );
-
-          landingPublicUrl = landingUpload.publicUrl;
-        }
-
-        // 7) DB → completed
-        const durationMs = Date.now() - captureStart;
-        const diagnostics = (channel as any).getDiagnostics?.() ?? null;
-        const successCategory = classifySuccessCategory(diagnostics);
-
-        if (!(await isCaptureStillProcessing(supabase, captureId))) {
-          console.log(`[BatchCapture] ⏹️ 완료 업데이트 스킵 (중단/상태 변경): ${captureId}`);
+        if (!executionOutcome.completed) {
           continue;
         }
 
-        await supabase
-          .from("vision_da_captures")
-          .update({
-            status: "completed",
-            placement_image_url: placementUpload.publicUrl,
-            screenshot_storage_path: placementUpload.path,
-            landing_image_url: landingPublicUrl,
-            landing_final_url: result.landingUrl ?? null,
-            metadata: {
-              ...captureMetadata,
-              capturedAt: result.capturedAt,
-              durationMs,
-              resultCategory: successCategory,
-              diagnostics,
-              runtime: {
-                provider: runtimeProvider,
-                capturedAt: result.capturedAt,
-                durationMs,
-                diagnostics,
-                fallback: fallbackRuntime ?? undefined,
-              },
-            },
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", captureId);
-
-        console.log(`[BatchCapture] ✅ 완료: ${captureId} (${durationMs}ms)`);
+        console.log(`[BatchCapture] ✅ 완료: ${captureId} (${executionOutcome.durationMs}ms)`);
 
       } catch (captureError) {
+        if (captureError instanceof CaptureAbortError) {
+          await markCaptureAbortedIfStillActive(supabase, captureId);
+          console.log(`[BatchCapture] ⏹️ 사용자 중단 처리: ${captureId}`);
+          continue;
+        }
+
         const errorMessage = captureError instanceof Error ? captureError.message : "알 수 없는 오류";
         const failureInfo = classifyFailureReason(captureError);
         const fallbackRuntime =
@@ -907,6 +1000,21 @@ async function executeBatchCaptures(captureIds: string[]): Promise<void> {
 
   const totalMs = Date.now() - startTime;
   console.log(`[BatchCapture] 📊 배치 완료 (${totalMs}ms)`);
+}
+
+async function markCaptureAbortedIfStillActive(
+  supabase: ReturnType<typeof createServerClient>,
+  captureId: string
+): Promise<void> {
+  await supabase
+    .from("vision_da_captures")
+    .update({
+      status: "failed",
+      error_message: USER_CANCELLED_CAPTURE_MESSAGE,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", captureId)
+    .in("status", ["pending", "processing"]);
 }
 
 async function markRemainingPendingAsBudgetSkipped(
@@ -1108,52 +1216,6 @@ function classifyFailureReason(err: unknown): { category: string; code: string; 
   return { category: "runtime", code: "unknown_capture_error", hardBlocked: false };
 }
 
-async function executeWithRetry<T>(fn: () => Promise<T>, maxAttempts: number, timeoutMs: number): Promise<T> {
-  let lastErr: unknown;
-  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    try {
-      return await withTimeout(fn(), timeoutMs);
-    } catch (err) {
-      lastErr = err;
-      // 브라우저 세션 종료/연결 종료는 재시도해도 같은 엔진에서 실패 확률이 높음
-      // → 외부 루프의 엔진 재시작 복구 로직으로 넘김
-      if (isBrowserSessionClosedError(err)) {
-        break;
-      }
-
-      // 타임아웃 계열만 재시도 (요청하신 장기 처리중 대응)
-      const msg = (err instanceof Error ? err.message : String(err)).toLowerCase();
-      const retryableTimeout =
-        msg.includes("capture timeout") ||
-        msg.includes("timeout") ||
-        msg.includes("timed out");
-      if (!retryableTimeout) {
-        break;
-      }
-
-      if (attempt >= maxAttempts) break;
-      console.warn(`[BatchCapture] 시도 ${attempt}/${maxAttempts} 실패 — 다음 시도 진행`);
-    }
-  }
-  throw lastErr instanceof Error ? lastErr : new Error(String(lastErr ?? "retry failed"));
-}
-
-async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
-  let timeoutHandle: ReturnType<typeof setTimeout> | null = null;
-  try {
-    return await Promise.race([
-      promise,
-      new Promise<T>((_, reject) => {
-        timeoutHandle = setTimeout(() => reject(new Error(`Capture timeout (${ms}ms)`)), ms);
-      }),
-    ]);
-  } finally {
-    if (timeoutHandle) clearTimeout(timeoutHandle);
-  }
-}
-
-const USER_CANCELLED_CAPTURE_MESSAGE = "사용자가 캡처를 중단했습니다.";
-
 function dedupeNormalizedUrls(urls: string[]): string[] {
   const seen = new Set<string>();
   const deduped: string[] = [];
@@ -1280,23 +1342,53 @@ export async function PATCH(request: NextRequest) {
     }
 
     const supabase = createServerClient();
-    const { data, error } = await supabase
+    const { data: candidates, error: fetchError } = await supabase
       .from("vision_da_captures")
-      .update({
-        status: "failed",
-        error_message: USER_CANCELLED_CAPTURE_MESSAGE,
-        updated_at: new Date().toISOString(),
-      })
-      .in("id", targetIds)
-      .in("status", ["pending", "processing"])
-      .select("id");
+      .select("id,status")
+      .in("id", targetIds);
 
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+    if (fetchError) {
+      return NextResponse.json({ error: fetchError.message }, { status: 500 });
     }
 
-    const cancelled = data?.length ?? 0;
-    console.log(`[API] 캡처 중단 요청 처리: ${cancelled}/${targetIds.length}건`);
+    const abortPlan = await cancelCaptureCandidates({
+      candidates: (candidates ?? []).map((candidate) => ({
+        id: String((candidate as { id?: unknown }).id ?? ""),
+        status: String((candidate as { status?: unknown }).status ?? ""),
+      })),
+      registry: captureRouteAbortRegistry,
+      reason: "operator-cancel",
+      markDurableCancelled: async (ids, message) => {
+        if (ids.length === 0) return [];
+
+        const { data, error } = await supabase
+          .from("vision_da_captures")
+          .update({
+            status: "failed",
+            error_message: message,
+            updated_at: new Date().toISOString(),
+          })
+          .in("id", ids)
+          .in("status", ["pending", "processing"])
+          .select("id");
+
+        if (error) {
+          throw new Error(error.message);
+        }
+
+        return (data ?? [])
+          .map((row) => (typeof row.id === "string" ? row.id : ""))
+          .filter((id) => id.length > 0);
+      },
+    });
+
+    const cancelled = abortPlan.cancelledIds.length;
+    const runtimeAbortHits = abortPlan.runtimeAbortResults.filter(
+      (result) => result.registryHit
+    ).length;
+    console.log(
+      `[API] 캡처 중단 요청 처리: ${cancelled}/${targetIds.length}건 (runtime ${runtimeAbortHits}/${abortPlan.runtimeAbortResults.length})`
+    );
     return NextResponse.json({
       success: true,
       cancelled,

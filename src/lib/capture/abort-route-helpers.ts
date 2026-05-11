@@ -1,10 +1,13 @@
 import {
   CaptureAbortError,
+  createCaptureAbortRegistry,
   type CaptureAbortHandle,
   type CaptureAbortRegistry,
 } from "./abort-registry";
 
 export const USER_CANCELLED_CAPTURE_MESSAGE = "사용자가 캡처를 중단했습니다.";
+
+export const captureRouteAbortRegistry = createCaptureAbortRegistry();
 
 export type CancellableCaptureStatus = "pending" | "processing";
 
