@@ -6,6 +6,12 @@
  */
 
 import type { IBrowserEngine, IPageHandle } from "../engine/browser-engine";
+import {
+  abortableDelay,
+  CaptureAbortError,
+  type CaptureAbortHandle,
+  type CaptureAbortPhase,
+} from "../abort-registry";
 import { PuppeteerEngine } from "../engine/puppeteer-engine";
 
 export interface CaptureResult {
@@ -36,6 +42,8 @@ export interface CaptureRequest {
   options?: Record<string, unknown>;
 }
 
+export type CaptureAbortContext = CaptureAbortHandle;
+
 export abstract class BaseChannel {
   protected engine: IBrowserEngine;
   /** 외부에서 전달된 공유 엔진 여부 (true면 자체 launch/close 안 함) */
@@ -50,29 +58,46 @@ export abstract class BaseChannel {
   abstract captureAdPlacement(page: IPageHandle, request: CaptureRequest): Promise<Buffer>;
 
   /** 전체 캡처 파이프라인 실행 */
-  async execute(request: CaptureRequest): Promise<CaptureResult> {
+  async execute(
+    request: CaptureRequest,
+    abortContext?: CaptureAbortContext,
+  ): Promise<CaptureResult> {
     // 공유 엔진이 아닌 경우에만 자체적으로 시작
-    if (!this.isSharedEngine) {
-      await this.engine.launch();
-    }
-
     try {
+      this.checkpointAbort(abortContext, "launching");
+      if (!this.isSharedEngine) {
+        await this.engine.launch();
+      }
+      this.checkpointAbort(abortContext, "launching");
+
       const page = await this.engine.newPage();
+      abortContext?.attachPage(page);
+      this.checkpointAbort(abortContext, "rendering");
 
       try {
         // 1) 광고 게재면 캡처
+        this.checkpointAbort(abortContext, "rendering");
         const placementScreenshot = await this.captureAdPlacement(page, request);
+        this.checkpointAbort(abortContext, "rendering");
 
         // 2) 랜딩 페이지 캡처 (옵션)
         let landingScreenshot: Buffer | undefined;
         let landingUrl: string | undefined;
 
         if (request.captureLanding && request.clickUrl) {
-          const landingResult = await this.captureLanding(page, request.clickUrl, request);
+          this.checkpointAbort(abortContext, "navigating");
+          const landingResult = await this.captureLanding(
+            page,
+            request.clickUrl,
+            request,
+            abortContext,
+          );
+          this.checkpointAbort(abortContext, "rendering");
           landingScreenshot = landingResult.screenshot;
           landingUrl = landingResult.finalUrl;
         }
 
+        this.checkpointAbort(abortContext, "completed");
         return {
           placementScreenshot,
           landingScreenshot,
@@ -84,6 +109,11 @@ export abstract class BaseChannel {
         // 페이지는 항상 닫기 (메모리 해제)
         await page.close().catch(() => {});
       }
+    } catch (error) {
+      if (!(error instanceof CaptureAbortError) && abortContext && !abortContext.signal.aborted) {
+        abortContext.setPhase("failed");
+      }
+      throw error;
     } finally {
       // 공유 엔진이 아닌 경우에만 자체적으로 종료
       if (!this.isSharedEngine) {
@@ -97,6 +127,7 @@ export abstract class BaseChannel {
     page: IPageHandle,
     clickUrl: string,
     request?: CaptureRequest,
+    abortContext?: CaptureAbortContext,
   ): Promise<{ screenshot: Buffer; finalUrl: string }> {
     const mobileGdn = request?.options?.gdnViewportMode === "mobile";
     // 모바일 지면: 게재면 이후 동일 탭에서 fullPage 랜딩 캡처 시 Chromium OOM·Target closed 빈발
@@ -106,27 +137,53 @@ export abstract class BaseChannel {
       );
     }
 
+    this.checkpointAbort(abortContext, "navigating");
     await page.goto(clickUrl, {
       waitUntil: mobileGdn ? "domcontentloaded" : "networkidle2",
       timeout: mobileGdn ? 45000 : 30000,
     });
+    this.checkpointAbort(abortContext, "navigating");
     if (mobileGdn) {
-      await new Promise((r) => setTimeout(r, 2500));
+      await this.delay(2500, abortContext);
+      this.checkpointAbort(abortContext, "rendering");
     }
 
     // 쿠키 배너/팝업 제거
     const { removePageObstructions } = await import("../injection/creative-injector");
+    this.checkpointAbort(abortContext, "rendering");
     await removePageObstructions(page);
+    this.checkpointAbort(abortContext, "rendering");
 
     // 잠시 대기 (동적 컨텐츠 로드)
-    await new Promise((r) => setTimeout(r, mobileGdn ? 1500 : 2000));
+    await this.delay(mobileGdn ? 1500 : 2000, abortContext);
+    this.checkpointAbort(abortContext, "writing");
 
     const screenshot = await page.screenshot({
       fullPage: !mobileGdn,
       type: "png",
     });
+    this.checkpointAbort(abortContext, "writing");
     const finalUrl = page.url();
 
     return { screenshot, finalUrl };
+  }
+
+  private checkpointAbort(
+    abortContext: CaptureAbortContext | undefined,
+    phase: CaptureAbortPhase,
+  ): void {
+    if (!abortContext) return;
+    abortContext.throwIfAborted();
+    abortContext.setPhase(phase);
+    abortContext.throwIfAborted();
+  }
+
+  private delay(
+    ms: number,
+    abortContext: CaptureAbortContext | undefined,
+  ): Promise<void> {
+    return abortContext
+      ? abortableDelay(ms, abortContext.signal)
+      : new Promise((resolve) => setTimeout(resolve, ms));
   }
 }

@@ -1,5 +1,15 @@
 import assert from "node:assert/strict";
 import {
+  BaseChannel,
+  type CaptureRequest,
+} from "../../src/lib/capture/channels/base-channel";
+import type {
+  IBrowserEngine,
+  IPageHandle,
+  IScreenshotOptions,
+  IViewport,
+} from "../../src/lib/capture/engine/browser-engine";
+import {
   abortableDelay,
   CaptureAbortError,
   CaptureAbortRegistry,
@@ -10,8 +20,71 @@ import {
   createCaptureExecutionContext,
 } from "../../src/lib/capture/abort-registry";
 
-class FakePage implements AbortablePageHandle {
+class FakePage implements AbortablePageHandle, IPageHandle {
   closeCount = 0;
+  gotoCount = 0;
+  screenshotCount = 0;
+  evaluateCount = 0;
+  currentUrl = "about:blank";
+
+  constructor(private readonly afterGoto?: () => void) {}
+
+  async goto(url: string): Promise<void> {
+    this.gotoCount += 1;
+    this.currentUrl = url;
+    this.afterGoto?.();
+  }
+
+  async screenshot(_options?: IScreenshotOptions): Promise<Buffer> {
+    this.screenshotCount += 1;
+    return Buffer.from("fake-screenshot");
+  }
+
+  async screenshotElement(): Promise<Buffer> {
+    return Buffer.from("fake-element-screenshot");
+  }
+
+  async evaluate<T>(): Promise<T> {
+    this.evaluateCount += 1;
+    return undefined as T;
+  }
+
+  async evaluateOnNewDocument(): Promise<void> {}
+
+  async click(): Promise<void> {}
+
+  async waitForSelector(): Promise<void> {}
+
+  async waitForNavigation(): Promise<void> {}
+
+  async setViewport(_viewport: IViewport): Promise<void> {}
+
+  async setUserAgent(): Promise<void> {}
+
+  async setCookie(): Promise<void> {}
+
+  url(): string {
+    return this.currentUrl;
+  }
+
+  async close(): Promise<void> {
+    this.closeCount += 1;
+  }
+}
+
+class FakeBrowserEngine implements IBrowserEngine {
+  launchCount = 0;
+  closeCount = 0;
+
+  constructor(readonly page: FakePage) {}
+
+  async launch(): Promise<void> {
+    this.launchCount += 1;
+  }
+
+  async newPage(): Promise<IPageHandle> {
+    return this.page;
+  }
 
   async close(): Promise<void> {
     this.closeCount += 1;
@@ -29,6 +102,18 @@ class FakeEngine {
     if (!this.handle.canWrite()) return false;
     this.writes.push(value);
     return true;
+  }
+}
+
+class FakeBaseChannel extends BaseChannel {
+  placementCount = 0;
+
+  async captureAdPlacement(
+    _page: IPageHandle,
+    _request: CaptureRequest,
+  ): Promise<Buffer> {
+    this.placementCount += 1;
+    return Buffer.from("fake-placement");
   }
 }
 
@@ -116,6 +201,69 @@ async function assertFakeWriteSuppressionAfterAbort(): Promise<void> {
   assert.deepEqual(engine.writes, []);
 }
 
+async function assertBaseChannelAttachesPageAndCompletes(): Promise<void> {
+  const registry = new CaptureAbortRegistry();
+  const handle = registry.register("capture-a");
+  const page = new FakePage();
+  const engine = new FakeBrowserEngine(page);
+  const channel = new FakeBaseChannel(engine);
+
+  const result = await channel.execute(
+    {
+      publisherUrl: "https://publisher.example",
+      creativeUrl: "https://creative.example/ad.png",
+    },
+    handle,
+  );
+
+  assert.equal(engine.launchCount, 0);
+  assert.equal(engine.closeCount, 0);
+  assert.equal(channel.placementCount, 1);
+  assert.equal(result.placementScreenshot.toString(), "fake-placement");
+  assert.equal(handle.snapshot().pageAttached, true);
+  assert.equal(handle.snapshot().phase, "completed");
+  assert.equal(page.closeCount, 1);
+}
+
+async function assertBaseChannelAbortDuringLandingDelay(): Promise<void> {
+  const registry = new CaptureAbortRegistry();
+  const handle = registry.register("capture-a");
+  const page = new FakePage(() => {
+    setTimeout(() => {
+      registry.requestAbort("capture-a", "landing-cancel");
+    }, 0);
+  });
+  const engine = new FakeBrowserEngine(page);
+  const channel = new FakeBaseChannel(engine);
+
+  await assert.rejects(
+    () =>
+      channel.execute(
+        {
+          publisherUrl: "https://publisher.example",
+          creativeUrl: "https://creative.example/ad.png",
+          captureLanding: true,
+          clickUrl: "https://landing.example",
+          options: { gdnViewportMode: "mobile" },
+        },
+        handle,
+      ),
+    (error) => {
+      assert.equal(error instanceof CaptureAbortError, true);
+      assert.equal((error as CaptureAbortError).reason, "landing-cancel");
+      return true;
+    },
+  );
+
+  const snapshot = handle.snapshot();
+  assert.equal(snapshot.phase, "aborted");
+  assert.equal(snapshot.pageAttached, true);
+  assert.equal(snapshot.pageCloseRequested, true);
+  assert.equal(page.gotoCount, 1);
+  assert.equal(page.screenshotCount, 0);
+  assert.equal(page.closeCount >= 1, true);
+}
+
 async function run(): Promise<void> {
   await assertRegisterUnregister();
   await assertDuplicateActiveIdBehavior();
@@ -123,6 +271,8 @@ async function run(): Promise<void> {
   await assertAbortableDelay();
   await assertPhaseTracking();
   await assertFakeWriteSuppressionAfterAbort();
+  await assertBaseChannelAttachesPageAndCompletes();
+  await assertBaseChannelAbortDuringLandingDelay();
 }
 
 run()
