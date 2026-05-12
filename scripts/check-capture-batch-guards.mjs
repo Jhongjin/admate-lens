@@ -118,6 +118,72 @@ function assertUxStaticClarityContracts() {
   return checks.every(Boolean)
 }
 
+function assertSlowHostBatchStaticContracts() {
+  const routePath = path.join(root, 'src', 'app', 'api', 'captures', 'route.ts')
+  const guardPath = path.join(root, 'src', 'lib', 'capture', 'batch-execution-guards.ts')
+  const route = fs.readFileSync(routePath, 'utf8')
+  const guard = fs.readFileSync(guardPath, 'utf8')
+  const checks = [
+    assertIncludes(
+      guard,
+      [
+        'export const SLOW_GDN_BATCH_SKIP_MESSAGE',
+        'const SLOW_GDN_BATCH_HOSTS = new Set(["donga.com", "www.donga.com", "m.donga.com"])',
+        'const SLOW_GDN_BATCH_MIN_CAPTURE_MS = 45_000',
+        'getGdnGotoTimeoutMs(args.host!, {',
+        'const minimumCaptureMs = Math.max(',
+        'gotoTimeoutMs + 10_000',
+        '!args.multiBatch ||',
+        'args.channel !== "gdn"',
+      ],
+      'slow GDN host guard must keep the skip-before-start budget policy',
+    ),
+    assertIncludes(
+      route,
+      [
+        'shouldSkipSlowGdnBatchCapture({',
+        'SLOW_GDN_BATCH_SKIP_MESSAGE',
+        'failureCategory: "timeout"',
+        'failureCode: "slow_gdn_host_batch_time_guard"',
+        'slowHost: host',
+        '.eq("status", "pending")',
+      ],
+      'capture route must persist slow-host budget skips as pending-row guarded failures',
+    ),
+  ]
+
+  const slowGuardIndex = route.indexOf('shouldSkipSlowGdnBatchCapture({')
+  const processingIndex = route.indexOf('const { data: processingRows')
+  const browserIndex = route.indexOf('runWithCaptureAbortRegistration', slowGuardIndex)
+  const fallbackIndex = route.indexOf('shouldAttemptBrowserbaseFallback', slowGuardIndex)
+
+  if (
+    slowGuardIndex === -1 ||
+    processingIndex === -1 ||
+    slowGuardIndex > processingIndex ||
+    (browserIndex !== -1 && slowGuardIndex > browserIndex) ||
+    (fallbackIndex !== -1 && slowGuardIndex > fallbackIndex)
+  ) {
+    console.error(
+      '[check-capture-batch-guards] slow GDN host guard must run before processing/browser/fallback capture work',
+    )
+    process.exitCode = 1
+    checks.push(false)
+  }
+
+  const slowMessageMatch = guard.match(/export const SLOW_GDN_BATCH_SKIP_MESSAGE =\s*"([^"]+)"/)
+  const slowMessage = slowMessageMatch?.[1] ?? ''
+  if (!slowMessage || /중단|cancel|abort/i.test(slowMessage)) {
+    console.error(
+      '[check-capture-batch-guards] slow GDN host skip copy must not be framed as capture cancellation',
+    )
+    process.exitCode = 1
+    checks.push(false)
+  }
+
+  return checks.every(Boolean)
+}
+
 function installAliasShim() {
   const aliasRoot = path.join(outDir, 'node_modules', '@', 'lib', 'capture', 'channels', 'gdn')
   fs.mkdirSync(aliasRoot, { recursive: true })
@@ -166,7 +232,12 @@ try {
     tsconfigPath,
   ])
 
-  if (compiled && assertRouteUsesSharedSourceKey() && assertUxStaticClarityContracts()) {
+  if (
+    compiled &&
+    assertRouteUsesSharedSourceKey() &&
+    assertUxStaticClarityContracts() &&
+    assertSlowHostBatchStaticContracts()
+  ) {
     installAliasShim()
     run(
       'batch execution guard assertions',
