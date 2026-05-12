@@ -20,7 +20,7 @@
     "check:golden-dimensions": "node scripts/check-golden-dimensions.mjs",
     "check:golden-pixels": "node scripts/check-golden-pixels.mjs",
     "harness:report": "node scripts/report-harness.mjs",
-    "verify:offline-smoke": "npm run check:abort-registry && npm run check:capture-batch-guards && npm run verify:harness",
+    "verify:offline-smoke": "npm run check:abort-registry && npm run check:capture-batch-guards && npm run check:harness-report-contract && npm run verify:harness",
     "verify:harness": "npm run check:surface-registry && npm run check:capture-metadata && npm run check:fixture-contracts",
     "verify:golden": "npm run check:golden-manifest && npm run check:golden-metadata && npm run check:golden-dimensions && npm run check:golden-pixels"
   },

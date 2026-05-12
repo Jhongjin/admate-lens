@@ -70,7 +70,12 @@ if (scripts['verify:harness'] !== 'npm run check:surface-registry && npm run che
 const offlineSmoke = scripts['verify:offline-smoke'] || ''
 requireIncludes(
   offlineSmoke,
-  ['npm run check:abort-registry', 'npm run check:capture-batch-guards', 'npm run verify:harness'],
+  [
+    'npm run check:abort-registry',
+    'npm run check:capture-batch-guards',
+    'npm run check:harness-report-contract',
+    'npm run verify:harness',
+  ],
   'verify:offline-smoke',
 )
 requireExcludes(
