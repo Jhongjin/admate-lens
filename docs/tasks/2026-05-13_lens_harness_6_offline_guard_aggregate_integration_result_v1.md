@@ -44,4 +44,3 @@ Local checks run:
 - `npm run verify:harness`: pass
 - `npm run harness:report`: pass
 - `git diff --check -- package.json scripts/check-harness-report-contract.mjs docs/tasks/2026-05-13_lens_harness_6_offline_guard_aggregate_integration_result_v1.md`: pass
-
