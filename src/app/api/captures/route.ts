@@ -697,6 +697,7 @@ async function executeBatchCaptures(captureIds: string[]): Promise<void> {
                   fallbackTimeoutMs
                 )
               ) {
+                captureRouteAbortRegistry.requestAbort(captureId, "capture-timeout");
                 throw primaryError;
               }
 
@@ -737,6 +738,9 @@ async function executeBatchCaptures(captureIds: string[]): Promise<void> {
                   {
                     maxAttempts: 1,
                     timeoutMs: fallbackTimeoutMs ?? 60_000,
+                    onTimeout: () => {
+                      captureRouteAbortRegistry.requestAbort(captureId, "capture-timeout");
+                    },
                     shouldRetry: isCaptureTimeoutError,
                   }
                 );
@@ -750,27 +754,40 @@ async function executeBatchCaptures(captureIds: string[]): Promise<void> {
                   primaryFailureCode: primaryFailure.code,
                 };
               } catch (fallbackError) {
-                if (abortHandle.signal.aborted) {
+                const fallbackAbortReason =
+                  abortHandle.signal.aborted && typeof abortHandle.signal.reason === "string"
+                    ? abortHandle.signal.reason
+                    : undefined;
+                if (abortHandle.signal.aborted && fallbackAbortReason !== "capture-timeout") {
                   throw new CaptureAbortError(
                     "Capture aborted",
-                    typeof abortHandle.signal.reason === "string"
-                      ? abortHandle.signal.reason
-                      : undefined
+                    fallbackAbortReason
                   );
                 }
-                if (fallbackError instanceof CaptureAbortError) {
+                if (
+                  fallbackError instanceof CaptureAbortError &&
+                  fallbackError.reason !== "capture-timeout"
+                ) {
                   throw fallbackError;
                 }
+                const normalizedFallbackError =
+                  fallbackAbortReason === "capture-timeout" ||
+                  (fallbackError instanceof CaptureAbortError &&
+                    fallbackError.reason === "capture-timeout")
+                    ? new Error("Capture timeout (capture-timeout)")
+                    : fallbackError;
                 const err = new Error(
                   `Browserbase fallback 실패: ${
-                    fallbackError instanceof Error ? fallbackError.message : String(fallbackError)
+                    normalizedFallbackError instanceof Error
+                      ? normalizedFallbackError.message
+                      : String(normalizedFallbackError)
                   }`
                 );
                 (err as any).fallbackRuntime = {
                   attempted: true,
                   provider: "browserbase",
                   primaryFailure: classifyFailureReason(primaryError),
-                  fallbackFailure: classifyFailureReason(fallbackError),
+                  fallbackFailure: classifyFailureReason(normalizedFallbackError),
                 };
                 throw err;
               } finally {
@@ -879,17 +896,25 @@ async function executeBatchCaptures(captureIds: string[]): Promise<void> {
         console.log(`[BatchCapture] ✅ 완료: ${captureId} (${executionOutcome.durationMs}ms)`);
 
       } catch (captureError) {
-        if (captureError instanceof CaptureAbortError) {
+        if (
+          captureError instanceof CaptureAbortError &&
+          captureError.reason !== "capture-timeout"
+        ) {
           await markCaptureAbortedIfStillActive(supabase, captureId);
           console.log(`[BatchCapture] ⏹️ 사용자 중단 처리: ${captureId}`);
           continue;
         }
 
-        const errorMessage = captureError instanceof Error ? captureError.message : "알 수 없는 오류";
-        const failureInfo = classifyFailureReason(captureError);
+        const normalizedError =
+          captureError instanceof CaptureAbortError &&
+          captureError.reason === "capture-timeout"
+            ? new Error("Capture timeout (capture-timeout)")
+            : captureError;
+        const errorMessage = normalizedError instanceof Error ? normalizedError.message : "알 수 없는 오류";
+        const failureInfo = classifyFailureReason(normalizedError);
         const fallbackRuntime =
-          typeof captureError === "object" && captureError !== null
-            ? ((captureError as any).fallbackRuntime as Record<string, unknown> | undefined)
+          typeof normalizedError === "object" && normalizedError !== null
+            ? ((normalizedError as any).fallbackRuntime as Record<string, unknown> | undefined)
             : undefined;
         const host = getHostname(sourceUrlForFailure);
 

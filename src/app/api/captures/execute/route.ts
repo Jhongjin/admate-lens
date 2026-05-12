@@ -307,6 +307,9 @@ export async function POST(request: NextRequest) {
                   {
                     maxAttempts: 1,
                     timeoutMs: perCaptureTimeoutMs,
+                    onTimeout: () => {
+                      captureRouteAbortRegistry.requestAbort(captureId, "capture-timeout");
+                    },
                     shouldRetry: isCaptureTimeoutError,
                   }
                 );
@@ -427,7 +430,10 @@ export async function POST(request: NextRequest) {
           results.push({ captureId, success: true, durationMs: executionOutcome.durationMs });
 
         } catch (captureError) {
-          if (captureError instanceof CaptureAbortError) {
+          if (
+            captureError instanceof CaptureAbortError &&
+            captureError.reason !== "capture-timeout"
+          ) {
             await markCaptureAbortedIfStillActive(supabase, captureId);
             console.log(`[Execute] ⏹️ 사용자 중단 처리: ${captureId}`);
             results.push({ captureId, success: false, error: USER_CANCELLED_CAPTURE_MESSAGE });
@@ -435,8 +441,13 @@ export async function POST(request: NextRequest) {
           }
 
           // 개별 캡처 실패 → DB 상태 업데이트 후 다음 캡처 계속
-          const errorMessage = captureError instanceof Error ? captureError.message : "알 수 없는 오류";
-          const failureInfo = classifyFailureReason(captureError);
+          const normalizedError =
+            captureError instanceof CaptureAbortError &&
+            captureError.reason === "capture-timeout"
+              ? new Error("Capture timeout (capture-timeout)")
+              : captureError;
+          const errorMessage = normalizedError instanceof Error ? normalizedError.message : "알 수 없는 오류";
+          const failureInfo = classifyFailureReason(normalizedError);
           const host = getHostname(sourceUrlForFailure);
 
           if (!(await isCapturePendingOrProcessing(supabase, captureId))) {

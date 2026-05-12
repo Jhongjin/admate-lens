@@ -93,6 +93,31 @@ async function assertAbortErrorDoesNotRetry(): Promise<void> {
   assert.equal(attempts, 1);
 }
 
+async function assertTimeoutRequestsAbortBeforeRetryDecision(): Promise<void> {
+  let timeoutCount = 0;
+
+  await assert.rejects(
+    () =>
+      executeCaptureWithRetry(
+        async () =>
+          new Promise<string>((resolve) => {
+            setTimeout(() => resolve("late-result"), 25);
+          }),
+        {
+          maxAttempts: 1,
+          timeoutMs: 1,
+          onTimeout: () => {
+            timeoutCount += 1;
+          },
+          shouldRetry: isRetryableCaptureTimeout,
+        },
+      ),
+    /Capture timeout/,
+  );
+
+  assert.equal(timeoutCount, 1);
+}
+
 async function assertAbortBeforeUploadPreventsFakeUpload(): Promise<void> {
   const registry = new CaptureAbortRegistry();
   const handle = registry.register("capture-a");
@@ -191,6 +216,7 @@ async function run(): Promise<void> {
   await assertDurableCancelAndRegistryHitMiss();
   await assertUnregisterInFinally();
   await assertAbortErrorDoesNotRetry();
+  await assertTimeoutRequestsAbortBeforeRetryDecision();
   await assertAbortBeforeUploadPreventsFakeUpload();
   await assertAbortAfterUploadSuppressesCompletedWrite();
   await assertBatchContinuesAfterAbort();

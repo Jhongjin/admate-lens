@@ -4,6 +4,7 @@ export interface CaptureRetryOptions {
   maxAttempts: number;
   timeoutMs: number;
   onRetry?: (attempt: number, error: unknown) => void;
+  onTimeout?: () => void;
   shouldRetry?: (error: unknown) => boolean;
 }
 
@@ -16,7 +17,7 @@ export async function executeCaptureWithRetry<T>(
 
   for (let attempt = 1; attempt <= options.maxAttempts; attempt++) {
     try {
-      return await withCaptureTimeout(fn(), options.timeoutMs);
+      return await withCaptureTimeout(fn(), options.timeoutMs, options.onTimeout);
     } catch (err) {
       lastErr = err;
 
@@ -40,6 +41,7 @@ export async function executeCaptureWithRetry<T>(
 export async function withCaptureTimeout<T>(
   promise: Promise<T>,
   ms: number,
+  onTimeout?: () => void,
 ): Promise<T> {
   let timeoutHandle: ReturnType<typeof setTimeout> | null = null;
   try {
@@ -47,7 +49,10 @@ export async function withCaptureTimeout<T>(
       promise,
       new Promise<T>((_, reject) => {
         timeoutHandle = setTimeout(
-          () => reject(new Error(`Capture timeout (${ms}ms)`)),
+          () => {
+            onTimeout?.();
+            reject(new Error(`Capture timeout (${ms}ms)`));
+          },
           ms,
         );
       }),
