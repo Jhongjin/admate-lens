@@ -154,6 +154,21 @@ function validateManifestCoverage() {
       continue
     }
 
+    const surface = typeof manifest.surface === 'string' ? manifest.surface : path.basename(file, '.json')
+    const fixturePath = path.join(fixtureDir, `${surface}.html`)
+    if (!fs.existsSync(fixturePath)) {
+      fail(`${relative(file)}: approved repo-safe manifest needs matching local fixture ${relative(fixturePath)}`)
+      continue
+    }
+
+    const fixtureHtml = fs.readFileSync(fixturePath, 'utf8')
+    if (!/<title>\s*Lens Golden Fixture\b/i.test(fixtureHtml)) {
+      fail(`${relative(fixturePath)}: approved golden fixture must keep a Lens Golden Fixture title`)
+    }
+    if (!/\bdata-ad-slot\s*=/.test(fixtureHtml)) {
+      fail(`${relative(fixturePath)}: approved golden fixture must keep a stable data-ad-slot marker`)
+    }
+
     const notes = typeof manifest.notes === 'string' ? manifest.notes : ''
     if (!/(static local fixture|controlled static local fixture|reviewed exception)/i.test(notes)) {
       fail(`${relative(file)}: approved repo-safe manifest needs a fixture source note or reviewed exception`)
