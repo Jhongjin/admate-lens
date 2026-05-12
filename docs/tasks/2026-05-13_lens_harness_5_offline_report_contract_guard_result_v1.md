@@ -48,4 +48,3 @@ Local checks run:
 - `npm run check:golden-metadata`: pass
 - `npm run check:golden-dimensions`: pass
 - `git diff --check -- scripts/report-harness.mjs scripts/check-harness-report-contract.mjs package.json docs/tasks/2026-05-13_lens_harness_5_offline_report_contract_guard_result_v1.md`: pass
-
