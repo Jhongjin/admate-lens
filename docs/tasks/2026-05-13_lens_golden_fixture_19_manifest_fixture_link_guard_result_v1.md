@@ -56,4 +56,3 @@ Local checks run:
 - `npm run harness:report`
 - `npm run verify:offline-smoke`
 - `git diff --check -- scripts/check-fixture-contracts.mjs docs/tasks/2026-05-13_lens_golden_fixture_19_manifest_fixture_link_guard_result_v1.md`
-
