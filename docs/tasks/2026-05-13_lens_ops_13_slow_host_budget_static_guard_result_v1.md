@@ -53,4 +53,3 @@ Local checks run:
 - `npm run verify:offline-smoke`
 - `npm run verify:harness`
 - `git diff --check -- scripts/check-capture-batch-guards.mjs tests/capture/batch-execution-guards.test.ts docs/tasks/2026-05-13_lens_ops_13_slow_host_budget_static_guard_result_v1.md`
-
