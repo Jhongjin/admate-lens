@@ -570,17 +570,28 @@ function isValidHttpSource(raw: string): boolean {
   }
 }
 
-function dedupeHttpUrls(urls: string[]): string[] {
+function summarizeDedupeHttpUrls(urls: string[]): {
+  dedupedUrls: string[];
+  duplicateCount: number;
+  submittedCount: number;
+} {
   const seen = new Set<string>();
-  const deduped: string[] = [];
+  const dedupedUrls: string[] = [];
+  let submittedCount = 0;
   for (const raw of urls) {
     const normalized = normalizeHttpUrl(raw);
     const key = normalized.trim().replace(/\/+$/, "").toLowerCase();
-    if (!key || seen.has(key)) continue;
+    if (!key) continue;
+    submittedCount += 1;
+    if (seen.has(key)) continue;
     seen.add(key);
-    deduped.push(normalized);
+    dedupedUrls.push(normalized);
   }
-  return deduped;
+  return {
+    dedupedUrls,
+    duplicateCount: submittedCount - dedupedUrls.length,
+    submittedCount,
+  };
 }
 
 /** 파일 크기 포맷 */
@@ -1216,6 +1227,10 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
   const isFormValid =
     (isAutoPublisherChannel || form.selectedPublishers.length > 0) &&
     hasValidSource;
+  const selectedPublisherDedupeSummary = useMemo(
+    () => summarizeDedupeHttpUrls(form.selectedPublishers),
+    [form.selectedPublishers],
+  );
 
   /** 폼 제출 */
   const handleSubmit = async (e: React.FormEvent) => {
@@ -1272,7 +1287,8 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
         : isMobileNativeChannel
           ? mobileNativePublisherUrls
           : form.selectedPublishers;
-      const dedupedPublisherUrls = dedupeHttpUrls(publisherUrls);
+      const dedupeSummary = summarizeDedupeHttpUrls(publisherUrls);
+      const dedupedPublisherUrls = dedupeSummary.dedupedUrls;
 
       const res = await fetch("/api/captures", {
         method: "POST",
@@ -1442,7 +1458,12 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
 
       const siteCount = result.count || 1;
       setAuthExpiredMessage(null);
-      showToast("success", `${siteCount}개 사이트 캡처 요청이 생성되었습니다!`);
+      showToast(
+        "success",
+        dedupeSummary.duplicateCount > 0
+          ? `${siteCount}개 사이트 캡처 요청이 생성되었습니다. 중복 URL ${dedupeSummary.duplicateCount}개는 같은 배치에서 제외했습니다.`
+          : `${siteCount}개 사이트 캡처 요청이 생성되었습니다. 캡처 이력에는 이전 배치 기록도 함께 표시됩니다.`,
+      );
 
       if (onCaptureCreated && result.data) {
         onCaptureCreated(result.data);
@@ -3400,7 +3421,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                 </button>
               </div>
               <p className="form-helper">
-                URL을 입력 후 추가 버튼으로 여러 사이트를 등록하세요
+                URL을 입력 후 추가 버튼으로 여러 사이트를 등록하세요. 같은 배치 안의 동일 URL은 한 번만 요청됩니다.
               </p>
               {customUrl && !isValidUrl(customUrl) && (
                 <p
@@ -3428,18 +3449,23 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
               >
                 선택된 게재면 ({form.selectedPublishers.length}개)
               </p>
+              {selectedPublisherDedupeSummary.duplicateCount > 0 && (
+                <p className="mb-2 text-[11px] leading-5 text-[var(--color-text-muted)]">
+                  중복 URL {selectedPublisherDedupeSummary.duplicateCount}개는 제출 시 같은 배치에서 제외됩니다.
+                </p>
+              )}
               <div className="flex flex-wrap gap-1.5">
                 {form.selectedPublishers.map((url) => (
                   <span
                     key={url}
-                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border"
+                    className="inline-flex max-w-full items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border"
                     style={{
                       borderColor: "var(--color-accent)",
                       backgroundColor: "var(--color-accent-subtle)",
                       color: "var(--color-accent)",
                     }}
                   >
-                    {getPresetName(url)}
+                    <span className="min-w-0 truncate">{getPresetName(url)}</span>
                     <button
                       type="button"
                       onClick={() => removePublisher(url)}

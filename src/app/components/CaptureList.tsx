@@ -115,13 +115,13 @@ function getCaptureStatusDescriptor(
 function getCancelButtonLabel(capture: CaptureRecord, isCancelling: boolean): string {
   if (isCancelling) return "중단 요청 중...";
   if (capture.status === "pending") return "대기 취소";
-  return "캡처 중단";
+  return "중단 요청";
 }
 
 function getCancelButtonAriaLabel(capture: CaptureRecord, isCancelling: boolean): string {
-  if (isCancelling) return "캡처 중단 요청 처리 중";
+  if (isCancelling) return "중단 요청 처리 중";
   if (capture.status === "pending") return "대기 중인 캡처 취소";
-  return "처리 중인 캡처 중단";
+  return "처리 중인 캡처에 중단 요청";
 }
 
 function getActiveCaptureHelper(capture: CaptureRecord): string {
@@ -376,7 +376,7 @@ function DetailInfoRow({
   mono?: boolean;
 }) {
   return (
-    <div className="flex items-start justify-between gap-4 text-sm">
+    <div className="flex min-w-0 items-start justify-between gap-4 text-sm">
       <span className="shrink-0 text-[var(--color-text-muted)]">{label}</span>
       <div
         className={`min-w-0 text-right text-[var(--color-text-secondary)] ${
@@ -536,7 +536,7 @@ export default function CaptureList({ refreshTrigger }: CaptureListProps) {
     }
   };
 
-  /** 대기/처리 중인 캡처 중단 */
+  /** 대기 취소 또는 처리 중 캡처에 중단 요청 */
   const handleCancelCapture = async (captureId: string) => {
     setCancellingIds((prev) => new Set(prev).add(captureId));
     try {
@@ -552,7 +552,7 @@ export default function CaptureList({ refreshTrigger }: CaptureListProps) {
         return;
       }
       if (!res.ok) {
-        throw new Error(result?.error || "캡처 중단 요청에 실패했습니다.");
+        throw new Error(result?.error || "중단 요청에 실패했습니다.");
       }
 
       setAuthExpiredMessage(null);
@@ -585,7 +585,7 @@ export default function CaptureList({ refreshTrigger }: CaptureListProps) {
       }
       await fetchCaptures();
     } catch (err) {
-      console.error("[CaptureList] 캡처 중단 실패:", err);
+      console.error("[CaptureList] 중단 요청 실패:", err);
     } finally {
       setCancellingIds((prev) => {
         const next = new Set(prev);
@@ -633,6 +633,9 @@ export default function CaptureList({ refreshTrigger }: CaptureListProps) {
                   실시간 갱신 중
                 </span>
               )}
+            </p>
+            <p className="mt-1 text-[11px] leading-5 text-[var(--color-text-muted)]">
+              최근 30개 전체 이력입니다. 같은 매체가 보여도 현재 배치 중복으로 단정하지 않습니다.
             </p>
           </div>
         </div>
@@ -691,6 +694,9 @@ export default function CaptureList({ refreshTrigger }: CaptureListProps) {
           <p className="text-2xl font-bold text-[var(--color-text-primary)]">{activeCount}</p>
           <p className="text-xs text-[var(--color-text-secondary)] mt-1">
             {activeCount > 0 ? "진행 중 작업이 있습니다" : "대기/진행 작업 없음"}
+          </p>
+          <p className="mt-2 text-[11px] leading-5 text-[var(--color-text-muted)]">
+            새 배치와 이전 이력이 함께 표시됩니다.
           </p>
         </div>
         <div className="glass-card-static p-4 md:col-span-2">
@@ -766,7 +772,7 @@ export default function CaptureList({ refreshTrigger }: CaptureListProps) {
                   key={capture.id}
                   onClick={() => setSelectedCapture(capture)}
                   className={`
-                    group flex items-center gap-4 p-4 cursor-pointer transition-all duration-200
+                    group flex flex-col gap-3 p-4 cursor-pointer transition-all duration-200 sm:flex-row sm:items-center sm:gap-4
                     hover:bg-[var(--color-bg-elevated)]
                     ${isActive ? "bg-[var(--color-accent-subtle)]" : ""}
                   `}
@@ -854,7 +860,7 @@ export default function CaptureList({ refreshTrigger }: CaptureListProps) {
                   </div>
 
                   {/* 삭제 버튼 + 화살표 */}
-                  <div className="flex items-center gap-1 flex-shrink-0">
+                  <div className="flex w-full items-center justify-end gap-1 sm:w-auto sm:flex-shrink-0">
                     {isActive && (
                       <button
                         onClick={(e) => {
@@ -864,7 +870,7 @@ export default function CaptureList({ refreshTrigger }: CaptureListProps) {
                         disabled={isCancelling}
                         aria-label={getCancelButtonAriaLabel(capture, isCancelling)}
                         aria-busy={isCancelling}
-                        className="inline-flex h-8 min-w-[6.5rem] items-center justify-center rounded-lg border border-[rgba(239,68,68,0.22)] px-2 text-xs font-semibold text-[var(--color-error)] transition-all hover:bg-[rgba(239,68,68,0.08)] disabled:cursor-not-allowed disabled:opacity-50"
+                        className="inline-flex h-8 min-w-[6.5rem] items-center justify-center whitespace-nowrap rounded-lg border border-[rgba(239,68,68,0.22)] px-2 text-xs font-semibold text-[var(--color-error)] transition-all hover:bg-[rgba(239,68,68,0.08)] disabled:cursor-not-allowed disabled:opacity-50"
                         title={cancelButtonLabel}
                       >
                         {cancelButtonLabel}
@@ -1191,10 +1197,10 @@ function CaptureDetailModal({
 
       <section className="space-y-2">
         <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--color-text-muted)]">캡처 정보</p>
-        <DetailInfoRow label="캡처 ID" mono>{capture.id}</DetailInfoRow>
+        <DetailInfoRow label="내부 캡처 ID" mono>{capture.id}</DetailInfoRow>
         <DetailInfoRow label="채널">{getCaptureChannelLabel(capture)}</DetailInfoRow>
         {productLabel && <DetailInfoRow label="상품 유형">{productLabel}</DetailInfoRow>}
-        {metadataSurfaceCode && <DetailInfoRow label="Surface" mono>{metadataSurfaceCode}</DetailInfoRow>}
+        {metadataSurfaceCode && <DetailInfoRow label="내부 surface" mono>{metadataSurfaceCode}</DetailInfoRow>}
         <DetailInfoRow label="생성 시각">{formatDate(capture.created_at)}</DetailInfoRow>
         {metadataEventTime && <DetailInfoRow label="캡처 시각">{metadataEventTime}</DetailInfoRow>}
         {durationLabel && <DetailInfoRow label="소요 시간">{durationLabel}</DetailInfoRow>}
@@ -1203,7 +1209,7 @@ function CaptureDetailModal({
       </section>
 
       <section className="space-y-2">
-        <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--color-text-muted)]">URL</p>
+        <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--color-text-muted)]">참조 URL</p>
         <DetailInfoRow label="게재면">
           {capture.source_url ? (
             <a href={capture.source_url} target="_blank" rel="noopener noreferrer" className="text-[var(--color-accent)] hover:underline">
@@ -1228,22 +1234,22 @@ function CaptureDetailModal({
       <section className="space-y-2">
         <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--color-text-muted)]">선택 이미지</p>
         <DetailInfoRow label="출력">{activeOutput.description}</DetailInfoRow>
-        <DetailInfoRow label="이미지 URL">
+        <DetailInfoRow label="이미지 URL(복사용)">
           {activeUrl ? (
             <button
               type="button"
-              onClick={() => copyText(activeUrl, "이미지 URL")}
-              className="text-[var(--color-accent)] hover:underline"
+              onClick={() => copyText(activeUrl, "이미지 URL(복사용)")}
+              className="break-all text-right text-[var(--color-accent)] hover:underline"
             >
               {getHostnameLabel(activeUrl) ?? "URL 복사"}
             </button>
           ) : "없음"}
         </DetailInfoRow>
-        <DetailInfoRow label="저장 경로" mono>
+        <DetailInfoRow label="저장 경로(내부용)" mono>
           {activeStoragePath ? (
             <button
               type="button"
-              onClick={() => copyText(activeStoragePath, "저장 경로")}
+              onClick={() => copyText(activeStoragePath, "저장 경로(내부용)")}
               className="break-all text-right text-[var(--color-accent)] hover:underline"
             >
               {activeStoragePath}
@@ -1257,7 +1263,7 @@ function CaptureDetailModal({
         <DetailInfoRow label="진단 데이터">{diagnosticsSummary.hasDiagnostics ? "있음" : "없음"}</DetailInfoRow>
         {qualityFlagCountLabel && <DetailInfoRow label="품질 플래그">{qualityFlagCountLabel}</DetailInfoRow>}
         {diagnosticsSummary.topIssue && <DetailInfoRow label="주요 확인">{diagnosticsSummary.topIssue}</DetailInfoRow>}
-        {diagnosticsSummary.score !== null && <DetailInfoRow label="내부 점수">{diagnosticsSummary.score}</DetailInfoRow>}
+        {diagnosticsSummary.score !== null && <DetailInfoRow label="내부 검수 점수">{diagnosticsSummary.score}</DetailInfoRow>}
         {diagnosticsSummary.needsReview !== null && (
           <DetailInfoRow label="검수 필요">{diagnosticsSummary.needsReview ? "예" : "아니오"}</DetailInfoRow>
         )}
@@ -1344,7 +1350,7 @@ function CaptureDetailModal({
             ) : (
               <button type="button" disabled className={primaryActionClass}>다운로드</button>
             )}
-            <button type="button" disabled={!activeUrl} onClick={() => copyText(activeUrl, "이미지 URL")} className={actionButtonClass}>
+            <button type="button" disabled={!activeUrl} onClick={() => copyText(activeUrl, "이미지 URL(복사용)")} className={actionButtonClass}>
               URL 복사
             </button>
           </div>
@@ -1381,6 +1387,7 @@ function CaptureDetailModal({
             </div>
             <div className="shrink-0 border-t border-[var(--color-border)] bg-[var(--color-bg-secondary)] px-4 py-2 text-[11px] text-[var(--color-text-muted)]">
               이미지 표시는 검토용 viewer 상태입니다. 원본 PNG 파일은 crop, filter, overlay 없이 그대로 열기/다운로드됩니다.
+              URL과 저장 경로는 운영 확인용 복사 정보입니다.
             </div>
 
             <div className="max-h-[38vh] overflow-y-auto border-t border-[var(--color-border)] bg-[var(--color-bg-secondary)] lg:hidden">
@@ -1397,13 +1404,13 @@ function CaptureDetailModal({
             </div>
             <div className="space-y-2 border-t border-[var(--color-border)] p-4">
               <div className="grid grid-cols-2 gap-2">
-                <button type="button" disabled={!activeUrl} onClick={() => copyText(activeUrl, "이미지 URL")} className={actionButtonClass}>
+                <button type="button" disabled={!activeUrl} onClick={() => copyText(activeUrl, "이미지 URL(복사용)")} className={actionButtonClass}>
                   URL 복사
                 </button>
                 <button
                   type="button"
                   disabled={!activeStoragePath}
-                  onClick={() => copyText(activeStoragePath, "저장 경로")}
+                  onClick={() => copyText(activeStoragePath, "저장 경로(내부용)")}
                   className={actionButtonClass}
                 >
                   경로 복사
@@ -1453,7 +1460,7 @@ function CaptureDetailModal({
           </aside>
         </div>
 
-        <div className="grid shrink-0 grid-cols-4 gap-2 border-t border-[var(--color-border)] bg-[var(--color-bg-secondary)] p-3 lg:hidden">
+        <div className="grid shrink-0 grid-cols-2 gap-2 border-t border-[var(--color-border)] bg-[var(--color-bg-secondary)] p-3 sm:grid-cols-4 lg:hidden">
           {activeUrl ? (
             <a href={activeUrl} download className={primaryActionClass}>
               다운로드
@@ -1461,7 +1468,7 @@ function CaptureDetailModal({
           ) : (
             <button type="button" disabled className={primaryActionClass}>다운로드</button>
           )}
-          <button type="button" disabled={!activeUrl} onClick={() => copyText(activeUrl, "이미지 URL")} className={actionButtonClass}>
+          <button type="button" disabled={!activeUrl} onClick={() => copyText(activeUrl, "이미지 URL(복사용)")} className={actionButtonClass}>
             URL 복사
           </button>
           {activeUrl ? (
@@ -1474,7 +1481,7 @@ function CaptureDetailModal({
           <button
             type="button"
             disabled={!activeStoragePath}
-            onClick={() => copyText(activeStoragePath, "저장 경로")}
+            onClick={() => copyText(activeStoragePath, "저장 경로(내부용)")}
             className={actionButtonClass}
           >
             경로
