@@ -89,8 +89,9 @@ const report = {
   checks,
   golden: readManifests(),
   notes: [
-    'This report does not execute capture or upload flows.',
+    'This report does not execute capture, upload, browser screenshot, or external browser flows.',
     'Pending golden samples are reported as placeholders and do not require PNG files.',
+    'Golden PNG generation, promotion, replacement, and image mutation are intentionally excluded.',
     'Pixel diff is intentionally excluded because approved samples can create diff PNG and JSON artifacts.',
   ],
 }

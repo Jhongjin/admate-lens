@@ -14,6 +14,7 @@
     "check:capture-batch-guards": "node scripts/check-capture-batch-guards.mjs",
     "check:capture-dimensions": "node scripts/check-capture-dimensions.mjs",
     "check:fixture-contracts": "node scripts/check-fixture-contracts.mjs",
+    "check:harness-report-contract": "node scripts/check-harness-report-contract.mjs",
     "check:golden-manifest": "node scripts/check-golden-manifest.mjs",
     "check:golden-metadata": "node scripts/check-golden-metadata.mjs",
     "check:golden-dimensions": "node scripts/check-golden-dimensions.mjs",
