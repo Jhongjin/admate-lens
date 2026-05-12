@@ -65,4 +65,3 @@ Local checks run:
 - `npm run verify:offline-smoke`
 - `npm run harness:report`
 - `git diff --check -- docs/tasks/2026-05-13_lens_static_offline_guard_readiness_closure_v1.md`
-
