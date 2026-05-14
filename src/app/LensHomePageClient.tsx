@@ -176,28 +176,28 @@ const proofQueueRows = [
   {
     lane: "SOURCE",
     title: "소재 원본 접수",
-    status: "INTAKE",
+    status: "01 INTAKE",
     detail: "이미지, 영상, 로고, 랜딩 URL을 캡처 요청의 증거 원본으로 확인합니다.",
     tone: "ready",
   },
   {
     lane: "RENDER",
     title: "지면 재현 대기",
-    status: "QUEUED",
+    status: "02 RENDER",
     detail: "상품과 surface metadata 기준으로 실제 매체 레이아웃에 맞춰 렌더링합니다.",
     tone: "queued",
   },
   {
     lane: "QA",
     title: "검수 판정 필요",
-    status: "CHECK",
-    detail: "픽셀 매칭, CTA 노출, 소재 비율, 실패 플래그를 한 번 더 대조합니다.",
+    status: "03 QA HOLD",
+    detail: "보존 전에 픽셀 매칭, CTA 노출, 소재 비율, 실패 플래그를 한 번 더 대조합니다.",
     tone: "check",
   },
   {
     lane: "ARCHIVE",
     title: "증빙 보존",
-    status: "LOCK",
+    status: "04 LOCK",
     detail: "삭제보다 보존과 재요청을 우선해 결과 이력을 감사 추적으로 남깁니다.",
     tone: "lock",
   },
@@ -225,8 +225,8 @@ const homeActionCards = [
     tone: "primary",
   },
   {
-    title: "렌더 결과",
-    description: "완료, 실패, 처리중 렌더 이력을 확인합니다.",
+    title: "렌더 검수",
+    description: "완료, 실패, 처리중 렌더를 보존 전 기준으로 확인합니다.",
     targetId: "result-review",
     tone: "default",
   },
@@ -520,14 +520,14 @@ export default function Home() {
                 <em>요청/처리/완료 이력</em>
               </article>
               <article>
-                <span>렌더 통과 / 실패</span>
+                <span>렌더 QA 통과 / 실패</span>
                 <strong>{dashboardStats.completed} / {dashboardStats.failed}</strong>
-                <em>결과 검수 상태</em>
+                <em>보존 전 판정 상태</em>
               </article>
               <article>
-                <span>QA 플래그</span>
+                <span>QA 우선순위</span>
                 <strong>{dashboardStats.reviewNeeded}</strong>
-                <em>품질 플래그 또는 실패 포함</em>
+                <em>플래그, 실패, 재요청 후보</em>
               </article>
             </div>
           </section>
