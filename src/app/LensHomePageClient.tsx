@@ -12,17 +12,17 @@ type CaptureSummaryRecord = {
 };
 
 const primaryNav = [
-  { id: "home", label: "증빙 데스크", targetId: "lens-home" },
-  { id: "studio", label: "원본 접수", targetId: "capture-studio" },
-  { id: "review", label: "렌더 검수", targetId: "result-review" },
-  { id: "campaigns", label: "캠페인 증빙", targetId: "campaign-review" },
-  { id: "assets", label: "원본 소재", targetId: "asset-library" },
-  { id: "coverage", label: "지면 보존", targetId: "coverage-matrix" },
+  { id: "home", label: "증빙", targetId: "lens-home" },
+  { id: "studio", label: "접수", targetId: "capture-studio" },
+  { id: "review", label: "검수", targetId: "result-review" },
+  { id: "campaigns", label: "캠페인", targetId: "campaign-review" },
+  { id: "assets", label: "소재", targetId: "asset-library" },
+  { id: "coverage", label: "보존", targetId: "coverage-matrix" },
 ] satisfies Array<{ id: PrimaryNavId; label: string; targetId: string }>;
 
 const viewLabels: Record<PrimaryNavId, { title: string; status: string }> = {
-  home: { title: "AdMate Lens", status: "증빙 큐" },
-  studio: { title: "원본 접수", status: "소재 접수" },
+  home: { title: "AdMate Lens", status: "QA 큐" },
+  studio: { title: "원본 접수", status: "접수 대기" },
   review: { title: "렌더 검수", status: "QA 판정" },
   campaigns: { title: "캠페인 증빙", status: "증빙 묶음" },
   assets: { title: "원본 소재", status: "소재 원본" },
@@ -211,10 +211,10 @@ const inspectionMarkers = [
 ] as const;
 
 const kpiCards = [
-  { label: "공개 캡처 타입", value: "27", meta: "YouTube, Demand Gen, GDN, Naver, Kakao" },
-  { label: "국내 모바일 지면", value: "8", meta: "Naver 4종 + Kakao 4종" },
-  { label: "레거시 제외", value: "2", meta: "Display, Overlay" },
-  { label: "삭제 정책", value: "Off", meta: "UI 기본 비활성" },
+  { label: "캡처 타입", value: "27", meta: "YouTube, Demand Gen, GDN, Naver, Kakao" },
+  { label: "MO 지면", value: "8", meta: "Naver 4종 + Kakao 4종" },
+  { label: "제외 지면", value: "2", meta: "Display, Overlay" },
+  { label: "삭제 잠금", value: "Off", meta: "UI 기본 비활성" },
 ];
 
 const homeActionCards = [
@@ -237,7 +237,7 @@ const homeActionCards = [
     tone: "warning",
   },
   {
-    title: "Surface Archive",
+    title: "지면 보존",
     description: "공개/제외 지면과 증빙 보존 범위를 대조합니다.",
     targetId: "coverage-matrix",
     tone: "default",
@@ -246,7 +246,7 @@ const homeActionCards = [
 
 const externalLinks = [
   {
-    title: "접근 요청",
+    title: "Sentinel 요청",
     href: "https://sentinel.admate.ai.kr/access-request",
     description: "권한과 운영 콘솔 접근은 Sentinel에서 요청합니다.",
   },
@@ -369,7 +369,7 @@ export default function Home() {
                 AdMate Lens
               </h1>
               <p className="text-xs leading-tight text-[var(--color-text-muted)]">
-                Capture Automation
+                Evidence QA Desk
               </p>
             </div>
           </div>
@@ -389,17 +389,17 @@ export default function Home() {
           </nav>
 
           <div className="studio-sidebar-panel">
-            <p className="studio-eyebrow">Evidence Standard</p>
+            <p className="studio-eyebrow">QA 기준</p>
             <div className="studio-sidebar-metric">
-              <span>Queue</span>
+              <span>큐</span>
               <strong>검수 필요 우선</strong>
             </div>
             <div className="studio-sidebar-metric">
-              <span>Evidence</span>
+              <span>증빙</span>
               <strong>Source/Render 대조</strong>
             </div>
             <div className="studio-sidebar-metric">
-              <span>Archive</span>
+              <span>보존</span>
               <strong>삭제보다 보존</strong>
             </div>
           </div>
@@ -421,7 +421,7 @@ export default function Home() {
             <div className="flex items-center gap-2">
               <span className="badge badge-completed">
                 <span className="w-1.5 h-1.5 rounded-full bg-[var(--color-success)]" />
-                엔진 정상
+                렌더 정상
               </span>
               <span className="badge badge-processing">{viewLabels[activeNav].status}</span>
               <button
@@ -444,14 +444,14 @@ export default function Home() {
                   <p className="ops-kicker">lens.admate.ai.kr · Evidence Operations</p>
                   <h2>AdMate Lens</h2>
                   <p>
-                    원본, 렌더, QA 판정, 보존 이력을 한 화면에서 대조하는 광고 증빙 워크벤치입니다.
-                    캡처 요청은 큐에 올리고, 운영자는 품질 플래그와 커버리지 공백을 먼저 판정합니다.
+                    원본, 렌더, QA 판정, 보존 이력을 한 화면에서 대조하는 광고 증빙 QA 워크벤치입니다.
+                    캡처 요청은 큐에 올리고, 운영자는 품질 플래그와 보존 공백을 먼저 판정합니다.
                   </p>
                 </div>
 
                 <div className="lens-hero-stamp" aria-label="현재 운영 모드">
                   <span>Evidence Desk</span>
-                  <strong>QA-LOCKED</strong>
+                  <strong>QA GATE</strong>
                 </div>
               </div>
 
@@ -506,16 +506,16 @@ export default function Home() {
 
             <div className="lens-home-status" aria-label="운영 상태 요약">
               <div className="lens-status-header">
-                <p className="studio-eyebrow">Evidence Rail</p>
-                <strong>최근 30건 증빙 큐</strong>
+                <p className="studio-eyebrow">QA Rail</p>
+                <strong>최근 30건 QA 큐</strong>
               </div>
               <article>
-                <span>증빙 지면 커버리지</span>
+                <span>지면 커버리지</span>
                 <strong>27</strong>
                 <em>YouTube, Demand Gen, GDN, Naver, Kakao</em>
               </article>
               <article>
-                <span>접수 큐</span>
+                <span>접수</span>
                 <strong>{dashboardStats.recent}</strong>
                 <em>요청/처리/완료 이력</em>
               </article>
