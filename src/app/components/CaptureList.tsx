@@ -596,7 +596,7 @@ export default function CaptureList({ refreshTrigger }: CaptureListProps) {
   };
 
   return (
-    <div className="animate-fade-in delay-200">
+    <div className="lens-capture-list animate-fade-in delay-200">
       {authExpiredMessage && (
         <div className="mb-4 rounded-xl border border-[rgba(239,68,68,0.22)] bg-[rgba(239,68,68,0.08)] p-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -624,7 +624,7 @@ export default function CaptureList({ refreshTrigger }: CaptureListProps) {
         <div className="flex items-center gap-3">
           <div className="ops-icon-tile">이력</div>
           <div>
-            <h2 className="ops-section-title">캡처 이력</h2>
+            <h2 className="ops-section-title">증빙 캡처 이력</h2>
             <p className="text-xs text-[var(--color-text-muted)]">
               총 {statusCounts.all || 0}건
               {captures.some((c) => c.status === "processing") && (
@@ -690,7 +690,7 @@ export default function CaptureList({ refreshTrigger }: CaptureListProps) {
       {/* 렌더링 현황 + 최신 결과 */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
         <div className="glass-card-static p-4 md:col-span-1">
-          <p className="text-xs text-[var(--color-text-muted)] mb-1">렌더링 현황</p>
+          <p className="text-xs text-[var(--color-text-muted)] mb-1">작업 큐</p>
           <p className="text-2xl font-bold text-[var(--color-text-primary)]">{activeCount}</p>
           <p className="text-xs text-[var(--color-text-secondary)] mt-1">
             {activeCount > 0 ? "진행 중 작업이 있습니다" : "대기/진행 작업 없음"}
@@ -700,7 +700,7 @@ export default function CaptureList({ refreshTrigger }: CaptureListProps) {
           </p>
         </div>
         <div className="glass-card-static p-4 md:col-span-2">
-          <p className="text-xs text-[var(--color-text-muted)] mb-2">최신 렌더링 결과</p>
+          <p className="text-xs text-[var(--color-text-muted)] mb-2">최신 증빙 이미지</p>
           {latestCompleted?.placement_image_url ? (
             <div className="flex items-center gap-3">
               <img
@@ -725,7 +725,7 @@ export default function CaptureList({ refreshTrigger }: CaptureListProps) {
               </a>
             </div>
           ) : (
-            <p className="text-xs text-[var(--color-text-muted)]">아직 완료된 렌더링 결과가 없습니다.</p>
+            <p className="text-xs text-[var(--color-text-muted)]">아직 완료된 증빙 이미지가 없습니다.</p>
           )}
         </div>
       </div>

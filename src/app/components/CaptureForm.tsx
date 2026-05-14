@@ -1517,7 +1517,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
     <>
       <form
         onSubmit={handleSubmit}
-        className="glass-card-static p-6 animate-fade-in"
+        className="glass-card-static lens-capture-form p-6 animate-fade-in"
       >
         {authExpiredMessage && (
           <div className="mb-5 rounded-xl border border-[rgba(239,68,68,0.22)] bg-[rgba(239,68,68,0.08)] p-4">
@@ -1549,10 +1549,10 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
               className="ops-section-title"
               style={{ color: "var(--color-text-primary)" }}
             >
-              새 캡처 요청
+              새 증빙 캡처 접수
             </h2>
             <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-              광고 게재면과 소재를 선택하세요
+              매체 지면, 소재, 캡처 조건을 한 번에 대조하세요
             </p>
           </div>
         </div>

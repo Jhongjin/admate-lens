@@ -55,16 +55,16 @@ export default function LoginShell({ nextPath }: LoginShellProps) {
   };
 
   return (
-    <main className="min-h-screen bg-[var(--color-bg-primary)] px-4 py-10 text-[var(--color-text-primary)]">
+    <main className="lens-login-shell min-h-screen bg-[var(--color-bg-primary)] px-4 py-10 text-[var(--color-text-primary)]">
       <div className="mx-auto flex min-h-[calc(100vh-5rem)] w-full max-w-5xl items-center">
         <section className="grid w-full gap-6 lg:grid-cols-[minmax(0,1.1fr)_420px]">
-          <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-secondary)] p-8 lg:p-10">
+          <div className="lens-login-brief rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-secondary)] p-8 lg:p-10">
             <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--color-text-muted)]">
               lens.admate.ai.kr
             </p>
-            <h1 className="mt-4 text-3xl font-semibold tracking-normal">AdMate Lens 로그인</h1>
+            <h1 className="mt-4 text-3xl font-semibold tracking-normal">AdMate Lens 증빙 데스크</h1>
             <p className="mt-3 max-w-xl text-sm leading-6 text-[var(--color-text-secondary)]">
-              광고 캡처 기능을 이용하려면 AdMate 계정으로 로그인하세요.
+              광고 캡처와 결과 검수 기록은 보호된 운영 자료입니다. AdMate 계정으로 로그인한 뒤 지면별 증빙 워크벤치로 이동합니다.
             </p>
             <p className="mt-2 text-sm leading-6 text-[var(--color-text-muted)]">
               로그인 후 현재 보려던 Lens 화면으로 돌아갑니다.
@@ -101,10 +101,10 @@ export default function LoginShell({ nextPath }: LoginShellProps) {
             </div>
           </div>
 
-          <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-secondary)] p-6 lg:p-8">
+          <div className="lens-login-card rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-secondary)] p-6 lg:p-8">
             <div className="mb-6">
               <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--color-text-muted)]">
-                Product Login
+                Evidence Login
               </p>
               <h2 className="mt-2 text-xl font-semibold text-[var(--color-text-primary)]">
                 AdMate 계정으로 계속
