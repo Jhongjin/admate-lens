@@ -1591,7 +1591,7 @@ button.lens-action-card {
 }
 
 .lens-home-copy::after {
-  content: "EVIDENCE CONTACT SHEET";
+  content: "증빙 컨택트 시트";
   position: absolute;
   right: 18px;
   bottom: 16px;
@@ -2593,6 +2593,76 @@ button.lens-action-card {
   color: #746a5b;
 }
 
+.lens-archive-trail {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0;
+  margin-top: 10px;
+  border: 1px solid var(--lens-rule);
+  border-radius: 8px;
+  background:
+    linear-gradient(90deg, rgba(15, 118, 110, 0.08), transparent 48%),
+    #fffaf0;
+  overflow: hidden;
+}
+
+.lens-archive-trail article {
+  position: relative;
+  min-height: 78px;
+  border-right: 1px solid #e5dccd;
+  padding: 10px 12px;
+}
+
+.lens-archive-trail article:last-child {
+  border-right: 0;
+}
+
+.lens-archive-trail article::after {
+  content: "";
+  position: absolute;
+  right: -5px;
+  top: 50%;
+  z-index: 1;
+  width: 10px;
+  height: 10px;
+  border-top: 1px solid #cfc4b0;
+  border-right: 1px solid #cfc4b0;
+  background: #fffaf0;
+  transform: translateY(-50%) rotate(45deg);
+}
+
+.lens-archive-trail article:last-child::after {
+  display: none;
+}
+
+.lens-archive-trail span,
+.lens-archive-trail strong,
+.lens-archive-trail em {
+  display: block;
+}
+
+.lens-archive-trail span {
+  color: var(--lens-teal);
+  font-size: 10px;
+  font-weight: 950;
+}
+
+.lens-archive-trail strong {
+  margin-top: 4px;
+  color: var(--lens-ink);
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.lens-archive-trail em {
+  margin-top: 3px;
+  color: #746a5b;
+  font-size: 11px;
+  font-style: normal;
+  line-height: 1.35;
+  word-break: keep-all;
+}
+
 .lens-home-button {
   border-color: var(--lens-rule);
   background: var(--lens-canvas);
@@ -2971,7 +3041,10 @@ button.lens-action-card {
   font-size: 9px;
   font-style: normal;
   font-weight: 950;
-  white-space: nowrap;
+  line-height: 1.25;
+  text-align: right;
+  white-space: normal;
+  word-break: keep-all;
 }
 
 .lens-proof-card strong {
@@ -3090,6 +3163,18 @@ button.lens-action-card {
 }
 
 @media (max-width: 980px) {
+  .lens-archive-trail {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .lens-archive-trail article:nth-child(2n) {
+    border-right: 0;
+  }
+
+  .lens-archive-trail article:nth-child(-n + 2) {
+    border-bottom: 1px solid #e5dccd;
+  }
+
   .lens-proof-queue-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -3106,8 +3191,24 @@ button.lens-action-card {
   }
 
   .lens-proof-queue-grid,
+  .lens-archive-trail,
   .lens-login-proof-grid {
     grid-template-columns: 1fr;
+  }
+
+  .lens-archive-trail article,
+  .lens-archive-trail article:nth-child(2n),
+  .lens-archive-trail article:nth-child(-n + 2) {
+    border-right: 0;
+    border-bottom: 1px solid #e5dccd;
+  }
+
+  .lens-archive-trail article::after {
+    display: none;
+  }
+
+  .lens-archive-trail article:last-child {
+    border-bottom: 0;
   }
 
   .lens-proof-card {

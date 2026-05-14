@@ -176,31 +176,38 @@ const proofQueueRows = [
   {
     lane: "SRC",
     title: "소재 원본 접수",
-    status: "01 INTAKE",
+    status: "01 원본 접수",
     detail: "이미지, 영상, 로고, 랜딩 URL을 캡처 요청의 증거 원본으로 확인합니다.",
     tone: "ready",
   },
   {
     lane: "RDR",
     title: "지면 렌더 대기",
-    status: "02 RENDER",
+    status: "02 렌더 증빙",
     detail: "상품과 surface metadata 기준으로 실제 매체 레이아웃에 맞춰 렌더링합니다.",
     tone: "queued",
   },
   {
     lane: "QA",
     title: "보존 전 QA 판정",
-    status: "03 QA GATE",
+    status: "03 QA 게이트",
     detail: "보존 전에 픽셀 매칭, CTA 노출, 소재 비율, 실패 플래그를 한 번 더 대조합니다.",
     tone: "check",
   },
   {
     lane: "ARC",
     title: "증빙 보존",
-    status: "04 LOCK",
+    status: "04 보존 이력",
     detail: "삭제보다 보존과 재요청을 우선해 결과 이력을 감사 추적으로 남깁니다.",
     tone: "lock",
   },
+] as const;
+
+const archiveTrailRows = [
+  { step: "접수", label: "원본 접수", detail: "URL, 소재, 랜딩 문안" },
+  { step: "렌더", label: "렌더 증빙", detail: "지면 비율과 화면 상태" },
+  { step: "판정", label: "QA 게이트", detail: "픽셀, CTA, 실패 플래그" },
+  { step: "보존", label: "보존 이력", detail: "감사 추적과 재요청 근거" },
 ] as const;
 
 const inspectionMarkers = [
@@ -369,7 +376,7 @@ export default function Home() {
                 AdMate Lens
               </h1>
               <p className="text-xs leading-tight text-[var(--color-text-muted)]">
-                Evidence QA Desk
+                증빙 QA 데스크
               </p>
             </div>
           </div>
@@ -396,7 +403,7 @@ export default function Home() {
             </div>
             <div className="studio-sidebar-metric">
               <span>증빙</span>
-              <strong>Source/Render 대조</strong>
+              <strong>원본/렌더 대조</strong>
             </div>
             <div className="studio-sidebar-metric">
               <span>보존</span>
@@ -450,8 +457,8 @@ export default function Home() {
                 </div>
 
                 <div className="lens-hero-stamp" aria-label="현재 운영 모드">
-                  <span>Evidence Desk</span>
-                  <strong>QA GATE</strong>
+                  <span>증빙 데스크</span>
+                  <strong>QA 게이트</strong>
                 </div>
               </div>
 
@@ -486,6 +493,16 @@ export default function Home() {
                 ))}
               </div>
 
+              <div className="lens-archive-trail" aria-label="원본 접수부터 보존 이력까지의 증거선">
+                {archiveTrailRows.map((row) => (
+                  <article key={row.step}>
+                    <span>{row.step}</span>
+                    <strong>{row.label}</strong>
+                    <em>{row.detail}</em>
+                  </article>
+                ))}
+              </div>
+
               <div className="lens-home-actions" aria-label="주요 작업">
                 <button
                   type="button"
@@ -506,7 +523,7 @@ export default function Home() {
 
             <div className="lens-home-status" aria-label="운영 상태 요약">
               <div className="lens-status-header">
-                <p className="studio-eyebrow">QA Rail</p>
+                <p className="studio-eyebrow">QA 레일</p>
                 <strong>최근 30건 QA 큐</strong>
               </div>
               <article>
@@ -535,10 +552,10 @@ export default function Home() {
           <section className="lens-proof-queue" aria-label="Lens 증빙 처리 큐">
             <div className="lens-proof-queue-header">
               <div>
-                <p className="studio-eyebrow">Evidence Queue</p>
+                <p className="studio-eyebrow">증빙 큐</p>
                 <h3>원본에서 보존까지 같은 증거선으로 검수</h3>
               </div>
-              <span>Source to Archive</span>
+              <span>원본-보존</span>
             </div>
             <div className="lens-proof-queue-grid">
               {proofQueueRows.map((row) => (
@@ -556,7 +573,7 @@ export default function Home() {
 
           <section className="lens-inspection-strip" aria-label="AdMate Lens 증빙 운영 레일">
             <div>
-              <p className="studio-eyebrow">Source / Render / QA / Archive</p>
+              <p className="studio-eyebrow">원본 / 렌더 / QA / 보존</p>
               <strong>생성된 이미지를 보존하기 전에 지면 재현, 소재 비율, CTA 노출을 먼저 판정합니다.</strong>
             </div>
             <div className="lens-inspection-board" aria-label="QA 판정 항목">
@@ -616,7 +633,7 @@ export default function Home() {
 
           <section className="lens-quality-panel" aria-label="AdMate Lens 품질 기준">
             <div>
-              <p className="studio-eyebrow">QA Standard</p>
+              <p className="studio-eyebrow">QA 기준</p>
               <h3>캡처 결과물과 운영자 UI의 경계</h3>
             </div>
             <ul>
@@ -649,7 +666,7 @@ export default function Home() {
               </span>
               <span className="studio-hero-stat">
                 <strong>0</strong>
-                <span>Archive 삭제 허용</span>
+                <span>삭제 허용</span>
               </span>
             </div>
           </section>
@@ -730,7 +747,7 @@ export default function Home() {
 
               <div className="studio-panel-header compact">
                 <p className="studio-eyebrow">제외 지면</p>
-                <h3>Archive 제외</h3>
+                <h3>보존 제외</h3>
               </div>
               <div className="studio-chip-row">
                 <span className="studio-chip muted">Audio</span>
