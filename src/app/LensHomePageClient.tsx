@@ -156,6 +156,22 @@ const studioSteps = [
   "결과 검수",
 ];
 
+const evidenceWorkflow = [
+  { code: "01", label: "접수", detail: "상품/소재 입력" },
+  { code: "02", label: "합성", detail: "매체 지면 재현" },
+  { code: "03", label: "검수", detail: "픽셀/CTA 확인" },
+  { code: "04", label: "보존", detail: "증빙 이력 유지" },
+] as const;
+
+const contactSheetSlots = [
+  { code: "YT", surface: "In-stream", ratio: "16:9", status: "verified" },
+  { code: "DG", surface: "Shorts", ratio: "9:16", status: "queued" },
+  { code: "GDN", surface: "Display", ratio: "300x250", status: "verified" },
+  { code: "NV", surface: "Mobile", ratio: "MO", status: "review" },
+  { code: "KK", surface: "Native", ratio: "Feed", status: "verified" },
+  { code: "QA", surface: "Flags", ratio: "Audit", status: "hold" },
+] as const;
+
 const kpiCards = [
   { label: "공개 캡처 타입", value: "27", meta: "YouTube, Demand Gen, GDN, Naver, Kakao" },
   { label: "국내 모바일 지면", value: "8", meta: "Naver 4종 + Kakao 4종" },
@@ -385,13 +401,53 @@ export default function Home() {
         <main className="ops-content studio-content">
           <section id="lens-home" className="lens-home-hub" aria-label="AdMate Lens 캡처 홈">
             <div className="lens-home-copy">
-              <p className="ops-kicker">lens.admate.ai.kr · Capture Home</p>
-              <h2>AdMate Lens</h2>
-              <p>
-                광고 게재 화면과 보고서 증빙 이미지를 자동 생성하는 캡처 자동화 도구입니다.
-                Lens는 캡처/증빙 생성 품질과 지면 커버리지를 담당하고, 접근 권한과 운영 기준은
-                Sentinel/Openclaw 흐름을 따릅니다.
-              </p>
+              <div className="lens-home-copy-grid">
+                <div>
+                  <p className="ops-kicker">lens.admate.ai.kr · Evidence Operations</p>
+                  <h2>AdMate Lens</h2>
+                  <p>
+                    지면, 소재, 랜딩, 검수 플래그를 한 화면에서 대조하는 증빙 운영 데스크입니다.
+                    캡처 요청은 바로 생성하고, 운영자는 품질 신호와 커버리지 공백을 먼저 확인합니다.
+                  </p>
+                </div>
+
+                <div className="lens-hero-stamp" aria-label="현재 운영 모드">
+                  <span>Lens Desk</span>
+                  <strong>QA-READY</strong>
+                </div>
+              </div>
+
+              <div className="lens-contact-sheet" aria-label="캡처 지면 컨택트 시트">
+                {contactSheetSlots.map((slot, index) => (
+                  <article className={`lens-contact-frame ${slot.status}`} key={`${slot.code}-${slot.surface}`}>
+                    <div className="lens-frame-preview" aria-hidden="true">
+                      <span className="lens-frame-timecode">CAP-{String(index + 1).padStart(2, "0")}</span>
+                      <span className="lens-frame-bar" />
+                      <span className="lens-frame-slot-label">AD</span>
+                      <span className="lens-frame-block wide" />
+                      <span className="lens-frame-block" />
+                      <span className="lens-frame-cta" />
+                      <span className="lens-frame-dot" />
+                    </div>
+                    <div className="lens-frame-caption">
+                      <strong>{slot.code}</strong>
+                      <span>{slot.surface}</span>
+                      <em>{slot.ratio}</em>
+                    </div>
+                  </article>
+                ))}
+              </div>
+
+              <div className="lens-evidence-flow" aria-label="증빙 처리 흐름">
+                {evidenceWorkflow.map((step) => (
+                  <article key={step.code}>
+                    <span>{step.code}</span>
+                    <strong>{step.label}</strong>
+                    <em>{step.detail}</em>
+                  </article>
+                ))}
+              </div>
+
               <div className="lens-home-actions" aria-label="주요 작업">
                 <button
                   type="button"
@@ -411,6 +467,10 @@ export default function Home() {
             </div>
 
             <div className="lens-home-status" aria-label="운영 상태 요약">
+              <div className="lens-status-header">
+                <p className="studio-eyebrow">Live Evidence Rail</p>
+                <strong>최근 30건 기준</strong>
+              </div>
               <article>
                 <span>공개 캡처 타입</span>
                 <strong>27</strong>
@@ -419,7 +479,7 @@ export default function Home() {
               <article>
                 <span>최근 캡처</span>
                 <strong>{dashboardStats.recent}</strong>
-                <em>최근 30건 기준</em>
+                <em>요청/처리/완료 이력</em>
               </article>
               <article>
                 <span>완료 / 실패</span>
@@ -431,6 +491,20 @@ export default function Home() {
                 <strong>{dashboardStats.reviewNeeded}</strong>
                 <em>품질 플래그 또는 실패 포함</em>
               </article>
+            </div>
+          </section>
+
+          <section className="lens-inspection-strip" aria-label="AdMate Lens 증빙 운영 레일">
+            <div>
+              <p className="studio-eyebrow">Inspection Board</p>
+              <strong>생성된 이미지를 저장하기 전에 지면 재현, 소재 비율, CTA 노출을 먼저 판정합니다.</strong>
+            </div>
+            <div className="lens-strip-rail" aria-hidden="true">
+              <span />
+              <span />
+              <span />
+              <span />
+              <span />
             </div>
           </section>
 
@@ -483,13 +557,14 @@ export default function Home() {
 
           <section id="capture-studio" className="studio-hero">
             <div>
-              <p className="ops-kicker">Capture Studio · Powered by Openclaw Engine</p>
+              <p className="ops-kicker">Capture Studio · Evidence Intake Desk</p>
               <h2 className="studio-title">
-                캡처 요청 생성
+                캡처 요청 생성 및 증빙 검수 워크벤치
               </h2>
               <p className="studio-subtitle">
-                기존 작업실은 root 안의 주요 작업 섹션으로 유지합니다. 상품, 지면,
-                소재 정보를 입력하면 결과 검수 영역에서 증빙 이미지를 확인할 수 있습니다.
+                상품, 지면, 소재 정보를 접수한 뒤 실제 매체 화면과 맞는지 확인하는
+                QA 책상 흐름으로 배치했습니다. 생성 폼은 그대로 유지하고, 주변 정보는
+                운영자가 캡처 품질과 커버리지를 먼저 판단하도록 구성합니다.
               </p>
             </div>
             <div className="studio-hero-actions" aria-label="작업 상태">
