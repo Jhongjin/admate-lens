@@ -15,20 +15,32 @@ type LoginResponse = {
 
 const loginProofLanes = [
   {
-    label: "SOURCE",
+    label: "원본",
     title: "원본 접수",
     detail: "소재 URL과 랜딩을 보호된 세션에서만 엽니다.",
   },
   {
-    label: "RENDER",
-    title: "지면 재현",
+    label: "렌더",
+    title: "렌더 증빙",
     detail: "매체 화면에 맞춘 렌더 결과를 로그인 후 확인합니다.",
   },
   {
     label: "QA",
-    title: "검수 판정",
+    title: "QA 게이트",
     detail: "품질 플래그와 실패 사유는 계정 권한으로 조회합니다.",
   },
+  {
+    label: "보존",
+    title: "보존 이력",
+    detail: "승인된 결과만 감사 추적과 재요청 근거로 남깁니다.",
+  },
+] as const;
+
+const loginGateChecks = [
+  "원본 접수 권한",
+  "렌더 증빙 조회",
+  "QA 판정 기록",
+  "보존 이력 접근",
 ] as const;
 
 export default function LoginShell({ nextPath }: LoginShellProps) {
@@ -78,7 +90,7 @@ export default function LoginShell({ nextPath }: LoginShellProps) {
         <section className="grid w-full gap-6 lg:grid-cols-[minmax(0,1.1fr)_420px]">
           <div className="lens-login-brief rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-secondary)] p-8 lg:p-10">
             <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--color-text-muted)]">
-              lens.admate.ai.kr · Evidence Gate
+              lens.admate.ai.kr · 증빙 게이트
             </p>
             <h1 className="mt-4 text-3xl font-semibold tracking-normal">AdMate Lens 증빙 데스크</h1>
             <p className="mt-3 max-w-xl text-sm leading-6 text-[var(--color-text-secondary)]">
@@ -105,18 +117,27 @@ export default function LoginShell({ nextPath }: LoginShellProps) {
                 </article>
               ))}
             </div>
+
+            <div className="lens-login-audit-strip" aria-label="로그인 후 열리는 Lens 증빙 권한 범위">
+              {loginGateChecks.map((check, index) => (
+                <span key={check}>
+                  <em>{String(index + 1).padStart(2, "0")}</em>
+                  {check}
+                </span>
+              ))}
+            </div>
           </div>
 
           <div className="lens-login-card rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-secondary)] p-6 lg:p-8">
             <div className="mb-6">
               <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--color-text-muted)]">
-                Evidence Gate
+                증빙 게이트
               </p>
               <h2 className="mt-2 text-xl font-semibold text-[var(--color-text-primary)]">
                 증빙 큐 열기
               </h2>
               <p className="mt-2 text-xs leading-5 text-[var(--color-text-muted)]">
-                인증된 계정만 원본 접수, 렌더 검수, 보존 이력 확인을 진행할 수 있습니다.
+                인증된 계정만 원본 접수, 렌더 증빙, QA 게이트, 보존 이력 확인을 진행할 수 있습니다.
               </p>
             </div>
 
