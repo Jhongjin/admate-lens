@@ -13,6 +13,24 @@ type LoginResponse = {
   error?: string;
 };
 
+const loginProofLanes = [
+  {
+    label: "SOURCE",
+    title: "원본 접수",
+    detail: "소재 URL과 랜딩을 보호된 세션에서만 엽니다.",
+  },
+  {
+    label: "RENDER",
+    title: "지면 재현",
+    detail: "매체 화면에 맞춘 렌더 결과를 로그인 후 확인합니다.",
+  },
+  {
+    label: "QA",
+    title: "검수 판정",
+    detail: "품질 플래그와 실패 사유는 계정 권한으로 조회합니다.",
+  },
+] as const;
+
 export default function LoginShell({ nextPath }: LoginShellProps) {
   const router = useRouter();
   const [email, setEmail] = useState("");
@@ -60,44 +78,32 @@ export default function LoginShell({ nextPath }: LoginShellProps) {
         <section className="grid w-full gap-6 lg:grid-cols-[minmax(0,1.1fr)_420px]">
           <div className="lens-login-brief rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-secondary)] p-8 lg:p-10">
             <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--color-text-muted)]">
-              lens.admate.ai.kr
+              lens.admate.ai.kr · Evidence Gate
             </p>
             <h1 className="mt-4 text-3xl font-semibold tracking-normal">AdMate Lens 증빙 데스크</h1>
             <p className="mt-3 max-w-xl text-sm leading-6 text-[var(--color-text-secondary)]">
-              광고 캡처와 결과 검수 기록은 보호된 운영 자료입니다. AdMate 계정으로 로그인한 뒤 지면별 증빙 워크벤치로 이동합니다.
+              광고 캡처 원본, 렌더 결과, QA 판정, 보존 기록은 보호된 운영 증거입니다.
+              AdMate 계정으로 로그인한 뒤 지면별 증빙 워크벤치로 이동합니다.
             </p>
             <p className="mt-2 text-sm leading-6 text-[var(--color-text-muted)]">
-              로그인 후 현재 보려던 Lens 화면으로 돌아갑니다.
+              로그인 후 현재 보려던 Lens 화면으로 돌아갑니다. 세션 없이 캡처 API나 결과 목록은 호출하지 않습니다.
             </p>
 
-            <div className="mt-8 grid gap-4 sm:grid-cols-3">
-              <article className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-primary)] p-4">
-                <p className="text-xs font-semibold text-[var(--color-text-muted)]">보호 범위</p>
-                <strong className="mt-2 block text-sm text-[var(--color-text-primary)]">
-                  Capture Form
-                </strong>
-                <p className="mt-1 text-xs leading-5 text-[var(--color-text-secondary)]">
-                  요청 생성과 업로드는 세션이 있어야 동작합니다.
-                </p>
-              </article>
-              <article className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-primary)] p-4">
-                <p className="text-xs font-semibold text-[var(--color-text-muted)]">결과 검수</p>
-                <strong className="mt-2 block text-sm text-[var(--color-text-primary)]">
-                  Preview Workspace
-                </strong>
-                <p className="mt-1 text-xs leading-5 text-[var(--color-text-secondary)]">
-                  결과 목록, 메타데이터, 원본 링크는 로그인 후 확인합니다.
-                </p>
-              </article>
-              <article className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-primary)] p-4">
-                <p className="text-xs font-semibold text-[var(--color-text-muted)]">권한 요청</p>
-                <strong className="mt-2 block text-sm text-[var(--color-text-primary)]">
-                  Sentinel Access
-                </strong>
-                <p className="mt-1 text-xs leading-5 text-[var(--color-text-secondary)]">
-                  접근 권한이 없다면 외부 요청 흐름으로 이어집니다.
-                </p>
-              </article>
+            <div className="lens-login-rail" aria-hidden="true">
+              <span />
+              <span />
+              <span />
+              <span />
+            </div>
+
+            <div className="lens-login-proof-grid">
+              {loginProofLanes.map((lane) => (
+                <article className="lens-login-proof-card" key={lane.label}>
+                  <p>{lane.label}</p>
+                  <strong>{lane.title}</strong>
+                  <span>{lane.detail}</span>
+                </article>
+              ))}
             </div>
           </div>
 
@@ -107,8 +113,11 @@ export default function LoginShell({ nextPath }: LoginShellProps) {
                 Evidence Login
               </p>
               <h2 className="mt-2 text-xl font-semibold text-[var(--color-text-primary)]">
-                AdMate 계정으로 계속
+                증빙 큐 열기
               </h2>
+              <p className="mt-2 text-xs leading-5 text-[var(--color-text-muted)]">
+                인증된 계정만 원본 접수, 렌더 검수, 보존 이력 확인을 진행할 수 있습니다.
+              </p>
             </div>
 
             <form className="space-y-4" onSubmit={handleSubmit}>
@@ -161,10 +170,10 @@ export default function LoginShell({ nextPath }: LoginShellProps) {
 
             <div className="mt-6 space-y-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-primary)] p-4">
               <p className="text-sm font-medium text-[var(--color-text-primary)]">
-                접근 권한이 없다면 이용 신청
+                접근 권한이 없다면 Sentinel 요청
               </p>
               <p className="text-xs leading-5 text-[var(--color-text-secondary)]">
-                Lens 접근 권한은 Sentinel access-request 흐름에서 관리합니다.
+                Lens 증빙 워크벤치 권한은 Sentinel access-request 흐름에서 관리합니다.
               </p>
               <a
                 href="https://sentinel.admate.ai.kr/access-request"

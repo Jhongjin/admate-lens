@@ -12,21 +12,21 @@ type CaptureSummaryRecord = {
 };
 
 const primaryNav = [
-  { id: "home", label: "캡처 홈", targetId: "lens-home" },
-  { id: "studio", label: "캡처 작업실", targetId: "capture-studio" },
-  { id: "review", label: "결과 검수", targetId: "result-review" },
-  { id: "campaigns", label: "캠페인", targetId: "campaign-review" },
-  { id: "assets", label: "소재 라이브러리", targetId: "asset-library" },
-  { id: "coverage", label: "커버리지", targetId: "coverage-matrix" },
+  { id: "home", label: "증빙 데스크", targetId: "lens-home" },
+  { id: "studio", label: "원본 접수", targetId: "capture-studio" },
+  { id: "review", label: "렌더 검수", targetId: "result-review" },
+  { id: "campaigns", label: "캠페인 증빙", targetId: "campaign-review" },
+  { id: "assets", label: "원본 소재", targetId: "asset-library" },
+  { id: "coverage", label: "지면 보존", targetId: "coverage-matrix" },
 ] satisfies Array<{ id: PrimaryNavId; label: string; targetId: string }>;
 
 const viewLabels: Record<PrimaryNavId, { title: string; status: string }> = {
-  home: { title: "AdMate Lens", status: "캡처 홈" },
-  studio: { title: "캡처 작업실", status: "요청 생성" },
-  review: { title: "결과 검수", status: "결과 확인" },
-  campaigns: { title: "캠페인", status: "검토 시작" },
-  assets: { title: "소재 라이브러리", status: "검토 시작" },
-  coverage: { title: "커버리지", status: "공개 범위" },
+  home: { title: "AdMate Lens", status: "증빙 큐" },
+  studio: { title: "원본 접수", status: "소재 접수" },
+  review: { title: "렌더 검수", status: "QA 판정" },
+  campaigns: { title: "Campaign Evidence", status: "증빙 묶음" },
+  assets: { title: "원본 소재", status: "소재 원본" },
+  coverage: { title: "Surface Archive", status: "보존 범위" },
 };
 
 const campaignReviewRows = [
@@ -157,19 +157,50 @@ const studioSteps = [
 ];
 
 const evidenceWorkflow = [
-  { code: "01", label: "접수", detail: "상품/소재 입력" },
-  { code: "02", label: "합성", detail: "매체 지면 재현" },
-  { code: "03", label: "검수", detail: "픽셀/CTA 확인" },
-  { code: "04", label: "보존", detail: "증빙 이력 유지" },
+  { code: "01", label: "Source", detail: "상품/소재 접수" },
+  { code: "02", label: "Render", detail: "매체 지면 재현" },
+  { code: "03", label: "QA", detail: "픽셀/CTA 판정" },
+  { code: "04", label: "Archive", detail: "증빙 이력 보존" },
 ] as const;
 
 const contactSheetSlots = [
-  { code: "YT", surface: "In-stream", ratio: "16:9", status: "verified" },
-  { code: "DG", surface: "Shorts", ratio: "9:16", status: "queued" },
-  { code: "GDN", surface: "Display", ratio: "300x250", status: "verified" },
-  { code: "NV", surface: "Mobile", ratio: "MO", status: "review" },
-  { code: "KK", surface: "Native", ratio: "Feed", status: "verified" },
-  { code: "QA", surface: "Flags", ratio: "Audit", status: "hold" },
+  { code: "SRC", surface: "Source", ratio: "URL", status: "verified" },
+  { code: "YT", surface: "Render", ratio: "16:9", status: "queued" },
+  { code: "DG", surface: "Shorts QA", ratio: "9:16", status: "review" },
+  { code: "GDN", surface: "Slot Proof", ratio: "300x250", status: "verified" },
+  { code: "MO", surface: "Mobile QA", ratio: "MO", status: "hold" },
+  { code: "ARC", surface: "Archive", ratio: "Audit", status: "verified" },
+] as const;
+
+const proofQueueRows = [
+  {
+    lane: "SOURCE",
+    title: "소재 원본 접수",
+    status: "INTAKE",
+    detail: "이미지, 영상, 로고, 랜딩 URL을 캡처 요청의 증거 원본으로 확인합니다.",
+    tone: "ready",
+  },
+  {
+    lane: "RENDER",
+    title: "지면 재현 대기",
+    status: "QUEUED",
+    detail: "상품과 surface metadata 기준으로 실제 매체 레이아웃에 맞춰 렌더링합니다.",
+    tone: "queued",
+  },
+  {
+    lane: "QA",
+    title: "검수 판정 필요",
+    status: "CHECK",
+    detail: "픽셀 매칭, CTA 노출, 소재 비율, 실패 플래그를 한 번 더 대조합니다.",
+    tone: "check",
+  },
+  {
+    lane: "ARCHIVE",
+    title: "증빙 보존",
+    status: "LOCK",
+    detail: "삭제보다 보존과 재요청을 우선해 결과 이력을 감사 추적으로 남깁니다.",
+    tone: "lock",
+  },
 ] as const;
 
 const kpiCards = [
@@ -181,26 +212,26 @@ const kpiCards = [
 
 const homeActionCards = [
   {
-    title: "새 캡처 만들기",
-    description: "상품, 지면, 소재를 선택해 새 증빙 캡처를 생성합니다.",
+    title: "원본 접수",
+    description: "상품, 지면, 소재 URL을 새 증빙 큐에 올립니다.",
     targetId: "capture-studio",
     tone: "primary",
   },
   {
-    title: "최근 캡처 결과",
-    description: "완료, 실패, 처리중 캡처 이력을 확인합니다.",
+    title: "렌더 결과",
+    description: "완료, 실패, 처리중 렌더 이력을 확인합니다.",
     targetId: "result-review",
     tone: "default",
   },
   {
-    title: "검수 필요 결과",
-    description: "품질 플래그와 실패 사유를 결과 목록에서 확인합니다.",
+    title: "QA 플래그",
+    description: "품질 플래그와 실패 사유를 먼저 판정합니다.",
     targetId: "result-review",
     tone: "warning",
   },
   {
-    title: "지원 지면 커버리지",
-    description: "공개/제외 지면과 상품별 구현 상태를 봅니다.",
+    title: "Surface Archive",
+    description: "공개/제외 지면과 증빙 보존 범위를 대조합니다.",
     targetId: "coverage-matrix",
     tone: "default",
   },
@@ -351,18 +382,18 @@ export default function Home() {
           </nav>
 
           <div className="studio-sidebar-panel">
-            <p className="studio-eyebrow">오늘의 작업 기준</p>
+            <p className="studio-eyebrow">Evidence Standard</p>
             <div className="studio-sidebar-metric">
-              <span>우선순위</span>
-              <strong>캡처 성공률</strong>
+              <span>Queue</span>
+              <strong>검수 필요 우선</strong>
             </div>
             <div className="studio-sidebar-metric">
-              <span>검수 기준</span>
-              <strong>픽셀 매칭</strong>
+              <span>Evidence</span>
+              <strong>Source/Render 대조</strong>
             </div>
             <div className="studio-sidebar-metric">
-              <span>변경 금지</span>
-              <strong>합성 결과물 UI</strong>
+              <span>Archive</span>
+              <strong>삭제보다 보존</strong>
             </div>
           </div>
         </div>
@@ -406,14 +437,14 @@ export default function Home() {
                   <p className="ops-kicker">lens.admate.ai.kr · Evidence Operations</p>
                   <h2>AdMate Lens</h2>
                   <p>
-                    지면, 소재, 랜딩, 검수 플래그를 한 화면에서 대조하는 증빙 운영 데스크입니다.
-                    캡처 요청은 바로 생성하고, 운영자는 품질 신호와 커버리지 공백을 먼저 확인합니다.
+                    원본, 렌더, QA 판정, 보존 이력을 한 화면에서 대조하는 광고 증빙 워크벤치입니다.
+                    캡처 요청은 큐에 올리고, 운영자는 품질 플래그와 커버리지 공백을 먼저 판정합니다.
                   </p>
                 </div>
 
                 <div className="lens-hero-stamp" aria-label="현재 운영 모드">
-                  <span>Lens Desk</span>
-                  <strong>QA-READY</strong>
+                  <span>Evidence Desk</span>
+                  <strong>QA-LOCKED</strong>
                 </div>
               </div>
 
@@ -454,50 +485,72 @@ export default function Home() {
                   className="lens-home-button primary"
                   onClick={() => scrollToSection("capture-studio", "studio")}
                 >
-                  새 캡처 만들기
+                  원본 접수
                 </button>
                 <button
                   type="button"
                   className="lens-home-button"
                   onClick={() => scrollToSection("result-review", "review")}
                 >
-                  최근 결과 보기
+                  렌더 검수 보기
                 </button>
               </div>
             </div>
 
             <div className="lens-home-status" aria-label="운영 상태 요약">
               <div className="lens-status-header">
-                <p className="studio-eyebrow">Live Evidence Rail</p>
-                <strong>최근 30건 기준</strong>
+                <p className="studio-eyebrow">Evidence Rail</p>
+                <strong>최근 30건 증빙 큐</strong>
               </div>
               <article>
-                <span>공개 캡처 타입</span>
+                <span>증빙 지면 커버리지</span>
                 <strong>27</strong>
                 <em>YouTube, Demand Gen, GDN, Naver, Kakao</em>
               </article>
               <article>
-                <span>최근 캡처</span>
+                <span>접수 큐</span>
                 <strong>{dashboardStats.recent}</strong>
                 <em>요청/처리/완료 이력</em>
               </article>
               <article>
-                <span>완료 / 실패</span>
+                <span>렌더 통과 / 실패</span>
                 <strong>{dashboardStats.completed} / {dashboardStats.failed}</strong>
                 <em>결과 검수 상태</em>
               </article>
               <article>
-                <span>검수 필요</span>
+                <span>QA 플래그</span>
                 <strong>{dashboardStats.reviewNeeded}</strong>
                 <em>품질 플래그 또는 실패 포함</em>
               </article>
             </div>
           </section>
 
+          <section className="lens-proof-queue" aria-label="Lens 증빙 처리 큐">
+            <div className="lens-proof-queue-header">
+              <div>
+                <p className="studio-eyebrow">Evidence Queue</p>
+                <h3>원본에서 보존까지 같은 증거선으로 검수</h3>
+              </div>
+              <span>Source to Archive</span>
+            </div>
+            <div className="lens-proof-queue-grid">
+              {proofQueueRows.map((row) => (
+                <article className={`lens-proof-card ${row.tone}`} key={row.lane}>
+                  <div>
+                    <span>{row.lane}</span>
+                    <em>{row.status}</em>
+                  </div>
+                  <strong>{row.title}</strong>
+                  <p>{row.detail}</p>
+                </article>
+              ))}
+            </div>
+          </section>
+
           <section className="lens-inspection-strip" aria-label="AdMate Lens 증빙 운영 레일">
             <div>
-              <p className="studio-eyebrow">Inspection Board</p>
-              <strong>생성된 이미지를 저장하기 전에 지면 재현, 소재 비율, CTA 노출을 먼저 판정합니다.</strong>
+              <p className="studio-eyebrow">Source / Render / QA / Archive</p>
+              <strong>생성된 이미지를 보존하기 전에 지면 재현, 소재 비율, CTA 노출을 먼저 판정합니다.</strong>
             </div>
             <div className="lens-strip-rail" aria-hidden="true">
               <span />
@@ -545,7 +598,7 @@ export default function Home() {
 
           <section className="lens-quality-panel" aria-label="AdMate Lens 품질 기준">
             <div>
-              <p className="studio-eyebrow">Quality Standard</p>
+              <p className="studio-eyebrow">QA Standard</p>
               <h3>캡처 결과물과 운영자 UI의 경계</h3>
             </div>
             <ul>
@@ -557,14 +610,14 @@ export default function Home() {
 
           <section id="capture-studio" className="studio-hero">
             <div>
-              <p className="ops-kicker">Capture Studio · Evidence Intake Desk</p>
+              <p className="ops-kicker">Source Intake · Evidence Builder</p>
               <h2 className="studio-title">
-                캡처 요청 생성 및 증빙 검수 워크벤치
+                원본 접수 및 렌더 검수 워크벤치
               </h2>
               <p className="studio-subtitle">
                 상품, 지면, 소재 정보를 접수한 뒤 실제 매체 화면과 맞는지 확인하는
-                QA 책상 흐름으로 배치했습니다. 생성 폼은 그대로 유지하고, 주변 정보는
-                운영자가 캡처 품질과 커버리지를 먼저 판단하도록 구성합니다.
+                증빙 큐 흐름으로 배치했습니다. 생성 폼은 그대로 유지하고, 주변 정보는
+                운영자가 렌더 품질과 보존 범위를 먼저 판단하도록 구성합니다.
               </p>
             </div>
             <div className="studio-hero-actions" aria-label="작업 상태">
@@ -578,7 +631,7 @@ export default function Home() {
               </span>
               <span className="studio-hero-stat">
                 <strong>0</strong>
-                <span>삭제 허용</span>
+                <span>Archive 삭제 허용</span>
               </span>
             </div>
           </section>
@@ -596,8 +649,8 @@ export default function Home() {
           <section className="studio-workbench-grid" aria-label="캡처 워크벤치">
             <aside className="studio-panel studio-left-panel">
               <div className="studio-panel-header">
-                <p className="studio-eyebrow">Product Coverage</p>
-                <h3>캡처 상품 커버리지</h3>
+                <p className="studio-eyebrow">Surface Archive</p>
+                <h3>상품별 증빙 커버리지</h3>
               </div>
 
               <div className="studio-product-stack">
@@ -625,8 +678,8 @@ export default function Home() {
             <section className="studio-panel studio-form-panel">
               <div className="studio-panel-header horizontal">
                 <div>
-                  <p className="studio-eyebrow">Request Builder</p>
-                  <h3>캡처 요청 생성</h3>
+                  <p className="studio-eyebrow">Source Intake</p>
+                  <h3>증빙 Source 요청 생성</h3>
                 </div>
                 <div className="studio-stepper" aria-label="캡처 생성 단계">
                   {studioSteps.map((step, index) => (
@@ -642,8 +695,8 @@ export default function Home() {
 
             <aside className="studio-panel studio-right-panel">
               <div className="studio-panel-header">
-                <p className="studio-eyebrow">Operator Guardrails</p>
-                <h3>실행 가드레일</h3>
+                <p className="studio-eyebrow">QA Guardrails</p>
+                <h3>검수 가드레일</h3>
               </div>
 
               <ul className="studio-check-list">
@@ -659,7 +712,7 @@ export default function Home() {
 
               <div className="studio-panel-header compact">
                 <p className="studio-eyebrow">Excluded Scope</p>
-                <h3>공개 제외</h3>
+                <h3>Archive 제외</h3>
               </div>
               <div className="studio-chip-row">
                 <span className="studio-chip muted">Audio</span>
@@ -673,12 +726,12 @@ export default function Home() {
           <section id="result-review" className="studio-results-panel">
             <div className="studio-panel-header horizontal">
               <div>
-                <p className="studio-eyebrow">Result Review</p>
-                <h3>최근 캡처 결과 검수</h3>
+                <p className="studio-eyebrow">Render QA</p>
+                <h3>최근 렌더 결과 검수</h3>
               </div>
               <p className="studio-panel-note">
                 완료, 실패, 처리중 결과를 확인합니다. 운영 UI에서는 삭제 대신
-                보존과 재요청을 우선합니다.
+                증빙 보존과 재요청을 우선합니다.
               </p>
             </div>
             <CaptureList refreshTrigger={refreshTrigger} />
@@ -687,8 +740,8 @@ export default function Home() {
           <section id="campaign-review" className="studio-samples-panel" aria-label="캠페인 기능 검토">
             <div className="studio-panel-header horizontal">
               <div>
-                <p className="studio-eyebrow">Campaign Review</p>
-                <h3>캠페인 메뉴 활성화 검토</h3>
+                <p className="studio-eyebrow">Campaign Evidence</p>
+                <h3>캠페인 증빙 묶음 검토</h3>
               </div>
               <p className="studio-panel-note">
                 DB schema 변경 없이 현재 캡처 metadata와 campaign_id 활용 가능 범위를 먼저 확인합니다.
@@ -721,8 +774,8 @@ export default function Home() {
           <section id="asset-library" className="studio-samples-panel" aria-label="소재 라이브러리 기능 검토">
             <div className="studio-panel-header horizontal">
               <div>
-                <p className="studio-eyebrow">Asset Library</p>
-                <h3>소재 라이브러리 메뉴 활성화 검토</h3>
+                <p className="studio-eyebrow">Source Assets</p>
+                <h3>소재 원본 라이브러리 검토</h3>
               </div>
               <p className="studio-panel-note">
                 실제 소재 파일과 URL은 캡처 결과 픽셀 매칭에 직접 영향을 주므로 저장/재사용 정책을 분리합니다.
@@ -751,8 +804,8 @@ export default function Home() {
           <section id="coverage-matrix" className="studio-samples-panel" aria-label="캡처 커버리지 매트릭스">
             <div className="studio-panel-header horizontal">
               <div>
-                <p className="studio-eyebrow">Coverage Matrix</p>
-                <h3>캡처 지면 상태</h3>
+                <p className="studio-eyebrow">Surface Archive</p>
+                <h3>증빙 지면 보존 상태</h3>
               </div>
               <p className="studio-panel-note">
                 공개 구현, 신규 공개, 제외 상태를 운영자가 한눈에 확인합니다.
