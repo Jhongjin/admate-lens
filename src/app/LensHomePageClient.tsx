@@ -24,9 +24,9 @@ const viewLabels: Record<PrimaryNavId, { title: string; status: string }> = {
   home: { title: "AdMate Lens", status: "증빙 큐" },
   studio: { title: "원본 접수", status: "소재 접수" },
   review: { title: "렌더 검수", status: "QA 판정" },
-  campaigns: { title: "Campaign Evidence", status: "증빙 묶음" },
+  campaigns: { title: "캠페인 증빙", status: "증빙 묶음" },
   assets: { title: "원본 소재", status: "소재 원본" },
-  coverage: { title: "Surface Archive", status: "보존 범위" },
+  coverage: { title: "지면 보존", status: "보존 범위" },
 };
 
 const campaignReviewRows = [
@@ -153,7 +153,7 @@ const studioSteps = [
   "상품 선택",
   "소재 입력",
   "지면 조건",
-  "결과 검수",
+  "QA 판정",
 ];
 
 const evidenceWorkflow = [
@@ -182,15 +182,15 @@ const proofQueueRows = [
   },
   {
     lane: "RENDER",
-    title: "지면 재현 대기",
+    title: "지면 렌더 대기",
     status: "02 RENDER",
     detail: "상품과 surface metadata 기준으로 실제 매체 레이아웃에 맞춰 렌더링합니다.",
     tone: "queued",
   },
   {
     lane: "QA",
-    title: "검수 판정 필요",
-    status: "03 QA HOLD",
+    title: "보존 전 QA 판정",
+    status: "03 QA GATE",
     detail: "보존 전에 픽셀 매칭, CTA 노출, 소재 비율, 실패 플래그를 한 번 더 대조합니다.",
     tone: "check",
   },
@@ -231,8 +231,8 @@ const homeActionCards = [
     tone: "default",
   },
   {
-    title: "QA 플래그",
-    description: "품질 플래그와 실패 사유를 먼저 판정합니다.",
+    title: "QA 판정 대기",
+    description: "보존 전 플래그와 실패 사유를 먼저 판정합니다.",
     targetId: "result-review",
     tone: "warning",
   },
@@ -748,8 +748,8 @@ export default function Home() {
                 <h3>최근 렌더 결과 검수</h3>
               </div>
               <p className="studio-panel-note">
-                완료, 실패, 처리중 결과를 확인합니다. 운영 UI에서는 삭제 대신
-                증빙 보존과 재요청을 우선합니다.
+                렌더 상태와 실패 사유를 확인합니다. 운영 UI에서는 삭제 대신
+                보존 전 QA 판정과 재요청을 우선합니다.
               </p>
             </div>
             <CaptureList refreshTrigger={refreshTrigger} />
