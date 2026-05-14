@@ -203,6 +203,13 @@ const proofQueueRows = [
   },
 ] as const;
 
+const inspectionMarkers = [
+  { code: "PX", label: "픽셀 매칭", detail: "지면 비율과 소재 경계선" },
+  { code: "CTA", label: "CTA 노출", detail: "버튼, 랜딩, 문구 가시성" },
+  { code: "SURF", label: "지면 기준", detail: "YouTube/GDN/국내 MO 규격" },
+  { code: "RETRY", label: "재요청 경로", detail: "실패 사유와 보존 이력" },
+] as const;
+
 const kpiCards = [
   { label: "공개 캡처 타입", value: "27", meta: "YouTube, Demand Gen, GDN, Naver, Kakao" },
   { label: "국내 모바일 지면", value: "8", meta: "Naver 4종 + Kakao 4종" },
@@ -552,12 +559,23 @@ export default function Home() {
               <p className="studio-eyebrow">Source / Render / QA / Archive</p>
               <strong>생성된 이미지를 보존하기 전에 지면 재현, 소재 비율, CTA 노출을 먼저 판정합니다.</strong>
             </div>
-            <div className="lens-strip-rail" aria-hidden="true">
-              <span />
-              <span />
-              <span />
-              <span />
-              <span />
+            <div className="lens-inspection-board" aria-label="QA 판정 항목">
+              <div className="lens-strip-rail" aria-hidden="true">
+                <span />
+                <span />
+                <span />
+                <span />
+                <span />
+              </div>
+              <div className="lens-inspection-markers">
+                {inspectionMarkers.map((marker) => (
+                  <article className="lens-inspection-marker" key={marker.code}>
+                    <span>{marker.code}</span>
+                    <strong>{marker.label}</strong>
+                    <em>{marker.detail}</em>
+                  </article>
+                ))}
+              </div>
             </div>
           </section>
 
