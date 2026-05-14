@@ -1,6 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
 import {
+  applyLocalLensSessionCookie,
   applyLensSessionCookies,
+  canUseLocalLensAuthBypass,
   sanitizeLensNextPath,
   signInLensUser,
 } from "@/lib/auth/lens-session";
@@ -24,6 +26,16 @@ export async function POST(request: NextRequest) {
         { error: "이메일과 비밀번호를 입력하세요." },
         { status: 400 }
       );
+    }
+
+    if (canUseLocalLensAuthBypass()) {
+      const response = NextResponse.json({
+        success: true,
+        next: nextPath,
+        mode: "local-dev",
+      });
+      applyLocalLensSessionCookie(response, email);
+      return response;
     }
 
     const { data, error } = await signInLensUser(email, password);
