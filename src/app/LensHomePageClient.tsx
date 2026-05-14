@@ -157,31 +157,31 @@ const studioSteps = [
 ];
 
 const evidenceWorkflow = [
-  { code: "01", label: "Source", detail: "상품/소재 접수" },
-  { code: "02", label: "Render", detail: "매체 지면 재현" },
+  { code: "01", label: "원본", detail: "상품/소재 접수" },
+  { code: "02", label: "렌더", detail: "매체 지면 재현" },
   { code: "03", label: "QA", detail: "픽셀/CTA 판정" },
-  { code: "04", label: "Archive", detail: "증빙 이력 보존" },
+  { code: "04", label: "보존", detail: "증빙 이력 보존" },
 ] as const;
 
 const contactSheetSlots = [
-  { code: "SRC", surface: "Source", ratio: "URL", status: "verified" },
-  { code: "YT", surface: "Render", ratio: "16:9", status: "queued" },
-  { code: "DG", surface: "Shorts QA", ratio: "9:16", status: "review" },
-  { code: "GDN", surface: "Slot Proof", ratio: "300x250", status: "verified" },
-  { code: "MO", surface: "Mobile QA", ratio: "MO", status: "hold" },
-  { code: "ARC", surface: "Archive", ratio: "Audit", status: "verified" },
+  { code: "SRC", surface: "원본", ratio: "URL", status: "verified" },
+  { code: "YT", surface: "렌더", ratio: "16:9", status: "queued" },
+  { code: "DG", surface: "Shorts", ratio: "9:16", status: "review" },
+  { code: "GDN", surface: "슬롯", ratio: "300x250", status: "verified" },
+  { code: "MO", surface: "MO", ratio: "QA", status: "hold" },
+  { code: "ARC", surface: "보존", ratio: "Audit", status: "verified" },
 ] as const;
 
 const proofQueueRows = [
   {
-    lane: "SOURCE",
+    lane: "SRC",
     title: "소재 원본 접수",
     status: "01 INTAKE",
     detail: "이미지, 영상, 로고, 랜딩 URL을 캡처 요청의 증거 원본으로 확인합니다.",
     tone: "ready",
   },
   {
-    lane: "RENDER",
+    lane: "RDR",
     title: "지면 렌더 대기",
     status: "02 RENDER",
     detail: "상품과 surface metadata 기준으로 실제 매체 레이아웃에 맞춰 렌더링합니다.",
@@ -195,7 +195,7 @@ const proofQueueRows = [
     tone: "check",
   },
   {
-    lane: "ARCHIVE",
+    lane: "ARC",
     title: "증빙 보존",
     status: "04 LOCK",
     detail: "삭제보다 보존과 재요청을 우선해 결과 이력을 감사 추적으로 남깁니다.",
@@ -441,7 +441,7 @@ export default function Home() {
             <div className="lens-home-copy">
               <div className="lens-home-copy-grid">
                 <div>
-                  <p className="ops-kicker">lens.admate.ai.kr · Evidence Operations</p>
+                  <p className="ops-kicker">lens.admate.ai.kr · 증빙 QA Desk</p>
                   <h2>AdMate Lens</h2>
                   <p>
                     원본, 렌더, QA 판정, 보존 이력을 한 화면에서 대조하는 광고 증빙 QA 워크벤치입니다.
@@ -628,7 +628,7 @@ export default function Home() {
 
           <section id="capture-studio" className="studio-hero">
             <div>
-              <p className="ops-kicker">Source Intake · Evidence Builder</p>
+              <p className="ops-kicker">원본 접수 · 증빙 생성</p>
               <h2 className="studio-title">
                 원본 접수 및 렌더 검수 워크벤치
               </h2>
@@ -667,7 +667,7 @@ export default function Home() {
           <section className="studio-workbench-grid" aria-label="캡처 워크벤치">
             <aside className="studio-panel studio-left-panel">
               <div className="studio-panel-header">
-                <p className="studio-eyebrow">Surface Archive</p>
+                <p className="studio-eyebrow">지면 보존</p>
                 <h3>상품별 증빙 커버리지</h3>
               </div>
 
@@ -696,7 +696,7 @@ export default function Home() {
             <section className="studio-panel studio-form-panel">
               <div className="studio-panel-header horizontal">
                 <div>
-                  <p className="studio-eyebrow">Source Intake</p>
+                  <p className="studio-eyebrow">원본 접수</p>
                   <h3>증빙 Source 요청 생성</h3>
                 </div>
                 <div className="studio-stepper" aria-label="캡처 생성 단계">
@@ -713,7 +713,7 @@ export default function Home() {
 
             <aside className="studio-panel studio-right-panel">
               <div className="studio-panel-header">
-                <p className="studio-eyebrow">QA Guardrails</p>
+                <p className="studio-eyebrow">QA 기준</p>
                 <h3>검수 가드레일</h3>
               </div>
 
@@ -729,7 +729,7 @@ export default function Home() {
               <div className="studio-divider" />
 
               <div className="studio-panel-header compact">
-                <p className="studio-eyebrow">Excluded Scope</p>
+                <p className="studio-eyebrow">제외 지면</p>
                 <h3>Archive 제외</h3>
               </div>
               <div className="studio-chip-row">
@@ -744,7 +744,7 @@ export default function Home() {
           <section id="result-review" className="studio-results-panel">
             <div className="studio-panel-header horizontal">
               <div>
-                <p className="studio-eyebrow">Render QA</p>
+                <p className="studio-eyebrow">렌더 QA</p>
                 <h3>최근 렌더 결과 검수</h3>
               </div>
               <p className="studio-panel-note">
@@ -758,7 +758,7 @@ export default function Home() {
           <section id="campaign-review" className="studio-samples-panel" aria-label="캠페인 기능 검토">
             <div className="studio-panel-header horizontal">
               <div>
-                <p className="studio-eyebrow">Campaign Evidence</p>
+                <p className="studio-eyebrow">캠페인 증빙</p>
                 <h3>캠페인 증빙 묶음 검토</h3>
               </div>
               <p className="studio-panel-note">
@@ -792,7 +792,7 @@ export default function Home() {
           <section id="asset-library" className="studio-samples-panel" aria-label="소재 라이브러리 기능 검토">
             <div className="studio-panel-header horizontal">
               <div>
-                <p className="studio-eyebrow">Source Assets</p>
+                <p className="studio-eyebrow">원본 소재</p>
                 <h3>소재 원본 라이브러리 검토</h3>
               </div>
               <p className="studio-panel-note">
@@ -822,7 +822,7 @@ export default function Home() {
           <section id="coverage-matrix" className="studio-samples-panel" aria-label="캡처 커버리지 매트릭스">
             <div className="studio-panel-header horizontal">
               <div>
-                <p className="studio-eyebrow">Surface Archive</p>
+                <p className="studio-eyebrow">지면 보존</p>
                 <h3>증빙 지면 보존 상태</h3>
               </div>
               <p className="studio-panel-note">
