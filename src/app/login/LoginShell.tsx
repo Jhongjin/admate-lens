@@ -110,7 +110,7 @@ export default function LoginShell({ nextPath }: LoginShellProps) {
           <div className="lens-login-card rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-secondary)] p-6 lg:p-8">
             <div className="mb-6">
               <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--color-text-muted)]">
-                Evidence Login
+                Evidence Gate
               </p>
               <h2 className="mt-2 text-xl font-semibold text-[var(--color-text-primary)]">
                 증빙 큐 열기
@@ -164,7 +164,7 @@ export default function LoginShell({ nextPath }: LoginShellProps) {
                 disabled={isSubmitting}
                 className="inline-flex w-full items-center justify-center rounded-lg bg-[var(--color-text-primary)] px-4 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {isSubmitting ? "로그인 중..." : "로그인"}
+                {isSubmitting ? "증빙 큐 확인 중..." : "증빙 데스크 입장"}
               </button>
             </form>
 
@@ -181,7 +181,7 @@ export default function LoginShell({ nextPath }: LoginShellProps) {
                 rel="noreferrer"
                 className="inline-flex w-full items-center justify-center rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-secondary)] px-4 py-2.5 text-sm font-semibold text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-bg-tertiary)]"
               >
-                이용 신청
+                Sentinel 접근 요청
               </a>
               <Link
                 href="/"
