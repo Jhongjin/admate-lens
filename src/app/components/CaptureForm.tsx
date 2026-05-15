@@ -1222,7 +1222,6 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
   const captureOpsNextAction = isSubmitting
     ? "QA 이력에 진행 행이 생기면 행 또는 상세 패널에서 상태와 중단 요청 위치를 확인합니다."
     : "요청 전 지면, 소재, 랜딩을 확인하고 시작 후에는 QA 이력에서 진행 상태를 추적합니다.";
-
   const gdnAdSizeCatalog = useMemo(
     () => (isGdnMobileSurface ? GDN_AD_SIZES_MOBILE : GDN_AD_SIZES),
     [isGdnMobileSurface],
@@ -1247,6 +1246,28 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
       : isFormValid
         ? "접수 준비됨"
         : "입력 확인 필요";
+  const captureOpsStageIndex = isSubmitting ? 1 : 0;
+  const captureOpsStages = [
+    {
+      label: "입력 검증",
+      detail: isFormValid ? "지면과 소재 조건 확인됨" : "매체, 지면, 소재 조건 필요",
+    },
+    {
+      label: "요청 접수",
+      detail: "캡처 작업을 큐에 올리고 이력 생성을 기다립니다.",
+    },
+    {
+      label: form.channel === "gdn" ? "지면 렌더링" : "노출 지점 맞춤",
+      detail:
+        form.channel === "gdn"
+          ? "외부 페이지 로딩과 광고 슬롯 탐색을 진행합니다."
+          : "재생 상태와 게재 위치를 맞춘 뒤 증빙을 생성합니다.",
+    },
+    {
+      label: "QA 이력 핸드오프",
+      detail: "진행 행에서 상태와 중단 요청 위치를 확인합니다.",
+    },
+  ];
   const selectedPublisherDedupeSummary = useMemo(
     () => summarizeDedupeHttpUrls(form.selectedPublishers),
     [form.selectedPublishers],
@@ -1591,7 +1612,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
               <div className="min-w-0">
                 <p
                   id="capture-ops-control-title"
-                  className="text-xs font-semibold text-[var(--color-text-primary)]"
+                  className="text-sm font-semibold text-[var(--color-text-primary)]"
                 >
                   캡처 운영 관제
                 </p>
@@ -1599,27 +1620,50 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                   {captureOpsSurfaceLabel}. {captureOpsExpectation}
                 </p>
               </div>
-              <div className="shrink-0 rounded-lg border border-[var(--color-border)] bg-white/70 px-3 py-2 text-left md:min-w-[11rem]">
-                <p className="text-[10px] font-semibold text-[var(--color-text-muted)]">현재 단계</p>
-                <p className="mt-1 text-xs font-semibold text-[var(--color-text-primary)]">
-                  {captureOpsStatusLabel}
-                </p>
-              </div>
+              <dl className="grid grid-cols-2 gap-x-4 gap-y-2 rounded-lg border border-[var(--color-border)] bg-white/70 px-3 py-2 text-left md:min-w-[18rem]">
+                <div>
+                  <dt className="text-[10px] font-semibold text-[var(--color-text-muted)]">현재 단계</dt>
+                  <dd className="mt-1 text-xs font-semibold text-[var(--color-text-primary)]">
+                    {captureOpsStatusLabel}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-[10px] font-semibold text-[var(--color-text-muted)]">핸드오프</dt>
+                  <dd className="mt-1 text-xs font-semibold text-[var(--color-text-primary)]">QA 이력</dd>
+                </div>
+              </dl>
             </div>
-            <ol className="mt-3 grid grid-cols-1 gap-3 border-t border-[var(--color-border)] pt-3 text-[11px] leading-5 text-[var(--color-text-secondary)] sm:grid-cols-3 sm:gap-0">
-              <li className="sm:pr-4">
-                <span className="font-semibold text-[var(--color-text-primary)]">1. 요청 접수</span>
-                <p className="mt-1 text-[var(--color-text-muted)]">폼 검증 후 캡처 작업을 큐에 올립니다.</p>
-              </li>
-              <li className="border-t border-[var(--color-border)] pt-3 sm:border-l sm:border-t-0 sm:px-4 sm:pt-0">
-                <span className="font-semibold text-[var(--color-text-primary)]">2. QA 이력 생성</span>
-                <p className="mt-1 text-[var(--color-text-muted)]">진행 행에서 대기/처리 상태를 추적합니다.</p>
-              </li>
-              <li className="border-t border-[var(--color-border)] pt-3 sm:border-l sm:border-t-0 sm:pl-4 sm:pt-0">
-                <span className="font-semibold text-[var(--color-text-primary)]">3. 다음 액션</span>
-                <p className="mt-1 text-[var(--color-text-muted)]">{captureOpsNextAction}</p>
-              </li>
+            <ol className="mt-4 grid grid-cols-1 gap-0 border-y border-[var(--color-border)] text-[11px] leading-5 text-[var(--color-text-secondary)] sm:grid-cols-4">
+              {captureOpsStages.map((stage, index) => {
+                const isActiveStage = index === captureOpsStageIndex;
+                return (
+                  <li
+                    key={stage.label}
+                    aria-current={isActiveStage ? "step" : undefined}
+                    className={`border-t border-[var(--color-border)] px-0 py-3 first:border-t-0 sm:border-l sm:border-t-0 sm:px-3 sm:first:border-l-0 ${
+                      isActiveStage ? "text-[var(--color-text-primary)]" : ""
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border text-[10px] font-semibold ${
+                          isActiveStage
+                            ? "border-[rgba(185,83,61,0.34)] bg-[rgba(185,83,61,0.1)] text-[var(--color-accent)]"
+                            : "border-[var(--color-border)] bg-white/60 text-[var(--color-text-muted)]"
+                        }`}
+                      >
+                        {index + 1}
+                      </span>
+                      <span className="font-semibold text-[var(--color-text-primary)]">{stage.label}</span>
+                    </div>
+                    <p className="mt-2 text-[var(--color-text-muted)]">{stage.detail}</p>
+                  </li>
+                );
+              })}
             </ol>
+            <p className="mt-3 text-[11px] leading-5 text-[var(--color-text-muted)]">
+              {captureOpsNextAction}
+            </p>
           </section>
         )}
 
