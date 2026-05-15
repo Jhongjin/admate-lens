@@ -1274,6 +1274,24 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
     () => summarizeDedupeHttpUrls(form.selectedPublishers),
     [form.selectedPublishers],
   );
+  const captureOpsTargetLabel =
+    form.channel === "gdn"
+      ? selectedPublisherDedupeSummary.dedupedUrls.length > 0
+        ? `${selectedPublisherDedupeSummary.dedupedUrls.length}개 지면`
+        : "지면 선택 대기"
+      : detailOptionLabel[selectedOptionPreset] ?? productLabel[selectedProduct];
+  const captureOpsCreativeLabel = uploadedFile
+    ? "업로드 소재"
+    : form.creativeUrl.trim() || form.infeedVideoUrl.trim() || form.instreamVideoUrl.trim()
+      ? "외부 URL 소재"
+      : "소재 대기";
+  const captureOpsProofLabel = form.captureLanding ? "게재면 + 랜딩 증빙" : "게재면 증빙";
+  const captureOpsManifest = [
+    { label: "대상 지면", value: captureOpsTargetLabel },
+    { label: "소재 입력", value: captureOpsCreativeLabel },
+    { label: "증빙 산출", value: captureOpsProofLabel },
+    { label: "검수 위치", value: "QA 이력" },
+  ];
 
   /** 폼 제출 */
   const handleSubmit = async (e: React.FormEvent) => {
@@ -1680,6 +1698,17 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
             <p className="mt-3 text-[11px] leading-5 text-[var(--color-text-muted)]">
               {captureOpsNextAction}
             </p>
+            <dl className="mt-3 grid grid-cols-2 gap-0 border-t border-[var(--color-border)] pt-3 text-[11px] leading-5 sm:grid-cols-4">
+              {captureOpsManifest.map((item) => (
+                <div
+                  key={item.label}
+                  className="border-t border-[var(--color-border)] py-2 first:border-t-0 sm:border-l sm:border-t-0 sm:px-3 sm:py-0 sm:first:border-l-0"
+                >
+                  <dt className="font-semibold text-[var(--color-text-muted)]">{item.label}</dt>
+                  <dd className="mt-1 font-semibold text-[var(--color-text-primary)]">{item.value}</dd>
+                </div>
+              ))}
+            </dl>
           </section>
         )}
 
