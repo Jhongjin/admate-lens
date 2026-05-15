@@ -49,6 +49,24 @@ const loginMetrics = [
   { label: "DELETE", value: "기본 잠금" },
 ] as const;
 
+const loginOpsLanes = [
+  {
+    code: "GDN",
+    title: "매체 지면 캡처",
+    detail: "외부 페이지 로딩과 슬롯 탐색은 로그인 후 작업 이력에서 추적합니다.",
+  },
+  {
+    code: "YT",
+    title: "YouTube 노출 증빙",
+    detail: "재생 위치와 지면 맥락을 맞춘 뒤 QA 증빙으로 보존합니다.",
+  },
+  {
+    code: "QA",
+    title: "판정 대기열",
+    detail: "진행, 실패, 보존 이력은 계정 세션 안에서만 열립니다.",
+  },
+] as const;
+
 export default function LoginShell({ nextPath }: LoginShellProps) {
   const router = useRouter();
   const [email, setEmail] = useState("");
@@ -121,6 +139,36 @@ export default function LoginShell({ nextPath }: LoginShellProps) {
               <span />
               <span />
               <span />
+            </div>
+
+            <div className="mt-6 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-primary)] p-4">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+                <div>
+                  <p className="text-xs font-semibold text-[var(--color-text-primary)]">
+                    캡처 운영 콘솔
+                  </p>
+                  <p className="mt-1 text-[11px] leading-5 text-[var(--color-text-muted)]">
+                    로그인 후 GDN/YouTube 장기 캡처의 접수, 진행, QA 핸드오프를 한 화면에서 확인합니다.
+                  </p>
+                </div>
+                <span className="shrink-0 rounded-md border border-[var(--color-border)] bg-[var(--color-bg-secondary)] px-2 py-1 text-[11px] font-semibold text-[var(--color-text-secondary)]">
+                  대기열 잠금
+                </span>
+              </div>
+              <div className="mt-4 grid grid-cols-1 gap-0 border-y border-[var(--color-border)] text-[11px] leading-5 sm:grid-cols-3">
+                {loginOpsLanes.map((lane) => (
+                  <div
+                    key={lane.code}
+                    className="border-t border-[var(--color-border)] py-3 first:border-t-0 sm:border-l sm:border-t-0 sm:px-3 sm:first:border-l-0"
+                  >
+                    <span className="inline-flex h-6 min-w-8 items-center justify-center rounded-md border border-[rgba(185,83,61,0.24)] bg-[rgba(185,83,61,0.08)] px-2 text-[10px] font-semibold text-[var(--color-accent)]">
+                      {lane.code}
+                    </span>
+                    <p className="mt-2 font-semibold text-[var(--color-text-primary)]">{lane.title}</p>
+                    <p className="mt-1 text-[var(--color-text-muted)]">{lane.detail}</p>
+                  </div>
+                ))}
+              </div>
             </div>
 
             <div className="lens-login-proof-grid">

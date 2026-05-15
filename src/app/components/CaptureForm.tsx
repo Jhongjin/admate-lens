@@ -1247,6 +1247,8 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
         ? "접수 준비됨"
         : "입력 확인 필요";
   const captureOpsStageIndex = isSubmitting ? 1 : 0;
+  const captureOpsModeLabel = form.channel === "gdn" ? "매체 지면 탐색" : "영상 지면 증빙";
+  const captureOpsGuardrailLabel = form.channel === "gdn" ? "외부 로딩 감시" : "재생 지점 확인";
   const captureOpsStages = [
     {
       label: "입력 검증",
@@ -1610,6 +1612,14 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
           >
             <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
               <div className="min-w-0">
+                <div className="mb-2 flex flex-wrap gap-2">
+                  <span className="rounded-md border border-[rgba(185,83,61,0.24)] bg-[rgba(185,83,61,0.08)] px-2 py-1 text-[10px] font-semibold text-[var(--color-accent)]">
+                    {captureOpsModeLabel}
+                  </span>
+                  <span className="rounded-md border border-[var(--color-border)] bg-white/60 px-2 py-1 text-[10px] font-semibold text-[var(--color-text-muted)]">
+                    {captureOpsGuardrailLabel}
+                  </span>
+                </div>
                 <p
                   id="capture-ops-control-title"
                   className="text-sm font-semibold text-[var(--color-text-primary)]"
@@ -1630,6 +1640,12 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                 <div>
                   <dt className="text-[10px] font-semibold text-[var(--color-text-muted)]">핸드오프</dt>
                   <dd className="mt-1 text-xs font-semibold text-[var(--color-text-primary)]">QA 이력</dd>
+                </div>
+                <div className="col-span-2 border-t border-[var(--color-border)] pt-2">
+                  <dt className="text-[10px] font-semibold text-[var(--color-text-muted)]">운영 메모</dt>
+                  <dd className="mt-1 text-[11px] leading-5 text-[var(--color-text-secondary)]">
+                    캡처 실행 후 중단 요청은 QA 이력의 진행 행에서 확인합니다.
+                  </dd>
                 </div>
               </dl>
             </div>
