@@ -495,7 +495,10 @@ export default function CaptureList({ refreshTrigger }: CaptureListProps) {
 
   /** 필터링된 캡처 목록 */
   const filteredCaptures = captures;
-  const activeCount = captures.filter((c) => c.status === "pending" || c.status === "processing").length;
+  const activeCaptures = captures.filter((c) => c.status === "pending" || c.status === "processing");
+  const activeCount = activeCaptures.length;
+  const pendingCount = activeCaptures.filter((c) => c.status === "pending").length;
+  const processingCount = activeCount - pendingCount;
   const latestCompleted = captures.find((c) => c.status === "completed" && !!c.placement_image_url) || null;
   const featuredProof = captures.find(isGoldenCandidate) || latestCompleted;
   const featuredProofIsGolden = featuredProof ? isGoldenCandidate(featuredProof) : false;
@@ -688,6 +691,7 @@ export default function CaptureList({ refreshTrigger }: CaptureListProps) {
         {/* 상태 필터 탭 */}
         <div
           className="flex gap-1 bg-[var(--color-bg-primary)] rounded-lg p-1 border border-[var(--color-border)]"
+          role="group"
           aria-label="캡처 상태 필터"
         >
           {[
@@ -720,6 +724,11 @@ export default function CaptureList({ refreshTrigger }: CaptureListProps) {
         </div>
 
         <span className="badge badge-pending">삭제 비활성</span>
+        {activeCount > 0 && (
+          <span className="badge badge-processing" aria-live="polite">
+            진행 {activeCount}건 · 중단 가능
+          </span>
+        )}
 
         {/* 전체 삭제 버튼 */}
         {CAPTURE_DELETE_ENABLED && captures.length > 0 && (
@@ -745,8 +754,15 @@ export default function CaptureList({ refreshTrigger }: CaptureListProps) {
           role="status"
           aria-live="polite"
         >
-          진행 중인 캡처 {activeCount}건은 각 이력 행의 중단 버튼이나 상세 화면의 중단 버튼에서 요청할 수 있습니다.
-          처리 중 캡처는 서버가 요청을 반영한 뒤 최종 상태로 갱신됩니다.
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <p>
+              진행 중인 캡처 {activeCount}건은 각 이력 행의 중단 버튼이나 상세 화면의 중단 버튼에서 요청할 수 있습니다.
+              처리 중 캡처는 서버가 요청을 반영한 뒤 최종 상태로 갱신됩니다.
+            </p>
+            <span className="shrink-0 rounded-md border border-[rgba(185,83,61,0.22)] bg-white/70 px-2 py-1 font-medium text-[var(--color-text-primary)]">
+              대기 {pendingCount} · 처리 {processingCount}
+            </span>
+          </div>
         </div>
       )}
 
@@ -1221,6 +1237,25 @@ function CaptureDetailModal({
           <p className="mt-1 text-xs text-[var(--color-text-muted)]">
             {isCancelling ? "목록이 갱신되면 최종 상태를 확인할 수 있습니다." : getActiveCaptureHelper(capture)}
           </p>
+          <div
+            className="mt-4 grid w-full max-w-md grid-cols-1 gap-2 rounded-lg border border-[rgba(185,83,61,0.22)] bg-white/75 p-3 text-left sm:grid-cols-2"
+            aria-label="진행 중 캡처 상태와 중단 위치"
+          >
+            <div>
+              <p className="text-[10px] font-semibold uppercase text-[var(--color-text-muted)]">
+                현재 상태
+              </p>
+              <p className="mt-1 text-xs font-semibold text-[var(--color-text-primary)]">{status.label}</p>
+            </div>
+            <div>
+              <p className="text-[10px] font-semibold uppercase text-[var(--color-text-muted)]">
+                중단 위치
+              </p>
+              <p className="mt-1 text-xs font-semibold text-[var(--color-text-primary)]">
+                상세 패널 또는 이력 행
+              </p>
+            </div>
+          </div>
           <button
             type="button"
             onClick={() => onCancel(capture.id)}
