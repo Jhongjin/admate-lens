@@ -448,7 +448,7 @@ export default function Home() {
             <div className="lens-home-copy">
               <div className="lens-home-copy-grid">
                 <div>
-                  <p className="ops-kicker">lens.admate.ai.kr · 증빙 QA Desk</p>
+                  <p className="ops-kicker">lens.admate.ai.kr · 증빙 QA 데스크</p>
                   <h2>AdMate Lens</h2>
                   <p>
                     원본, 렌더, QA 판정, 보존 이력을 한 화면에서 대조하는 광고 증빙 QA 워크벤치입니다.
@@ -714,7 +714,7 @@ export default function Home() {
               <div className="studio-panel-header horizontal">
                 <div>
                   <p className="studio-eyebrow">원본 접수</p>
-                  <h3>증빙 Source 요청 생성</h3>
+                  <h3>증빙 원본 요청 생성</h3>
                 </div>
                 <div className="studio-stepper" aria-label="캡처 생성 단계">
                   {studioSteps.map((step, index) => (

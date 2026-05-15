@@ -43,6 +43,12 @@ const loginGateChecks = [
   "보존 이력 접근",
 ] as const;
 
+const loginMetrics = [
+  { label: "SESSION", value: "보호됨" },
+  { label: "API", value: "로그인 후" },
+  { label: "DELETE", value: "기본 잠금" },
+] as const;
+
 export default function LoginShell({ nextPath }: LoginShellProps) {
   const router = useRouter();
   const [email, setEmail] = useState("");
@@ -85,8 +91,8 @@ export default function LoginShell({ nextPath }: LoginShellProps) {
   };
 
   return (
-    <main className="lens-login-shell min-h-screen bg-[var(--color-bg-primary)] px-4 py-10 text-[var(--color-text-primary)]">
-      <div className="mx-auto flex min-h-[calc(100vh-5rem)] w-full max-w-5xl items-center">
+    <main className="lens-login-shell min-h-[100dvh] bg-[var(--color-bg-primary)] px-4 py-10 text-[var(--color-text-primary)]">
+      <div className="mx-auto flex min-h-[calc(100dvh-5rem)] w-full max-w-5xl items-center">
         <section className="grid w-full gap-6 lg:grid-cols-[minmax(0,1.1fr)_420px]">
           <div className="lens-login-brief rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-secondary)] p-8 lg:p-10">
             <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--color-text-muted)]">
@@ -100,6 +106,15 @@ export default function LoginShell({ nextPath }: LoginShellProps) {
             <p className="mt-2 text-sm leading-6 text-[var(--color-text-muted)]">
               로그인 후 현재 보려던 Lens 화면으로 돌아갑니다. 세션 없이 캡처 API나 결과 목록은 호출하지 않습니다.
             </p>
+
+            <div className="lens-login-command-strip" aria-label="Lens 로그인 운영 상태">
+              {loginMetrics.map((metric) => (
+                <span key={metric.label}>
+                  <em>{metric.label}</em>
+                  <strong>{metric.value}</strong>
+                </span>
+              ))}
+            </div>
 
             <div className="lens-login-rail" aria-hidden="true">
               <span />

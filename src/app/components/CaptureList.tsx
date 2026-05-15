@@ -40,10 +40,12 @@ const STATUS_LABELS: Record<CaptureDisplayStatus, StatusDescriptor> = {
   pending: { label: "대기중", class: "badge-pending", icon: "•" },
   processing: { label: "처리중", class: "badge-processing", icon: "•" },
   "cancel-requested": { label: "중단 요청됨", class: "badge-processing", icon: "•" },
-  canceled: { label: "중단됨", class: "badge-pending", icon: "•" },
+  canceled: { label: "운영자 중단", class: "badge-canceled", icon: "•" },
   completed: { label: "완료", class: "badge-completed", icon: "•" },
   failed: { label: "실패", class: "badge-failed", icon: "•" },
 };
+
+const CAPTURE_EVIDENCE_RAIL = ["원본 접수", "렌더 증빙", "QA 게이트", "보존 이력"] as const;
 
 /** 채널 라벨 */
 const CHANNEL_LABELS: Record<string, string> = {
@@ -366,6 +368,34 @@ function getDiagnosticsSummary(metadata: Record<string, unknown> | null): {
   };
 }
 
+function isGoldenCandidate(capture: CaptureRecord): boolean {
+  if (capture.status !== "completed" || !capture.placement_image_url) return false;
+  const diagnostics = capture.metadata?.diagnostics as Record<string, unknown> | undefined;
+  const quality = diagnostics?.captureQuality as
+    | { flags?: unknown; score?: unknown; needsReview?: unknown }
+    | undefined;
+  if (!quality) return false;
+  const flags = Array.isArray(quality?.flags) ? quality.flags : null;
+  const score =
+    typeof quality?.score === "number"
+      ? quality.score
+      : typeof quality?.score === "string" && !Number.isNaN(Number(quality.score))
+        ? Number(quality.score)
+        : null;
+
+  if (quality?.needsReview !== false) return false;
+  if (flags && flags.length > 0) return false;
+  if (score === null || score < 0.86) return false;
+  return true;
+}
+
+function getGoldenCandidateReason(capture: CaptureRecord): string {
+  const diagnostics = getDiagnosticsSummary(capture.metadata);
+  if (diagnostics.score !== null) return `내부 점수 ${diagnostics.score}`;
+  if (diagnostics.hasDiagnostics) return "진단 플래그 없음";
+  return "완료 이미지 보존 가능";
+}
+
 function DetailInfoRow({
   label,
   children,
@@ -376,7 +406,7 @@ function DetailInfoRow({
   mono?: boolean;
 }) {
   return (
-    <div className="flex min-w-0 items-start justify-between gap-4 text-sm">
+    <div className="lens-detail-info-row flex min-w-0 items-start justify-between gap-4 text-sm">
       <span className="shrink-0 text-[var(--color-text-muted)]">{label}</span>
       <div
         className={`min-w-0 text-right text-[var(--color-text-secondary)] ${
@@ -399,7 +429,7 @@ export default function CaptureList({ refreshTrigger }: CaptureListProps) {
   const [cancellingIds, setCancellingIds] = useState<Set<string>>(new Set());
   const [authExpiredMessage, setAuthExpiredMessage] = useState<string | null>(null);
 
-  // 🔑 폴링 안정화를 위한 ref — captures 변경에 의한 무한 재렌더 방지
+  // 폴링 안정화를 위한 ref: captures 변경에 의한 무한 재렌더 방지
   const capturesRef = useRef<CaptureRecord[]>([]);
   capturesRef.current = captures;
 
@@ -467,8 +497,22 @@ export default function CaptureList({ refreshTrigger }: CaptureListProps) {
   const filteredCaptures = captures;
   const activeCount = captures.filter((c) => c.status === "pending" || c.status === "processing").length;
   const latestCompleted = captures.find((c) => c.status === "completed" && !!c.placement_image_url) || null;
+  const featuredProof = captures.find(isGoldenCandidate) || latestCompleted;
+  const featuredProofIsGolden = featuredProof ? isGoldenCandidate(featuredProof) : false;
+  const activeStageIndex = activeCount > 0 ? 1 : featuredProof ? 3 : 0;
   const isCaptureActive = (capture: CaptureRecord) =>
     capture.status === "pending" || capture.status === "processing";
+  const openCaptureDetail = useCallback((capture: CaptureRecord) => {
+    setSelectedCapture(capture);
+  }, []);
+  const handleCaptureRowKeyDown = useCallback(
+    (event: React.KeyboardEvent, capture: CaptureRecord) => {
+      if (event.key !== "Enter" && event.key !== " ") return;
+      event.preventDefault();
+      openCaptureDetail(capture);
+    },
+    [openCaptureDetail],
+  );
 
   /** 상태별 카운트 */
   const statusCounts = captures.reduce(
@@ -622,9 +666,9 @@ export default function CaptureList({ refreshTrigger }: CaptureListProps) {
       {/* 헤더 + 필터 */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4">
         <div className="flex items-center gap-3">
-          <div className="ops-icon-tile">이력</div>
+          <div className="ops-icon-tile">QA</div>
           <div>
-            <h2 className="ops-section-title">증빙 캡처 이력</h2>
+            <h2 className="ops-section-title">렌더 증빙 QA 이력</h2>
             <p className="text-xs text-[var(--color-text-muted)]">
               총 {statusCounts.all || 0}건
               {captures.some((c) => c.status === "processing") && (
@@ -636,6 +680,7 @@ export default function CaptureList({ refreshTrigger }: CaptureListProps) {
             </p>
             <p className="mt-1 text-[11px] leading-5 text-[var(--color-text-muted)]">
               최근 30개 전체 이력입니다. 같은 매체가 보여도 현재 배치 중복으로 단정하지 않습니다.
+              원본 접수, 렌더 증빙, QA 게이트 이력을 같은 증거선으로 봅니다.
             </p>
           </div>
         </div>
@@ -687,39 +732,61 @@ export default function CaptureList({ refreshTrigger }: CaptureListProps) {
         )}
       </div>
 
+      <div
+        className={`lens-capture-stage-rail ${activeCount > 0 ? "lens-capture-stage-rail--active" : ""}`}
+        aria-label="렌더 증빙 처리 단계"
+      >
+        {CAPTURE_EVIDENCE_RAIL.map((stage, index) => (
+          <span key={stage} className={index === activeStageIndex ? "active" : undefined}>
+            <em>{String(index + 1).padStart(2, "0")}</em>
+            {stage}
+          </span>
+        ))}
+      </div>
+
       {/* 렌더링 현황 + 최신 결과 */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
-        <div className="glass-card-static p-4 md:col-span-1">
-          <p className="text-xs text-[var(--color-text-muted)] mb-1">작업 큐</p>
+        <div className="glass-card-static lens-capture-summary-card p-4 md:col-span-1">
+          <p className="text-xs text-[var(--color-text-muted)] mb-1">진행 중 렌더</p>
           <p className="text-2xl font-bold text-[var(--color-text-primary)]">{activeCount}</p>
           <p className="text-xs text-[var(--color-text-secondary)] mt-1">
-            {activeCount > 0 ? "진행 중 작업이 있습니다" : "대기/진행 작업 없음"}
+            {activeCount > 0 ? "렌더 증빙이 생성 중입니다" : "대기/진행 렌더 없음"}
           </p>
           <p className="mt-2 text-[11px] leading-5 text-[var(--color-text-muted)]">
             새 배치와 이전 이력이 함께 표시됩니다.
           </p>
         </div>
-        <div className="glass-card-static p-4 md:col-span-2">
-          <p className="text-xs text-[var(--color-text-muted)] mb-2">최신 증빙 이미지</p>
-          {latestCompleted?.placement_image_url ? (
-            <div className="flex items-center gap-3">
+        <div className="glass-card-static lens-capture-summary-card p-4 md:col-span-2">
+          <div className="mb-2 flex flex-wrap items-center gap-2">
+            <p className="text-xs text-[var(--color-text-muted)]">
+              {featuredProofIsGolden ? "보존 후보 증빙" : "최신 렌더 증빙"}
+            </p>
+            {featuredProofIsGolden && <span className="lens-golden-candidate-badge">Golden 후보</span>}
+          </div>
+          {featuredProof?.placement_image_url ? (
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
               <img
-                src={latestCompleted.placement_image_url}
-                alt="최신 렌더링"
-                className="w-24 h-16 rounded-lg object-cover border border-[var(--color-border)]"
+                src={featuredProof.placement_image_url}
+                alt={featuredProofIsGolden ? "보존 후보 렌더 증빙 이미지" : "최신 렌더 증빙 이미지"}
+                className="h-20 w-full rounded-lg border border-[var(--color-border)] object-cover sm:h-16 sm:w-24"
               />
               <div className="min-w-0 flex-1">
                 <p className="text-sm text-[var(--color-text-primary)] truncate">
-                  {latestCompleted.source_url ? truncateUrl(latestCompleted.source_url, 56) : "URL 없음"}
+                  {featuredProof.source_url ? truncateUrl(featuredProof.source_url, 56) : "URL 없음"}
                 </p>
                 <p className="text-xs text-[var(--color-text-muted)] mt-1">
-                  {formatDate(latestCompleted.created_at)}
+                  {featuredProofIsGolden ? getGoldenCandidateReason(featuredProof) : formatDate(featuredProof.created_at)}
                 </p>
+                {featuredProofIsGolden && (
+                  <p className="mt-1 text-[11px] leading-5 text-[var(--color-text-muted)]">
+                    최신 순서보다 QA 판정과 보존 가능성을 우선해 노출합니다.
+                  </p>
+                )}
               </div>
               <a
-                href={latestCompleted.placement_image_url}
+                href={featuredProof.placement_image_url}
                 download
-                className="btn btn-primary text-xs px-3 py-2 whitespace-nowrap"
+                className="btn btn-primary text-xs px-3 py-2 whitespace-nowrap sm:self-auto"
               >
                 다운로드
               </a>
@@ -731,7 +798,7 @@ export default function CaptureList({ refreshTrigger }: CaptureListProps) {
       </div>
 
       {/* 리스트 */}
-      <div className="glass-card-static overflow-hidden">
+      <div className="glass-card-static lens-capture-ledger overflow-hidden">
         {isLoading ? (
           /* 스켈레톤 로딩 */
           <div className="p-4 space-y-3">
@@ -753,110 +820,142 @@ export default function CaptureList({ refreshTrigger }: CaptureListProps) {
               <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
               <circle cx="12" cy="13" r="4" />
             </svg>
-            <p className="text-base font-medium mb-1">아직 캡처 기록이 없습니다</p>
-            <p className="text-sm">위 폼에서 첫 번째 캡처를 요청해보세요!</p>
+            <p className="text-base font-medium mb-1">아직 보존할 증빙 이력이 없습니다</p>
+            <p className="text-sm">원본 접수 후 렌더 증빙과 QA 판정이 이곳에 쌓입니다.</p>
           </div>
         ) : (
           /* 캡처 리스트 */
-          <div className="divide-y divide-[var(--color-border)]">
+          <div className="divide-y divide-[var(--color-border)]" role="list">
             {filteredCaptures.map((capture) => {
               const isCancelling = cancellingIds.has(capture.id);
               const status = getCaptureStatusDescriptor(capture, isCancelling);
               const displayStatus = getCaptureDisplayStatus(capture, isCancelling);
               const isActive = isCaptureActive(capture);
               const isCanceled = displayStatus === "canceled";
+              const goldenCandidate = isGoldenCandidate(capture);
+              const metadata = capture.metadata && typeof capture.metadata === "object" ? capture.metadata : null;
+              const rowDiagnostics = getDiagnosticsSummary(metadata);
+              const qualityStateLabel = getQualityStateLabel(metadata);
+              const failureCategoryLabel = getFailureCategoryLabel(metadata);
               const cancelButtonLabel = getCancelButtonLabel(capture, isCancelling);
 
               return (
-                <div
+                <article
                   key={capture.id}
-                  onClick={() => setSelectedCapture(capture)}
+                  role="listitem"
                   className={`
-                    group flex flex-col gap-3 p-4 cursor-pointer transition-all duration-200 sm:flex-row sm:items-center sm:gap-4
+                    lens-capture-row lens-capture-row--${displayStatus} ${goldenCandidate ? "lens-capture-row--golden" : ""} group flex flex-col gap-3 p-4 cursor-pointer transition-all duration-200 sm:flex-row sm:items-center sm:gap-4
                     hover:bg-[var(--color-bg-elevated)]
-                    ${isActive ? "bg-[var(--color-accent-subtle)]" : ""}
+                    ${isActive ? "lens-capture-row--active" : ""}
                   `}
                 >
-                  {/* 썸네일 / 상태 아이콘 */}
-                  <div className="flex-shrink-0">
-                    {capture.status === "completed" && capture.placement_image_url ? (
-                      <div className="w-16 h-16 rounded-lg overflow-hidden border border-[var(--color-border)] bg-[var(--color-bg-primary)]">
-                        <img
-                          src={capture.placement_image_url}
-                          alt="캡처 결과"
-                          className="w-full h-full object-cover"
-                          loading="lazy"
-                        />
-                      </div>
-                    ) : (
-                      <div
-                        className={`
-                          w-16 h-16 rounded-lg flex items-center justify-center text-2xl
-                          border border-[var(--color-border)] bg-[var(--color-bg-primary)]
-                          ${isActive ? "animate-pulse" : ""}
-                        `}
-                      >
-                        {status.icon}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* 정보 */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-xs font-semibold px-2 py-0.5 rounded bg-[var(--color-bg-tertiary)] text-[var(--color-text-secondary)]">
-                        {getCaptureChannelLabel(capture)}
-                      </span>
-                      <span className={`badge ${status.class}`} aria-live="polite">
-                        {(isActive || displayStatus === "cancel-requested") && (
-                          <span className="spinner" style={{ width: 10, height: 10, borderWidth: 1.5 }} />
-                        )}
-                        {status.label}
-                      </span>
-                    </div>
-                    <p className="text-sm text-[var(--color-text-primary)] truncate">
-                      {capture.source_url ? truncateUrl(capture.source_url) : "URL 없음"}
-                    </p>
-                    <p className="text-xs text-[var(--color-text-muted)] mt-0.5">
-                      {formatDate(capture.created_at)}
-                      {capture.metadata && typeof capture.metadata === "object" && getDurationMs(capture.metadata) !== null && (
-                        <span className="ml-2">
-                          ⏱ {Math.round((getDurationMs(capture.metadata) || 0) / 1000)}초
-                        </span>
+                  <div
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`캡처 상세 열기: ${getCaptureChannelLabel(capture)} ${status.label}, ${capture.source_url ? truncateUrl(capture.source_url, 60) : "URL 없음"}`}
+                    onClick={() => openCaptureDetail(capture)}
+                    onKeyDown={(event) => handleCaptureRowKeyDown(event, capture)}
+                    className="lens-capture-row-button flex min-w-0 flex-1 flex-col gap-3 rounded-md outline-none sm:flex-row sm:items-center sm:gap-4"
+                  >
+                    {/* 썸네일 / 상태 아이콘 */}
+                    <div className="flex-shrink-0">
+                      {capture.status === "completed" && capture.placement_image_url ? (
+                        <div className="lens-capture-thumb w-16 h-16 rounded-lg overflow-hidden border border-[var(--color-border)] bg-[var(--color-bg-primary)]">
+                          <img
+                            src={capture.placement_image_url}
+                            alt="캡처 결과"
+                            className="w-full h-full object-cover"
+                            loading="lazy"
+                          />
+                        </div>
+                      ) : (
+                        <div
+                          className={`
+                            lens-capture-status-tile w-16 h-16 rounded-lg flex items-center justify-center text-2xl
+                            border border-[var(--color-border)] bg-[var(--color-bg-primary)]
+                            ${isActive ? "animate-pulse" : ""}
+                          `}
+                        >
+                          {status.icon}
+                        </div>
                       )}
-                    </p>
-                    {capture.channel === "youtube" && capture.metadata && typeof capture.metadata === "object" && (
-                      <p className="text-[11px] text-[var(--color-text-muted)] mt-1">
-                        {(() => {
-                          const yt = getYoutubeMeta(capture.metadata);
-                          const productLabel = getProductMetaLabel(capture.metadata);
-                          const adLabel = getYoutubeAdTypeLabel(yt.adType);
-                          if (productLabel) return productLabel;
-                          if (!adLabel && yt.captureSecond === undefined) return null;
-                          return `${adLabel || "YouTube"}${yt.captureSecond !== undefined ? ` · ${yt.captureSecond}초` : ""}`;
-                        })()}
+                    </div>
+
+                    {/* 정보 */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-xs font-semibold px-2 py-0.5 rounded bg-[var(--color-bg-tertiary)] text-[var(--color-text-secondary)]">
+                          {getCaptureChannelLabel(capture)}
+                        </span>
+                        <span className={`badge ${status.class}`} aria-live="polite">
+                          {(isActive || displayStatus === "cancel-requested") && (
+                            <span className="spinner" style={{ width: 10, height: 10, borderWidth: 1.5 }} />
+                          )}
+                          {status.label}
+                        </span>
+                        {goldenCandidate && (
+                          <span className="lens-golden-candidate-badge" title={getGoldenCandidateReason(capture)}>
+                            Golden 후보
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-sm text-[var(--color-text-primary)] truncate">
+                        {capture.source_url ? truncateUrl(capture.source_url) : "URL 없음"}
                       </p>
-                    )}
-                    {capture.status === "failed" && capture.error_message && (
-                      <p className={`mt-1 truncate text-xs ${isCanceled ? "text-[var(--color-text-muted)]" : "text-[var(--color-error)]"}`}>
-                        {capture.error_message}
+                      <p className="text-xs text-[var(--color-text-muted)] mt-0.5">
+                        {formatDate(capture.created_at)}
+                        {capture.metadata && typeof capture.metadata === "object" && getDurationMs(capture.metadata) !== null && (
+                          <span className="ml-2">
+                            · 소요 {Math.round((getDurationMs(capture.metadata) || 0) / 1000)}초
+                          </span>
+                        )}
                       </p>
-                    )}
-                    {isCancelling && (
-                      <p className="mt-1 text-[11px] text-[var(--color-text-muted)]">
-                        요청을 보냈습니다. 목록 갱신 후 최종 상태를 확인합니다.
-                      </p>
-                    )}
-                    {capture.status === "completed" && capture.metadata && typeof capture.metadata === "object" && (
-                      <p className="text-[11px] text-[var(--color-text-muted)] mt-1">
-                        {getQualityStateLabel(capture.metadata)}
-                      </p>
-                    )}
-                    {capture.status === "failed" && !isCanceled && capture.metadata && typeof capture.metadata === "object" && (
-                      <p className="text-[11px] text-[var(--color-text-muted)] mt-1">
-                        {getFailureCategoryLabel(capture.metadata)}
-                      </p>
-                    )}
+                      {capture.channel === "youtube" && metadata && (
+                        <p className="text-[11px] text-[var(--color-text-muted)] mt-1">
+                          {(() => {
+                            const yt = getYoutubeMeta(metadata);
+                            const productLabel = getProductMetaLabel(metadata);
+                            const adLabel = getYoutubeAdTypeLabel(yt.adType);
+                            if (productLabel) return productLabel;
+                            if (!adLabel && yt.captureSecond === undefined) return null;
+                            return `${adLabel || "YouTube"}${yt.captureSecond !== undefined ? ` · ${yt.captureSecond}초` : ""}`;
+                          })()}
+                        </p>
+                      )}
+                      {capture.status === "failed" && capture.error_message && (
+                        <p className={`mt-1 truncate text-xs ${isCanceled ? "text-[var(--color-text-muted)]" : "text-[var(--color-error)]"}`}>
+                          {capture.error_message}
+                        </p>
+                      )}
+                      {isCanceled && (
+                        <p className="mt-1 text-[11px] text-[var(--color-text-muted)]">
+                          실패 집계와 분리해 보는 운영자 중단 이력입니다.
+                        </p>
+                      )}
+                      {isCancelling && (
+                        <p className="mt-1 text-[11px] text-[var(--color-text-muted)]">
+                          요청을 보냈습니다. 목록 갱신 후 최종 상태를 확인합니다.
+                        </p>
+                      )}
+                      {capture.status === "completed" && metadata && (
+                        <div className="lens-row-proof-meta">
+                          {qualityStateLabel && <span>{qualityStateLabel}</span>}
+                          {rowDiagnostics.score !== null && (
+                            <span className="lens-row-proof-chip">점수 {rowDiagnostics.score}</span>
+                          )}
+                          {rowDiagnostics.flagCount !== null && (
+                            <span className={rowDiagnostics.flagCount > 0 ? "lens-row-proof-chip warning" : "lens-row-proof-chip ok"}>
+                              {rowDiagnostics.flagCount > 0 ? `플래그 ${rowDiagnostics.flagCount}` : "플래그 없음"}
+                            </span>
+                          )}
+                        </div>
+                      )}
+                      {capture.status === "failed" && !isCanceled && metadata && (
+                        <p className="text-[11px] text-[var(--color-text-muted)] mt-1">
+                          {failureCategoryLabel}
+                        </p>
+                      )}
+                    </div>
                   </div>
 
                   {/* 삭제 버튼 + 화살표 */}
@@ -870,7 +969,7 @@ export default function CaptureList({ refreshTrigger }: CaptureListProps) {
                         disabled={isCancelling}
                         aria-label={getCancelButtonAriaLabel(capture, isCancelling)}
                         aria-busy={isCancelling}
-                        className="inline-flex h-8 min-w-[6.5rem] items-center justify-center whitespace-nowrap rounded-lg border border-[rgba(239,68,68,0.22)] px-2 text-xs font-semibold text-[var(--color-error)] transition-all hover:bg-[rgba(239,68,68,0.08)] disabled:cursor-not-allowed disabled:opacity-50"
+                        className="lens-stop-capture-button h-8 min-w-[6.5rem] px-2"
                         title={cancelButtonLabel}
                       >
                         {cancelButtonLabel}
@@ -885,6 +984,7 @@ export default function CaptureList({ refreshTrigger }: CaptureListProps) {
                         className="w-8 h-8 flex items-center justify-center rounded-lg
                                    text-[var(--color-text-muted)] hover:text-[var(--color-error)]
                                    hover:bg-[rgba(239,68,68,0.1)] transition-all opacity-0 group-hover:opacity-100"
+                        aria-label="캡처 삭제"
                         title="삭제"
                       >
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -899,7 +999,7 @@ export default function CaptureList({ refreshTrigger }: CaptureListProps) {
                       </svg>
                     </div>
                   </div>
-                </div>
+                </article>
               );
             })}
           </div>
@@ -1009,6 +1109,7 @@ function CaptureDetailModal({
   const durationLabel = formatDurationLabel(getDurationMs(metadata));
   const resultCategoryLabel = getResultCategoryLabel(metadata);
   const diagnosticsSummary = getDiagnosticsSummary(metadata);
+  const goldenCandidate = isGoldenCandidate(capture);
   const [selectedOutputId, setSelectedOutputId] = useState<OutputId>(
     capture.placement_image_url ? "placement" : "landing",
   );
@@ -1090,7 +1191,7 @@ function CaptureDetailModal({
   const renderPreview = () => {
     if (capture.status === "pending" || capture.status === "processing") {
       return (
-        <div className="flex h-full min-h-[320px] flex-col items-center justify-center p-8 text-center">
+        <div className="lens-proof-active-state flex h-full min-h-[320px] flex-col items-center justify-center p-8 text-center">
           <div className="spinner spinner-lg mb-4" />
           <p className="text-sm font-medium text-[var(--color-text-secondary)]">
             {isCancelling
@@ -1108,7 +1209,7 @@ function CaptureDetailModal({
             disabled={isCancelling}
             aria-label={cancelButtonAriaLabel}
             aria-busy={isCancelling}
-            className="mt-4 inline-flex min-w-[8rem] items-center justify-center rounded-md border border-[rgba(239,68,68,0.22)] px-4 py-2 text-xs font-semibold text-[var(--color-error)] transition-colors hover:bg-[rgba(239,68,68,0.08)] disabled:cursor-not-allowed disabled:opacity-50"
+            className="lens-stop-capture-button mt-4"
           >
             {cancelButtonLabel}
           </button>
@@ -1131,8 +1232,8 @@ function CaptureDetailModal({
       <div
         className={
           zoomMode === "fit"
-            ? "flex h-full min-h-[320px] items-center justify-center overflow-hidden p-4"
-            : "h-full min-h-[320px] overflow-auto p-4"
+            ? "lens-proof-viewer flex h-full min-h-[320px] items-center justify-center overflow-hidden p-4"
+            : "lens-proof-viewer h-full min-h-[320px] overflow-auto p-4"
         }
       >
         <img
@@ -1162,7 +1263,7 @@ function CaptureDetailModal({
 
   const renderInspectorContent = (compact = false) => (
     <div className={compact ? "space-y-5" : "space-y-6"}>
-      <section className="space-y-3">
+      <section className="lens-inspector-section space-y-3">
         <div className="flex items-center justify-between gap-3">
           <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--color-text-muted)]">상태</p>
           <span className={`badge ${status.class}`} aria-live="polite">
@@ -1178,6 +1279,13 @@ function CaptureDetailModal({
           <p className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-primary)] px-3 py-2 text-xs leading-5 text-[var(--color-text-secondary)]">
             {qualityStateLabel}
           </p>
+        )}
+        {goldenCandidate && (
+          <div className="lens-golden-candidate-panel">
+            <span>Golden 후보</span>
+            <strong>{getGoldenCandidateReason(capture)}</strong>
+            <p>게재면 이미지, 진단 플래그, 검수 필요 여부를 기준으로 보존 후보로 표시합니다.</p>
+          </div>
         )}
         {capture.status === "failed" && capture.error_message && (
           <div
@@ -1195,7 +1303,7 @@ function CaptureDetailModal({
         )}
       </section>
 
-      <section className="space-y-2">
+      <section className="lens-inspector-section space-y-2">
         <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--color-text-muted)]">캡처 정보</p>
         <DetailInfoRow label="내부 캡처 ID" mono>{capture.id}</DetailInfoRow>
         <DetailInfoRow label="채널">{getCaptureChannelLabel(capture)}</DetailInfoRow>
@@ -1208,7 +1316,7 @@ function CaptureDetailModal({
         <DetailInfoRow label="랜딩 캡처">{capture.capture_landing ? "예" : "아니오"}</DetailInfoRow>
       </section>
 
-      <section className="space-y-2">
+      <section className="lens-inspector-section space-y-2">
         <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--color-text-muted)]">참조 URL</p>
         <DetailInfoRow label="게재면">
           {capture.source_url ? (
@@ -1231,7 +1339,7 @@ function CaptureDetailModal({
         </DetailInfoRow>
       </section>
 
-      <section className="space-y-2">
+      <section className="lens-inspector-section space-y-2">
         <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--color-text-muted)]">선택 이미지</p>
         <DetailInfoRow label="출력">{activeOutput.description}</DetailInfoRow>
         <DetailInfoRow label="이미지 URL(복사용)">
@@ -1258,7 +1366,7 @@ function CaptureDetailModal({
         </DetailInfoRow>
       </section>
 
-      <section className="space-y-2">
+      <section className="lens-inspector-section space-y-2">
         <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--color-text-muted)]">진단 요약</p>
         <DetailInfoRow label="진단 데이터">{diagnosticsSummary.hasDiagnostics ? "있음" : "없음"}</DetailInfoRow>
         {qualityFlagCountLabel && <DetailInfoRow label="품질 플래그">{qualityFlagCountLabel}</DetailInfoRow>}
@@ -1289,10 +1397,10 @@ function CaptureDetailModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby="capture-detail-title"
-        className="relative z-10 flex h-[100dvh] w-full flex-col overflow-hidden bg-[var(--color-bg-secondary)] shadow-2xl animate-slide-up lg:h-[92vh] lg:max-h-[960px] lg:max-w-[1440px] lg:rounded-2xl lg:border lg:border-[var(--color-border)]"
+        className="lens-detail-shell relative z-10 flex h-[100dvh] w-full flex-col overflow-hidden bg-[var(--color-bg-secondary)] shadow-2xl animate-slide-up lg:h-[92vh] lg:max-h-[960px] lg:max-w-[1440px] lg:rounded-2xl lg:border lg:border-[var(--color-border)]"
         onClick={(e) => e.stopPropagation()}
       >
-        <header className="flex shrink-0 flex-wrap items-center gap-2 border-b border-[var(--color-border)] bg-[var(--color-bg-secondary)] px-4 py-3 lg:flex-nowrap lg:px-5">
+        <header className="lens-detail-header flex shrink-0 flex-wrap items-center gap-2 border-b border-[var(--color-border)] bg-[var(--color-bg-secondary)] px-4 py-3 lg:flex-nowrap lg:px-5">
           <button
             type="button"
             onClick={onClose}
@@ -1305,11 +1413,12 @@ function CaptureDetailModal({
             </svg>
           </button>
           <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="lens-detail-title-row flex flex-wrap items-center gap-2">
               <h2 id="capture-detail-title" className="truncate text-sm font-semibold text-[var(--color-text-primary)]">
                 {activeOutput.description}
               </h2>
               <span className={`badge ${status.class}`}>{status.icon} {status.label}</span>
+              {goldenCandidate && <span className="lens-golden-candidate-badge">Golden 후보</span>}
               <span className="rounded bg-[var(--color-bg-tertiary)] px-2 py-0.5 text-xs font-semibold text-[var(--color-text-secondary)]">
                 {getCaptureChannelLabel(capture)}
               </span>
@@ -1319,12 +1428,13 @@ function CaptureDetailModal({
               {copiedLabel ? ` · ${copiedLabel}` : ""}
             </p>
           </div>
-          <div className="order-3 flex w-full items-center gap-1 overflow-x-auto lg:order-none lg:w-auto">
+          <div className="lens-zoom-controls order-3 flex w-full items-center gap-1 overflow-x-auto lg:order-none lg:w-auto">
             {(["fit", "100", "150", "200"] as const).map((mode) => (
               <button
                 key={mode}
                 type="button"
                 onClick={() => setZoomMode(mode)}
+                aria-pressed={zoomMode === mode}
                 className={`shrink-0 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors ${
                   zoomMode === mode
                     ? "bg-[var(--color-text-primary)] text-white"
@@ -1358,7 +1468,7 @@ function CaptureDetailModal({
 
         <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[minmax(0,1fr)_360px]">
           <section className="flex min-h-0 flex-col">
-            <div className="flex shrink-0 items-center gap-2 overflow-x-auto border-b border-[var(--color-border)] bg-[var(--color-bg-secondary)] px-4 py-2">
+            <div className="lens-proof-output-tabs flex shrink-0 items-center gap-2 overflow-x-auto border-b border-[var(--color-border)] bg-[var(--color-bg-secondary)] px-4 py-2">
               {outputs.map((output) => {
                 const isActive = output.id === activeOutput.id;
                 const isAvailable = Boolean(output.url);
@@ -1385,7 +1495,7 @@ function CaptureDetailModal({
             <div className="min-h-0 flex-1 bg-[var(--color-bg-primary)]">
               {renderPreview()}
             </div>
-            <div className="shrink-0 border-t border-[var(--color-border)] bg-[var(--color-bg-secondary)] px-4 py-2 text-[11px] text-[var(--color-text-muted)]">
+            <div className="lens-proof-viewer-note shrink-0 border-t border-[var(--color-border)] bg-[var(--color-bg-secondary)] px-4 py-2 text-[11px] text-[var(--color-text-muted)]">
               이미지 표시는 검토용 viewer 상태입니다. 원본 PNG 파일은 crop, filter, overlay 없이 그대로 열기/다운로드됩니다.
               URL과 저장 경로는 운영 확인용 복사 정보입니다.
             </div>
@@ -1442,7 +1552,7 @@ function CaptureDetailModal({
                   disabled={isCancelling}
                   aria-label={cancelButtonAriaLabel}
                   aria-busy={isCancelling}
-                  className="inline-flex min-h-9 w-full items-center justify-center rounded-md border border-[rgba(239,68,68,0.22)] px-3 py-2 text-xs font-semibold text-[var(--color-error)] transition-colors hover:bg-[rgba(239,68,68,0.08)] disabled:cursor-not-allowed disabled:opacity-50"
+                  className="lens-stop-capture-button w-full"
                 >
                   {cancelButtonLabel}
                 </button>
@@ -1460,7 +1570,7 @@ function CaptureDetailModal({
           </aside>
         </div>
 
-        <div className="grid shrink-0 grid-cols-2 gap-2 border-t border-[var(--color-border)] bg-[var(--color-bg-secondary)] p-3 sm:grid-cols-4 lg:hidden">
+        <div className="lens-detail-footer-actions grid shrink-0 grid-cols-2 gap-2 border-t border-[var(--color-border)] bg-[var(--color-bg-secondary)] p-3 sm:grid-cols-4 lg:hidden">
           {activeUrl ? (
             <a href={activeUrl} download className={primaryActionClass}>
               다운로드
@@ -1486,6 +1596,18 @@ function CaptureDetailModal({
           >
             경로
           </button>
+          {(capture.status === "pending" || capture.status === "processing") && (
+            <button
+              type="button"
+              onClick={() => onCancel(capture.id)}
+              disabled={isCancelling}
+              aria-label={cancelButtonAriaLabel}
+              aria-busy={isCancelling}
+              className="lens-stop-capture-button col-span-2 sm:col-span-4"
+            >
+              {cancelButtonLabel}
+            </button>
+          )}
         </div>
       </div>
     </div>
