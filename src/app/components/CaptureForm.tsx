@@ -1210,6 +1210,18 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
   const isGdnMobileSurface =
     form.channel === "gdn" && form.gdnViewportMode === "mobile";
   const gdnOperationSurfaceLabel = isGdnMobileSurface ? "Google Ads MO 지면" : "Google Ads PC 지면";
+  const isLongRunningCapture = form.channel === "gdn" || isYouTubeChannel;
+  const captureOpsSurfaceLabel =
+    form.channel === "gdn"
+      ? gdnOperationSurfaceLabel
+      : `YouTube · ${detailOptionLabel[selectedOptionPreset] ?? productLabel[selectedProduct]}`;
+  const captureOpsExpectation =
+    form.channel === "gdn"
+      ? "외부 매체 페이지 로딩과 광고 슬롯 탐색 때문에 지연될 수 있습니다."
+      : "YouTube 지면은 재생 상태와 노출 지점을 맞춘 뒤 증빙을 생성합니다.";
+  const captureOpsNextAction = isSubmitting
+    ? "QA 이력에 진행 행이 생기면 행 또는 상세 패널에서 상태와 중단 요청 위치를 확인합니다."
+    : "요청 전 지면, 소재, 랜딩을 확인하고 시작 후에는 QA 이력에서 진행 상태를 추적합니다.";
 
   const gdnAdSizeCatalog = useMemo(
     () => (isGdnMobileSurface ? GDN_AD_SIZES_MOBILE : GDN_AD_SIZES),
@@ -1228,6 +1240,13 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
   const isFormValid =
     (isAutoPublisherChannel || form.selectedPublishers.length > 0) &&
     hasValidSource;
+  const captureOpsStatusLabel = isSubmitting
+    ? "요청 접수 중"
+    : isUploading
+      ? "소재 업로드 중"
+      : isFormValid
+        ? "접수 준비됨"
+        : "입력 확인 필요";
   const selectedPublisherDedupeSummary = useMemo(
     () => summarizeDedupeHttpUrls(form.selectedPublishers),
     [form.selectedPublishers],
@@ -1557,6 +1576,52 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
             </p>
           </div>
         </div>
+
+        {isLongRunningCapture && (
+          <section
+            className={`mb-5 rounded-xl border px-4 py-3 transition-colors ${
+              isSubmitting
+                ? "border-[rgba(185,83,61,0.3)] bg-[rgba(254,242,241,0.62)]"
+                : "border-[var(--color-border)] bg-[var(--color-bg-secondary)]"
+            }`}
+            aria-labelledby="capture-ops-control-title"
+            aria-live={isSubmitting ? "polite" : undefined}
+          >
+            <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+              <div className="min-w-0">
+                <p
+                  id="capture-ops-control-title"
+                  className="text-xs font-semibold text-[var(--color-text-primary)]"
+                >
+                  캡처 운영 관제
+                </p>
+                <p className="mt-1 text-[11px] leading-5 text-[var(--color-text-muted)]">
+                  {captureOpsSurfaceLabel}. {captureOpsExpectation}
+                </p>
+              </div>
+              <div className="shrink-0 rounded-lg border border-[var(--color-border)] bg-white/70 px-3 py-2 text-left md:min-w-[11rem]">
+                <p className="text-[10px] font-semibold text-[var(--color-text-muted)]">현재 단계</p>
+                <p className="mt-1 text-xs font-semibold text-[var(--color-text-primary)]">
+                  {captureOpsStatusLabel}
+                </p>
+              </div>
+            </div>
+            <ol className="mt-3 grid grid-cols-1 gap-3 border-t border-[var(--color-border)] pt-3 text-[11px] leading-5 text-[var(--color-text-secondary)] sm:grid-cols-3 sm:gap-0">
+              <li className="sm:pr-4">
+                <span className="font-semibold text-[var(--color-text-primary)]">1. 요청 접수</span>
+                <p className="mt-1 text-[var(--color-text-muted)]">폼 검증 후 캡처 작업을 큐에 올립니다.</p>
+              </li>
+              <li className="border-t border-[var(--color-border)] pt-3 sm:border-l sm:border-t-0 sm:px-4 sm:pt-0">
+                <span className="font-semibold text-[var(--color-text-primary)]">2. QA 이력 생성</span>
+                <p className="mt-1 text-[var(--color-text-muted)]">진행 행에서 대기/처리 상태를 추적합니다.</p>
+              </li>
+              <li className="border-t border-[var(--color-border)] pt-3 sm:border-l sm:border-t-0 sm:pl-4 sm:pt-0">
+                <span className="font-semibold text-[var(--color-text-primary)]">3. 다음 액션</span>
+                <p className="mt-1 text-[var(--color-text-muted)]">{captureOpsNextAction}</p>
+              </li>
+            </ol>
+          </section>
+        )}
 
         {/* ===== 매체 / 상품 / 상세 옵션 선택 ===== */}
         <div className="mb-5 space-y-3">
@@ -4366,7 +4431,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
               </>
             )}
           </button>
-          {form.channel === "gdn" && (
+          {isLongRunningCapture && (
             <div
               className={`mt-3 rounded-lg border px-3 py-2 text-[11px] leading-5 transition-colors ${
                 isSubmitting
@@ -4378,7 +4443,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
             >
               <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
                 <span className="font-semibold text-[var(--color-text-primary)]">
-                  {gdnOperationSurfaceLabel} 운영 상태
+                  {captureOpsSurfaceLabel} 운영 상태
                 </span>
                 <span className="shrink-0 font-medium">
                   {isSubmitting ? "요청 접수 중" : "긴 렌더링 대비"}
@@ -4387,7 +4452,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
               <p className="mt-1">
                 {isSubmitting
                   ? "캡처 요청이 수락되면 QA 이력에 진행 행이 생깁니다. 중단은 해당 행이나 상세 패널의 중단 버튼에서 요청할 수 있습니다."
-                  : "GDN 지면은 외부 페이지 로딩이 길 수 있습니다. 시작 후 진행 상태와 중단 요청 위치는 QA 이력에서 확인합니다."}
+                  : `${captureOpsExpectation} 시작 후 진행 상태와 중단 요청 위치는 QA 이력에서 확인합니다.`}
               </p>
             </div>
           )}
