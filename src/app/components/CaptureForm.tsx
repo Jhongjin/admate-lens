@@ -1209,6 +1209,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
 
   const isGdnMobileSurface =
     form.channel === "gdn" && form.gdnViewportMode === "mobile";
+  const gdnOperationSurfaceLabel = isGdnMobileSurface ? "Google Ads MO 지면" : "Google Ads PC 지면";
 
   const gdnAdSizeCatalog = useMemo(
     () => (isGdnMobileSurface ? GDN_AD_SIZES_MOBILE : GDN_AD_SIZES),
@@ -4365,6 +4366,31 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
               </>
             )}
           </button>
+          {form.channel === "gdn" && (
+            <div
+              className={`mt-3 rounded-lg border px-3 py-2 text-[11px] leading-5 transition-colors ${
+                isSubmitting
+                  ? "border-[rgba(185,83,61,0.28)] bg-[rgba(254,242,241,0.58)] text-[var(--color-text-secondary)]"
+                  : "border-[var(--color-border)] bg-[var(--color-bg-secondary)] text-[var(--color-text-muted)]"
+              }`}
+              role={isSubmitting ? "status" : undefined}
+              aria-live={isSubmitting ? "polite" : undefined}
+            >
+              <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                <span className="font-semibold text-[var(--color-text-primary)]">
+                  {gdnOperationSurfaceLabel} 운영 상태
+                </span>
+                <span className="shrink-0 font-medium">
+                  {isSubmitting ? "요청 접수 중" : "긴 렌더링 대비"}
+                </span>
+              </div>
+              <p className="mt-1">
+                {isSubmitting
+                  ? "캡처 요청이 수락되면 QA 이력에 진행 행이 생깁니다. 중단은 해당 행이나 상세 패널의 중단 버튼에서 요청할 수 있습니다."
+                  : "GDN 지면은 외부 페이지 로딩이 길 수 있습니다. 시작 후 진행 상태와 중단 요청 위치는 QA 이력에서 확인합니다."}
+              </p>
+            </div>
+          )}
         </div>
       </form>
 
