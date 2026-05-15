@@ -1560,8 +1560,11 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
         {/* ===== 매체 / 상품 / 상세 옵션 선택 ===== */}
         <div className="mb-5 space-y-3">
           <div>
-            <label className="form-label">1) 매체 선택</label>
+            <label className="form-label" htmlFor="capture-media-menu">
+              1) 매체 선택
+            </label>
             <select
+              id="capture-media-menu"
               className="form-input"
               value={selectedMediaMenu}
               onChange={(e) => {
@@ -1611,8 +1614,11 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
           </div>
 
           <div>
-            <label className="form-label">2) 상품 선택</label>
+            <label className="form-label" htmlFor="capture-product-menu">
+              2) 상품 선택
+            </label>
             <select
+              id="capture-product-menu"
               className="form-input"
               value={selectedProduct}
               onChange={(e) => {
@@ -1735,8 +1741,11 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
           </div>
 
           <div>
-            <label className="form-label">3) 상세 옵션</label>
+            <label className="form-label" htmlFor="capture-detail-option">
+              3) 상세 옵션
+            </label>
             <select
+              id="capture-detail-option"
               className="form-input"
               value={selectedOptionPreset}
               onChange={(e) => {
@@ -4324,6 +4333,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
             type="submit"
             className="btn btn-primary btn-lg w-full"
             disabled={!isFormValid || isSubmitting || isUploading}
+            aria-busy={isSubmitting || isUploading}
           >
             {isSubmitting ? (
               <>

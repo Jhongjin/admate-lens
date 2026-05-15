@@ -686,7 +686,10 @@ export default function CaptureList({ refreshTrigger }: CaptureListProps) {
         </div>
 
         {/* 상태 필터 탭 */}
-        <div className="flex gap-1 bg-[var(--color-bg-primary)] rounded-lg p-1 border border-[var(--color-border)]">
+        <div
+          className="flex gap-1 bg-[var(--color-bg-primary)] rounded-lg p-1 border border-[var(--color-border)]"
+          aria-label="캡처 상태 필터"
+        >
           {[
             { key: "all", label: "전체" },
             { key: "pending", label: "대기중" },
@@ -696,7 +699,10 @@ export default function CaptureList({ refreshTrigger }: CaptureListProps) {
           ].map((tab) => (
             <button
               key={tab.key}
+              type="button"
               onClick={() => setStatusFilter(tab.key)}
+              aria-pressed={statusFilter === tab.key}
+              aria-label={`${tab.label} 캡처 보기${statusCounts[tab.key] ? `, ${statusCounts[tab.key]}건` : ""}`}
               className={`
                 px-3 py-1.5 rounded-md text-xs font-medium transition-all
                 ${statusFilter === tab.key
@@ -718,6 +724,7 @@ export default function CaptureList({ refreshTrigger }: CaptureListProps) {
         {/* 전체 삭제 버튼 */}
         {CAPTURE_DELETE_ENABLED && captures.length > 0 && (
           <button
+            type="button"
             onClick={() => setDeleteConfirm({ type: "all" })}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium
                        text-[var(--color-error)] hover:bg-[rgba(239,68,68,0.1)]
@@ -731,6 +738,17 @@ export default function CaptureList({ refreshTrigger }: CaptureListProps) {
           </button>
         )}
       </div>
+
+      {activeCount > 0 && (
+        <div
+          className="mb-3 rounded-lg border border-[rgba(185,83,61,0.24)] bg-[rgba(254,242,241,0.5)] px-3 py-2 text-[11px] leading-5 text-[var(--color-text-secondary)]"
+          role="status"
+          aria-live="polite"
+        >
+          진행 중인 캡처 {activeCount}건은 각 이력 행의 중단 버튼이나 상세 화면의 중단 버튼에서 요청할 수 있습니다.
+          처리 중 캡처는 서버가 요청을 반영한 뒤 최종 상태로 갱신됩니다.
+        </div>
+      )}
 
       <div
         className={`lens-capture-stage-rail ${activeCount > 0 ? "lens-capture-stage-rail--active" : ""}`}
