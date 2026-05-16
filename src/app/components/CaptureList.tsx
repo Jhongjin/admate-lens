@@ -30,6 +30,12 @@ interface CaptureListProps {
   refreshTrigger?: number;
 }
 
+interface CaptureListResponse {
+  data?: CaptureRecord[];
+  fixture?: boolean;
+  error?: string;
+}
+
 type CaptureDisplayStatus = CaptureRecord["status"] | "cancel-requested" | "canceled";
 type StatusDescriptor = { label: string; class: string; icon: string };
 
@@ -280,6 +286,17 @@ function getRuntimeProviderLabel(metadata: Record<string, unknown> | null): stri
   return provider;
 }
 
+function isLocalFixtureRuntime(metadata: Record<string, unknown> | null): boolean {
+  if (!metadata) return false;
+  const runtime = metadata.runtime as Record<string, unknown> | undefined;
+  return runtime?.provider === "local-fixture" || metadata.runtimeProvider === "local-fixture";
+}
+
+function isLocalFixtureCapture(capture: CaptureRecord): boolean {
+  const metadata = capture.metadata && typeof capture.metadata === "object" ? capture.metadata : null;
+  return isLocalFixtureRuntime(metadata);
+}
+
 function getMetadataSurfaceCode(metadata: Record<string, unknown> | null): string | null {
   if (!metadata) return null;
   const family = typeof metadata.productFamily === "string" ? metadata.productFamily : null;
@@ -428,6 +445,7 @@ export default function CaptureList({ refreshTrigger }: CaptureListProps) {
   const [isDeleting, setIsDeleting] = useState(false);
   const [cancellingIds, setCancellingIds] = useState<Set<string>>(new Set());
   const [authExpiredMessage, setAuthExpiredMessage] = useState<string | null>(null);
+  const [isLocalFixtureMode, setIsLocalFixtureMode] = useState(false);
 
   // 폴링 안정화를 위한 ref: captures 변경에 의한 무한 재렌더 방지
   const capturesRef = useRef<CaptureRecord[]>([]);
@@ -444,10 +462,11 @@ export default function CaptureList({ refreshTrigger }: CaptureListProps) {
       const res = await fetch(`/api/captures?${params.toString()}`, {
         cache: "no-store",
       });
-      const result = await res.json();
+      const result = (await res.json()) as CaptureListResponse;
 
       if (isLensAuthRequiredResponse(res, result)) {
         setAuthExpiredMessage(result?.error || LENS_AUTH_EXPIRED_MESSAGE);
+        setIsLocalFixtureMode(false);
         setCaptures([]);
         setSelectedCapture(null);
         return;
@@ -455,6 +474,7 @@ export default function CaptureList({ refreshTrigger }: CaptureListProps) {
 
       if (res.ok && result.data) {
         setAuthExpiredMessage(null);
+        setIsLocalFixtureMode(result.fixture === true);
         setCaptures(result.data);
       }
     } catch (err) {
@@ -495,16 +515,19 @@ export default function CaptureList({ refreshTrigger }: CaptureListProps) {
 
   /** 필터링된 캡처 목록 */
   const filteredCaptures = captures;
-  const activeCaptures = captures.filter((c) => c.status === "pending" || c.status === "processing");
+  const activeCaptures = isLocalFixtureMode
+    ? []
+    : captures.filter((c) => c.status === "pending" || c.status === "processing");
   const activeCount = activeCaptures.length;
   const pendingCount = activeCaptures.filter((c) => c.status === "pending").length;
   const processingCount = activeCount - pendingCount;
+  const fixtureSampleCount = captures.filter((capture) => isLocalFixtureMode || isLocalFixtureCapture(capture)).length;
   const latestCompleted = captures.find((c) => c.status === "completed" && !!c.placement_image_url) || null;
   const featuredProof = captures.find(isGoldenCandidate) || latestCompleted;
   const featuredProofIsGolden = featuredProof ? isGoldenCandidate(featuredProof) : false;
-  const activeStageIndex = activeCount > 0 ? 1 : featuredProof ? 3 : 0;
+  const activeStageIndex = isLocalFixtureMode ? 2 : activeCount > 0 ? 1 : featuredProof ? 3 : 0;
   const isCaptureActive = (capture: CaptureRecord) =>
-    capture.status === "pending" || capture.status === "processing";
+    !isLocalFixtureMode && (capture.status === "pending" || capture.status === "processing");
   const openCaptureDetail = useCallback((capture: CaptureRecord) => {
     setSelectedCapture(capture);
   }, []);
@@ -673,8 +696,8 @@ export default function CaptureList({ refreshTrigger }: CaptureListProps) {
           <div>
             <h2 className="ops-section-title">렌더 증빙 QA 이력</h2>
             <p className="text-xs text-[var(--color-text-muted)]">
-              총 {statusCounts.all || 0}건
-              {captures.some((c) => c.status === "processing") && (
+              {isLocalFixtureMode ? `Fixture sample ${fixtureSampleCount}건` : `총 ${statusCounts.all || 0}건`}
+              {!isLocalFixtureMode && captures.some((c) => c.status === "processing") && (
                 <span className="text-[var(--color-accent)] ml-2">
                   <span className="inline-block w-2 h-2 rounded-full bg-[var(--color-accent)] animate-pulse mr-1" />
                   실시간 갱신 중
@@ -724,6 +747,11 @@ export default function CaptureList({ refreshTrigger }: CaptureListProps) {
         </div>
 
         <span className="badge badge-pending">삭제 비활성</span>
+        {isLocalFixtureMode && (
+          <span className="lens-fixture-chip" aria-live="polite">
+            Local fixture · 읽기 전용
+          </span>
+        )}
         {activeCount > 0 && (
           <span className="badge badge-processing" aria-live="polite">
             진행 {activeCount}건 · 중단 가능
@@ -747,6 +775,24 @@ export default function CaptureList({ refreshTrigger }: CaptureListProps) {
           </button>
         )}
       </div>
+
+      {isLocalFixtureMode && (
+        <div className="lens-fixture-mode-strip mb-3" role="status" aria-live="polite">
+          <div>
+            <span>Local fixture QA</span>
+            <strong>읽기 전용 샘플 모드</strong>
+            <p>
+              DB 저장, Storage 업로드, 실제 브라우저 캡처, 중단 요청은 API에서 차단됩니다.
+              현재 화면은 디자인 QA와 증빙 검수 흐름 확인용 fixture 이력만 보여줍니다.
+            </p>
+          </div>
+          <div className="lens-fixture-mode-strip__cells" aria-label="fixture 보호 경계">
+            <span>Fixture {fixtureSampleCount}</span>
+            <span>Mutation off</span>
+            <span>Capture off</span>
+          </div>
+        </div>
+      )}
 
       {activeCount > 0 && (
         <div
@@ -781,13 +827,21 @@ export default function CaptureList({ refreshTrigger }: CaptureListProps) {
       {/* 렌더링 현황 + 최신 결과 */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
         <div className="glass-card-static lens-capture-summary-card p-4 md:col-span-1">
-          <p className="text-xs text-[var(--color-text-muted)] mb-1">진행 중 렌더</p>
-          <p className="text-2xl font-bold text-[var(--color-text-primary)]">{activeCount}</p>
+          <p className="text-xs text-[var(--color-text-muted)] mb-1">
+            {isLocalFixtureMode ? "Fixture samples" : "진행 중 렌더"}
+          </p>
+          <p className="text-2xl font-bold text-[var(--color-text-primary)]">
+            {isLocalFixtureMode ? fixtureSampleCount : activeCount}
+          </p>
           <p className="text-xs text-[var(--color-text-secondary)] mt-1">
-            {activeCount > 0 ? "렌더 증빙이 생성 중입니다" : "대기/진행 렌더 없음"}
+            {isLocalFixtureMode
+              ? "읽기 전용 QA 이력입니다"
+              : activeCount > 0
+                ? "렌더 증빙이 생성 중입니다"
+                : "대기/진행 렌더 없음"}
           </p>
           <p className="mt-2 text-[11px] leading-5 text-[var(--color-text-muted)]">
-            새 배치와 이전 이력이 함께 표시됩니다.
+            {isLocalFixtureMode ? "실제 캡처 작업으로 집계하지 않습니다." : "새 배치와 이전 이력이 함께 표시됩니다."}
           </p>
         </div>
         <div className="glass-card-static lens-capture-summary-card p-4 md:col-span-2">
@@ -868,6 +922,7 @@ export default function CaptureList({ refreshTrigger }: CaptureListProps) {
               const isCanceled = displayStatus === "canceled";
               const goldenCandidate = isGoldenCandidate(capture);
               const metadata = capture.metadata && typeof capture.metadata === "object" ? capture.metadata : null;
+              const isFixtureRecord = isLocalFixtureMode || isLocalFixtureCapture(capture);
               const rowDiagnostics = getDiagnosticsSummary(metadata);
               const qualityStateLabel = getQualityStateLabel(metadata);
               const failureCategoryLabel = getFailureCategoryLabel(metadata);
@@ -932,6 +987,7 @@ export default function CaptureList({ refreshTrigger }: CaptureListProps) {
                             Golden 후보
                           </span>
                         )}
+                        {isFixtureRecord && <span className="lens-fixture-chip">Fixture sample</span>}
                       </div>
                       <p className="text-sm text-[var(--color-text-primary)] truncate">
                         {capture.source_url ? truncateUrl(capture.source_url) : "URL 없음"}
@@ -1048,6 +1104,7 @@ export default function CaptureList({ refreshTrigger }: CaptureListProps) {
           onDelete={(id) => setDeleteConfirm({ type: "single", id })}
           onCancel={handleCancelCapture}
           isCancelling={cancellingIds.has(selectedCapture.id)}
+          isLocalFixtureMode={isLocalFixtureMode}
         />
       )}
 
@@ -1119,12 +1176,14 @@ function CaptureDetailModal({
   onDelete,
   onCancel,
   isCancelling,
+  isLocalFixtureMode,
 }: {
   capture: CaptureRecord;
   onClose: () => void;
   onDelete: (id: string) => void;
   onCancel: (id: string) => void;
   isCancelling: boolean;
+  isLocalFixtureMode: boolean;
 }) {
   type OutputId = "placement" | "landing";
 
@@ -1135,6 +1194,9 @@ function CaptureDetailModal({
   const cancelButtonAriaLabel = getCancelButtonAriaLabel(capture, isCancelling);
   const metadata =
     capture.metadata && typeof capture.metadata === "object" ? capture.metadata : null;
+  const isFixtureRecord = isLocalFixtureMode || isLocalFixtureRuntime(metadata);
+  const isCancellableActive =
+    !isFixtureRecord && (capture.status === "pending" || capture.status === "processing");
   const qualityStateLabel = getQualityStateLabel(metadata);
   const qualityFlagCountLabel = getQualityFlagCountLabel(metadata);
   const runtimeProviderLabel = getRuntimeProviderLabel(metadata);
@@ -1223,7 +1285,7 @@ function CaptureDetailModal({
   }, []);
 
   const renderPreview = () => {
-    if (capture.status === "pending" || capture.status === "processing") {
+    if (isCancellableActive) {
       return (
         <div className="lens-proof-active-state flex h-full min-h-[320px] flex-col items-center justify-center p-8 text-center">
           <div className="spinner spinner-lg mb-4" />
@@ -1338,6 +1400,13 @@ function CaptureDetailModal({
             <span>Golden 후보</span>
             <strong>{getGoldenCandidateReason(capture)}</strong>
             <p>게재면 이미지, 진단 플래그, 검수 필요 여부를 기준으로 보존 후보로 표시합니다.</p>
+          </div>
+        )}
+        {isFixtureRecord && (
+          <div className="lens-fixture-detail-panel">
+            <span>Local fixture QA</span>
+            <strong>읽기 전용 샘플</strong>
+            <p>이 상세 화면은 fixture 데이터 판독용입니다. 실제 캡처 실행, 중단, 저장소 변경은 수행하지 않습니다.</p>
           </div>
         )}
         {capture.status === "failed" && capture.error_message && (
@@ -1472,6 +1541,7 @@ function CaptureDetailModal({
               </h2>
               <span className={`badge ${status.class}`}>{status.icon} {status.label}</span>
               {goldenCandidate && <span className="lens-golden-candidate-badge">Golden 후보</span>}
+              {isFixtureRecord && <span className="lens-fixture-chip">Fixture sample</span>}
               <span className="rounded bg-[var(--color-bg-tertiary)] px-2 py-0.5 text-xs font-semibold text-[var(--color-text-secondary)]">
                 {getCaptureChannelLabel(capture)}
               </span>
@@ -1598,7 +1668,7 @@ function CaptureDetailModal({
                   참조 URL 복사
                 </button>
               )}
-              {(capture.status === "pending" || capture.status === "processing") && (
+              {isCancellableActive && (
                 <button
                   type="button"
                   onClick={() => onCancel(capture.id)}
@@ -1649,7 +1719,7 @@ function CaptureDetailModal({
           >
             경로
           </button>
-          {(capture.status === "pending" || capture.status === "processing") && (
+          {isCancellableActive && (
             <button
               type="button"
               onClick={() => onCancel(capture.id)}
