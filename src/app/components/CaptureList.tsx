@@ -1248,6 +1248,13 @@ function CaptureDetailModal({
   const activeReferenceUrl = activeOutput.referenceUrl;
   const selectedZoomLabel =
     zoomMode === "fit" ? "맞춤" : zoomMode === "100" ? "100%" : zoomMode === "150" ? "150%" : "200%";
+  const openActionLabel = isFixtureRecord ? "샘플 열기" : "원본 열기";
+  const downloadActionLabel = isFixtureRecord ? "샘플 저장" : "다운로드";
+  const urlCopyActionLabel = isFixtureRecord ? "샘플 URL 복사" : "URL 복사";
+  const pathCopyActionLabel = isFixtureRecord ? "Fixture 경로 복사" : "경로 복사";
+  const compactPathActionLabel = isFixtureRecord ? "Fixture 경로" : "경로";
+  const imageCopyLabel = isFixtureRecord ? "샘플 이미지 URL" : "이미지 URL(복사용)";
+  const storageCopyLabel = isFixtureRecord ? "Fixture 저장 경로" : "저장 경로(내부용)";
   const actionButtonClass =
     "inline-flex items-center justify-center gap-1.5 rounded-md border border-[var(--color-border)] bg-[var(--color-bg-secondary)] px-3 py-1.5 text-xs font-medium text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-bg-tertiary)] disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:bg-[var(--color-bg-secondary)]";
   const primaryActionClass =
@@ -1407,6 +1414,7 @@ function CaptureDetailModal({
             <span>Local fixture QA</span>
             <strong>읽기 전용 샘플</strong>
             <p>이 상세 화면은 fixture 데이터 판독용입니다. 실제 캡처 실행, 중단, 저장소 변경은 수행하지 않습니다.</p>
+            <p>샘플 열기, 저장, URL 복사는 fixture 검수용 동작이며 기록 변경을 만들지 않습니다.</p>
           </div>
         )}
         {capture.status === "failed" && capture.error_message && (
@@ -1464,22 +1472,22 @@ function CaptureDetailModal({
       <section className="lens-inspector-section space-y-2">
         <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--color-text-muted)]">선택 이미지</p>
         <DetailInfoRow label="출력">{activeOutput.description}</DetailInfoRow>
-        <DetailInfoRow label="이미지 URL(복사용)">
+        <DetailInfoRow label={imageCopyLabel}>
           {activeUrl ? (
             <button
               type="button"
-              onClick={() => copyText(activeUrl, "이미지 URL(복사용)")}
+              onClick={() => copyText(activeUrl, imageCopyLabel)}
               className="break-all text-right text-[var(--color-accent)] hover:underline"
             >
               {getHostnameLabel(activeUrl) ?? "URL 복사"}
             </button>
           ) : "없음"}
         </DetailInfoRow>
-        <DetailInfoRow label="저장 경로(내부용)" mono>
+        <DetailInfoRow label={storageCopyLabel} mono>
           {activeStoragePath ? (
             <button
               type="button"
-              onClick={() => copyText(activeStoragePath, "저장 경로(내부용)")}
+              onClick={() => copyText(activeStoragePath, storageCopyLabel)}
               className="break-all text-right text-[var(--color-accent)] hover:underline"
             >
               {activeStoragePath}
@@ -1571,20 +1579,20 @@ function CaptureDetailModal({
           <div className="ml-auto hidden items-center gap-2 lg:flex">
             {activeUrl ? (
               <a href={activeUrl} target="_blank" rel="noopener noreferrer" className={actionButtonClass}>
-                원본 열기
+                {openActionLabel}
               </a>
             ) : (
-              <button type="button" disabled className={actionButtonClass}>원본 열기</button>
+              <button type="button" disabled className={actionButtonClass}>{openActionLabel}</button>
             )}
             {activeUrl ? (
               <a href={activeUrl} download className={primaryActionClass}>
-                다운로드
+                {downloadActionLabel}
               </a>
             ) : (
-              <button type="button" disabled className={primaryActionClass}>다운로드</button>
+              <button type="button" disabled className={primaryActionClass}>{downloadActionLabel}</button>
             )}
-            <button type="button" disabled={!activeUrl} onClick={() => copyText(activeUrl, "이미지 URL(복사용)")} className={actionButtonClass}>
-              URL 복사
+            <button type="button" disabled={!activeUrl} onClick={() => copyText(activeUrl, imageCopyLabel)} className={actionButtonClass}>
+              {urlCopyActionLabel}
             </button>
           </div>
         </header>
@@ -1624,7 +1632,7 @@ function CaptureDetailModal({
             </div>
 
             <div className="max-h-[38vh] overflow-y-auto border-t border-[var(--color-border)] bg-[var(--color-bg-secondary)] lg:hidden">
-              <details open className="border-b border-[var(--color-border)] px-4 py-3">
+              <details open={!isFixtureRecord} className="border-b border-[var(--color-border)] px-4 py-3">
                 <summary className="cursor-pointer text-sm font-semibold text-[var(--color-text-primary)]">메타데이터</summary>
                 <div className="mt-3">{renderInspectorContent(true)}</div>
               </details>
@@ -1637,30 +1645,30 @@ function CaptureDetailModal({
             </div>
             <div className="space-y-2 border-t border-[var(--color-border)] p-4">
               <div className="grid grid-cols-2 gap-2">
-                <button type="button" disabled={!activeUrl} onClick={() => copyText(activeUrl, "이미지 URL(복사용)")} className={actionButtonClass}>
-                  URL 복사
+                <button type="button" disabled={!activeUrl} onClick={() => copyText(activeUrl, imageCopyLabel)} className={actionButtonClass}>
+                  {urlCopyActionLabel}
                 </button>
                 <button
                   type="button"
                   disabled={!activeStoragePath}
-                  onClick={() => copyText(activeStoragePath, "저장 경로(내부용)")}
+                  onClick={() => copyText(activeStoragePath, storageCopyLabel)}
                   className={actionButtonClass}
                 >
-                  경로 복사
+                  {pathCopyActionLabel}
                 </button>
                 {activeUrl ? (
                   <a href={activeUrl} target="_blank" rel="noopener noreferrer" className={actionButtonClass}>
-                    원본 열기
+                    {openActionLabel}
                   </a>
                 ) : (
-                  <button type="button" disabled className={actionButtonClass}>원본 열기</button>
+                  <button type="button" disabled className={actionButtonClass}>{openActionLabel}</button>
                 )}
                 {activeUrl ? (
                   <a href={activeUrl} download className={primaryActionClass}>
-                    다운로드
+                    {downloadActionLabel}
                   </a>
                 ) : (
-                  <button type="button" disabled className={primaryActionClass}>다운로드</button>
+                  <button type="button" disabled className={primaryActionClass}>{downloadActionLabel}</button>
                 )}
               </div>
               {activeReferenceUrl && (
@@ -1696,28 +1704,28 @@ function CaptureDetailModal({
         <div className="lens-detail-footer-actions grid shrink-0 grid-cols-2 gap-2 border-t border-[var(--color-border)] bg-[var(--color-bg-secondary)] p-3 sm:grid-cols-4 lg:hidden">
           {activeUrl ? (
             <a href={activeUrl} download className={primaryActionClass}>
-              다운로드
+              {downloadActionLabel}
             </a>
           ) : (
-            <button type="button" disabled className={primaryActionClass}>다운로드</button>
+            <button type="button" disabled className={primaryActionClass}>{downloadActionLabel}</button>
           )}
-          <button type="button" disabled={!activeUrl} onClick={() => copyText(activeUrl, "이미지 URL(복사용)")} className={actionButtonClass}>
-            URL 복사
+          <button type="button" disabled={!activeUrl} onClick={() => copyText(activeUrl, imageCopyLabel)} className={actionButtonClass}>
+            {urlCopyActionLabel}
           </button>
           {activeUrl ? (
             <a href={activeUrl} target="_blank" rel="noopener noreferrer" className={actionButtonClass}>
-              원본
+              {openActionLabel}
             </a>
           ) : (
-            <button type="button" disabled className={actionButtonClass}>원본</button>
+            <button type="button" disabled className={actionButtonClass}>{openActionLabel}</button>
           )}
           <button
             type="button"
             disabled={!activeStoragePath}
-            onClick={() => copyText(activeStoragePath, "저장 경로(내부용)")}
+            onClick={() => copyText(activeStoragePath, storageCopyLabel)}
             className={actionButtonClass}
           >
-            경로
+            {compactPathActionLabel}
           </button>
           {isCancellableActive && (
             <button
