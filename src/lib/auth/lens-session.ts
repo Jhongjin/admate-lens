@@ -19,6 +19,14 @@ function isLocalLensAuthBypassEnabled(): boolean {
   );
 }
 
+function isLocalLensFixtureModeEnabled(): boolean {
+  return (
+    process.env.NODE_ENV !== "production" &&
+    process.env.IS_LOCAL === "true" &&
+    process.env.LENS_LOCAL_FIXTURE_MODE === "true"
+  );
+}
+
 function getSupabaseUrl(): string {
   const value = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
   if (!value) {
@@ -228,4 +236,8 @@ export async function signInLensUser(email: string, password: string) {
 
 export function canUseLocalLensAuthBypass(): boolean {
   return isLocalLensAuthBypassEnabled();
+}
+
+export function canUseLocalLensFixtureMode(): boolean {
+  return isLocalLensFixtureModeEnabled();
 }

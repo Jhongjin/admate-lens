@@ -5,7 +5,7 @@
  */
 
 import { NextResponse, type NextRequest } from "next/server";
-import { requireLensSession } from "@/lib/auth/lens-session";
+import { canUseLocalLensFixtureMode, requireLensSession } from "@/lib/auth/lens-session";
 import { createServerClient } from "@/lib/supabase/client";
 import {
   getStorageFilename,
@@ -20,6 +20,16 @@ export async function POST(request: NextRequest) {
   const auth = await requireLensSession(request);
   if ("response" in auth) {
     return auth.response;
+  }
+
+  if (canUseLocalLensFixtureMode()) {
+    return NextResponse.json(
+      {
+        error: "Local fixture mode blocks storage uploads.",
+        code: "local_fixture_read_only",
+      },
+      { status: 409 }
+    );
   }
 
   try {

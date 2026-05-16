@@ -8,9 +8,10 @@
 
 import { NextResponse, type NextRequest } from "next/server";
 import { after } from "next/server";
-import { requireLensSession } from "@/lib/auth/lens-session";
+import { canUseLocalLensFixtureMode, requireLensSession } from "@/lib/auth/lens-session";
 import { createServerClient } from "@/lib/supabase/client";
 import { createChannel } from "@/lib/capture";
+import { listLocalFixtureCaptures } from "@/lib/capture/local-fixture-captures";
 import {
   resolveBatchPerCaptureTimeoutMs,
   SERVERLESS_BATCH_BUDGET_MS,
@@ -82,6 +83,16 @@ export async function POST(request: NextRequest) {
   const auth = await requireLensSession(request);
   if ("response" in auth) {
     return auth.response;
+  }
+
+  if (canUseLocalLensFixtureMode()) {
+    return NextResponse.json(
+      {
+        error: "Local fixture mode blocks capture creation and real capture execution.",
+        code: "local_fixture_read_only",
+      },
+      { status: 409 }
+    );
   }
 
   try {
@@ -1298,8 +1309,16 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const supabase = createServerClient();
     const { searchParams } = new URL(request.url);
+    const status = searchParams.get("status");
+    const limit = parseInt(searchParams.get("limit") ?? "20", 10);
+    const offset = parseInt(searchParams.get("offset") ?? "0", 10);
+
+    if (canUseLocalLensFixtureMode()) {
+      return NextResponse.json(listLocalFixtureCaptures({ status, limit, offset }));
+    }
+
+    const supabase = createServerClient();
     // 캡처 중에는 DB를 건드리지 않아 updated_at이 갱신되지 않음 → 너무 짧으면 정상 장기 처리중 행까지 실패 처리됨(SBS 등)
     const staleThresholdIso = new Date(Date.now() - 12 * 60 * 1000).toISOString();
 
@@ -1313,10 +1332,6 @@ export async function GET(request: NextRequest) {
       })
       .eq("status", "processing")
       .lt("updated_at", staleThresholdIso);
-
-    const status = searchParams.get("status");
-    const limit = parseInt(searchParams.get("limit") ?? "20", 10);
-    const offset = parseInt(searchParams.get("offset") ?? "0", 10);
 
     let query = supabase
       .from("vision_da_captures")
@@ -1349,6 +1364,16 @@ export async function PATCH(request: NextRequest) {
   const auth = await requireLensSession(request);
   if ("response" in auth) {
     return auth.response;
+  }
+
+  if (canUseLocalLensFixtureMode()) {
+    return NextResponse.json(
+      {
+        error: "Local fixture mode blocks capture cancellation.",
+        code: "local_fixture_read_only",
+      },
+      { status: 409 }
+    );
   }
 
   try {
@@ -1436,6 +1461,16 @@ export async function DELETE(request: NextRequest) {
   const auth = await requireLensSession(request);
   if ("response" in auth) {
     return auth.response;
+  }
+
+  if (canUseLocalLensFixtureMode()) {
+    return NextResponse.json(
+      {
+        error: "Local fixture mode blocks capture deletion.",
+        code: "local_fixture_read_only",
+      },
+      { status: 409 }
+    );
   }
 
   try {

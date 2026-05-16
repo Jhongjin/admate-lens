@@ -4,7 +4,7 @@ Date: 2026-05-15
 
 ## Decision
 
-Do not add a new preview bypass route in this pass.
+Use the local-only fixture mode for authenticated shell visual QA.
 
 The app already has a local-only auth bypass path in `src/lib/auth/lens-session.ts`:
 
@@ -12,12 +12,12 @@ The app already has a local-only auth bypass path in `src/lib/auth/lens-session.
 - `IS_LOCAL === "true"`
 - `LENS_LOCAL_AUTH_BYPASS === "true"`
 
-When those guards are active, the existing `/api/auth/login` route can issue a local dev session cookie without calling production auth. That is safer than adding a second unauthenticated fixture route because it keeps preview review on the same authenticated shell and API auth boundary used by the app.
+When those guards are active, the existing `/api/auth/login` route can issue a local dev session cookie without calling production auth. Pair it with `LENS_LOCAL_FIXTURE_MODE=true` to make capture APIs return static fixture data and block write/execute paths before Supabase clients, storage uploads, cleanup updates, or browser capture execution.
 
 ## Safe local preview plan
 
 1. Use only a local development server.
-2. Enable the existing local bypass flags in a local-only environment file or shell session.
+2. Enable the existing local bypass flags and `LENS_LOCAL_FIXTURE_MODE=true` in a local-only shell session.
 3. Sign in through the normal login form with a non-secret local email and any non-empty password.
 4. Review the capture workspace UI using the local session.
 5. Do not execute real captures or call production endpoints during visual review.
@@ -26,5 +26,5 @@ When those guards are active, the existing `/api/auth/login` route can issue a l
 
 - No production bypass should exist.
 - No route should expose fixture data without the existing session boundary.
+- In fixture mode, capture list reads return static rows, while capture creation, cancellation, deletion, upload, and execute routes return read-only fixture errors.
 - No DB, storage, auth-provider, capture execution, or secret-reading behavior is required for design review.
-- If a future fixture route is needed, it should be gated by the same local-only conditions and return static UI data only.
