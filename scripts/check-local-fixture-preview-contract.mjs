@@ -111,6 +111,10 @@ assertOrder(uploadText, 'canUseLocalLensFixtureMode()', 'request.formData()', 'u
 for (const needle of [
   'getVisualInspectionDecision',
   'visualInspectionRows',
+  'sanitizeEvidenceBundleUrl',
+  'evidenceBundleRows',
+  'Evidence bundle',
+  '증빙 패키지',
   '시각 검수 게이트',
   'Visual QA gate',
   'Fixture read-only',
@@ -124,6 +128,9 @@ for (const needle of [
   '.lens-visual-qa-gate',
   '.lens-visual-qa-grid',
   '.lens-visual-qa-cell',
+  '.lens-evidence-bundle',
+  '.lens-evidence-bundle__grid',
+  '.lens-evidence-bundle__payload',
 ]) {
   assertIncludes(globalsText, needle, 'visual QA gate styles')
 }

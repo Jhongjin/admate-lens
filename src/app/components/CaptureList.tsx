@@ -339,6 +339,33 @@ function getHostnameLabel(url: string | null | undefined): string | null {
   }
 }
 
+function sanitizeEvidenceBundleUrl(value: string | null | undefined): string | null {
+  if (!value) return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  if (/^data:/i.test(trimmed)) return "[data-url-redacted]";
+
+  try {
+    const url = new URL(trimmed);
+    const hadPrivateParts = Boolean(url.search || url.hash);
+    url.search = "";
+    url.hash = "";
+    return hadPrivateParts ? `${url.toString()}?[query-redacted]` : url.toString();
+  } catch {
+    return truncateUrl(trimmed, 160);
+  }
+}
+
+function sanitizeEvidenceBundleText(value: string | null | undefined): string | null {
+  if (!value) return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  if (/\b(token|secret|credential|cookie|session|authorization|bearer|signature)\b/i.test(trimmed)) {
+    return "[sensitive-text-redacted]";
+  }
+  return truncateUrl(trimmed, 180);
+}
+
 function getDiagnosticsSummary(metadata: Record<string, unknown> | null): {
   hasDiagnostics: boolean;
   flagCount: number | null;
@@ -1485,6 +1512,69 @@ function CaptureDetailModal({
       tone: visualInspectionDecision.tone,
     },
   ] as const;
+  const evidenceBundle = {
+    captureId: capture.id,
+    status: displayStatus,
+    statusLabel: status.label,
+    mode: isFixtureRecord ? "fixture-read-only" : "capture-record",
+    channel: getCaptureChannelLabel(capture),
+    product: productLabel,
+    surface: metadataSurfaceCode,
+    selectedOutput: activeOutput.id,
+    outputDescription: activeOutput.description,
+    urls: {
+      source: sanitizeEvidenceBundleUrl(capture.source_url),
+      creative: sanitizeEvidenceBundleUrl(capture.creative_url),
+      landing: sanitizeEvidenceBundleUrl(capture.landing_final_url),
+      output: sanitizeEvidenceBundleUrl(activeUrl),
+      reference: sanitizeEvidenceBundleUrl(activeReferenceUrl),
+    },
+    storagePath: sanitizeEvidenceBundleText(activeStoragePath),
+    timestamps: {
+      createdAt: capture.created_at,
+      capturedAt: metadataEventTime,
+    },
+    duration: durationLabel,
+    quality: {
+      state: qualityStateLabel,
+      flags: qualityFlagCountLabel,
+      score: diagnosticsSummary.score,
+      needsReview: diagnosticsSummary.needsReview,
+      topIssue: diagnosticsSummary.topIssue,
+    },
+    visualQa: {
+      decision: visualInspectionDecision.label,
+      detail: visualInspectionDecision.detail,
+      goldenCandidate,
+    },
+  };
+  const evidenceBundleText = JSON.stringify(evidenceBundle, null, 2);
+  const evidenceBundleRows = [
+    {
+      label: "증빙 ID",
+      value: capture.id,
+      detail: status.label,
+      tone: "ready",
+    },
+    {
+      label: "출력",
+      value: activeOutput.label,
+      detail: activeUrl ? `${getHostnameLabel(activeUrl) ?? "image url"} 확보` : "이미지 없음",
+      tone: activeUrl ? "ready" : "warning",
+    },
+    {
+      label: "참조",
+      value: getHostnameLabel(activeReferenceUrl) ?? "참조 없음",
+      detail: capture.creative_url ? `소재 ${getHostnameLabel(capture.creative_url) ?? "URL"}` : "소재 URL 없음",
+      tone: activeReferenceUrl ? "ready" : "muted",
+    },
+    {
+      label: "보존",
+      value: activeStoragePath ? "저장 경로" : isFixtureRecord ? "Fixture" : "미기록",
+      detail: isFixtureRecord ? "Fixture read-only" : activeStoragePath ? "경로 기록됨" : "저장 추적 대기",
+      tone: activeStoragePath || isFixtureRecord ? "ready" : "muted",
+    },
+  ] as const;
   const selectedZoomLabel =
     zoomMode === "fit" ? "맞춤" : zoomMode === "100" ? "100%" : zoomMode === "150" ? "150%" : "200%";
   const openActionLabel = isFixtureRecord ? "샘플 열기" : "원본 열기";
@@ -1703,6 +1793,37 @@ function CaptureDetailModal({
               <em>{row.detail}</em>
             </div>
           ))}
+        </div>
+      </section>
+
+      <section className="lens-inspector-section space-y-3">
+        <div className="lens-evidence-bundle">
+          <div className="lens-evidence-bundle__head">
+            <div>
+              <span>Evidence bundle</span>
+              <strong>증빙 패키지</strong>
+            </div>
+            <button
+              type="button"
+              onClick={() => copyText(evidenceBundleText, "증빙 패키지")}
+              className="lens-evidence-bundle__copy"
+            >
+              복사
+            </button>
+          </div>
+          <div className="lens-evidence-bundle__grid" aria-label="증빙 패키지 요약">
+            {evidenceBundleRows.map((row) => (
+              <div className={`lens-evidence-bundle__cell ${row.tone}`} key={row.label}>
+                <span>{row.label}</span>
+                <strong>{row.value}</strong>
+                <em>{row.detail}</em>
+              </div>
+            ))}
+          </div>
+          <details className="lens-evidence-bundle__payload">
+            <summary>Payload preview</summary>
+            <pre>{evidenceBundleText}</pre>
+          </details>
         </div>
       </section>
 
