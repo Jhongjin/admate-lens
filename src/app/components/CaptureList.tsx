@@ -1368,6 +1368,7 @@ function CaptureDetailModal({
     capture.placement_image_url ? "placement" : "landing",
   );
   const [zoomMode, setZoomMode] = useState<"fit" | "100" | "150" | "200">("fit");
+  const [naturalImageSize, setNaturalImageSize] = useState<{ width: number; height: number } | null>(null);
   const [copiedLabel, setCopiedLabel] = useState<string | null>(null);
   const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const productLabel =
@@ -1431,6 +1432,11 @@ function CaptureDetailModal({
   );
   const creativeDimensionLabel = getDimensionLabel(metadata?.creativeDimensions);
   const targetAdSizeLabel = getTargetAdSizeLabel(metadata);
+  const naturalImageSizeLabel = naturalImageSize
+    ? `${naturalImageSize.width}×${naturalImageSize.height}`
+    : activeUrl
+      ? "이미지 로드 후 표시"
+      : "이미지 없음";
   const proofIntegrityRows = [
     {
       label: "출력",
@@ -1460,13 +1466,15 @@ function CaptureDetailModal({
     },
     {
       label: "규격",
-      value: creativeDimensionLabel ?? targetAdSizeLabel ?? "미기록",
-      detail: creativeDimensionLabel
-        ? "소재 natural size"
-        : targetAdSizeLabel
-          ? "대상 슬롯 size"
-          : "metadata에 규격 없음",
-      tone: creativeDimensionLabel || targetAdSizeLabel ? "ready" : "muted",
+      value: naturalImageSize ? naturalImageSizeLabel : creativeDimensionLabel ?? targetAdSizeLabel ?? "미기록",
+      detail: naturalImageSize
+        ? "viewer 원본 픽셀"
+        : creativeDimensionLabel
+          ? "소재 natural size"
+          : targetAdSizeLabel
+            ? "대상 슬롯 size"
+            : "metadata에 규격 없음",
+      tone: naturalImageSize || creativeDimensionLabel || targetAdSizeLabel ? "ready" : "muted",
     },
   ] as const;
   const pixelInspectionValue = goldenCandidate
@@ -1482,7 +1490,7 @@ function CaptureDetailModal({
     {
       label: "이미지 판독",
       value: activeUrl ? `${activeOutput.label} 확보` : "이미지 없음",
-      detail: activeUrl ? "원본 viewer 연결" : "렌더 결과 대기",
+      detail: activeUrl ? `원본 픽셀 ${naturalImageSizeLabel}` : "렌더 결과 대기",
       tone: activeUrl ? "ready" : "warning",
     },
     {
@@ -1592,7 +1600,12 @@ function CaptureDetailModal({
   useEffect(() => {
     setSelectedOutputId(capture.placement_image_url ? "placement" : "landing");
     setZoomMode("fit");
+    setNaturalImageSize(null);
   }, [capture.id, capture.placement_image_url]);
+
+  useEffect(() => {
+    setNaturalImageSize(null);
+  }, [activeUrl]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -1690,6 +1703,13 @@ function CaptureDetailModal({
         <img
           src={activeUrl}
           alt={activeOutput.alt}
+          onLoad={(event) => {
+            const image = event.currentTarget;
+            setNaturalImageSize({
+              width: image.naturalWidth,
+              height: image.naturalHeight,
+            });
+          }}
           className={
             zoomMode === "fit"
               ? "max-h-full max-w-full object-contain"
@@ -1866,6 +1886,7 @@ function CaptureDetailModal({
       <section className="lens-inspector-section space-y-2">
         <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--color-text-muted)]">선택 이미지</p>
         <DetailInfoRow label="출력">{activeOutput.description}</DetailInfoRow>
+        <DetailInfoRow label="원본 픽셀">{naturalImageSizeLabel}</DetailInfoRow>
         <DetailInfoRow label={imageCopyLabel}>
           {activeUrl ? (
             <button

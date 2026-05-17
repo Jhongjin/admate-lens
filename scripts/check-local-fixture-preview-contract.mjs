@@ -111,6 +111,9 @@ assertOrder(uploadText, 'canUseLocalLensFixtureMode()', 'request.formData()', 'u
 for (const needle of [
   'getVisualInspectionDecision',
   'visualInspectionRows',
+  'naturalImageSize',
+  '원본 픽셀',
+  'viewer 원본 픽셀',
   'sanitizeEvidenceBundleUrl',
   'evidenceBundleRows',
   'Evidence bundle',
