@@ -385,6 +385,88 @@ function getDiagnosticsSummary(metadata: Record<string, unknown> | null): {
   };
 }
 
+type DiagnosticsSummary = ReturnType<typeof getDiagnosticsSummary>;
+
+function getDimensionLabel(value: unknown): string | null {
+  if (!value || typeof value !== "object") return null;
+  const record = value as Record<string, unknown>;
+  const width = Number(record.width);
+  const height = Number(record.height);
+  if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
+    return null;
+  }
+  return `${Math.round(width)}×${Math.round(height)}`;
+}
+
+function getTargetAdSizeLabel(metadata: Record<string, unknown> | null): string | null {
+  const targetAdSizes = metadata?.targetAdSizes;
+  if (!Array.isArray(targetAdSizes)) return null;
+  const labels = targetAdSizes
+    .map((size) => (typeof size === "string" ? size : getDimensionLabel(size)))
+    .filter((label): label is string => Boolean(label));
+  if (labels.length === 0) return null;
+  const preview = labels.slice(0, 3).join(", ");
+  return labels.length > 3 ? `${preview} 외 ${labels.length - 3}` : preview;
+}
+
+function getOutputCoverageLabel(capture: CaptureRecord): string {
+  if (capture.placement_image_url && capture.landing_image_url) return "게재면 + 랜딩";
+  if (capture.placement_image_url) return "게재면";
+  if (capture.landing_image_url) return "랜딩";
+  return "이미지 대기";
+}
+
+function getProofDecisionLabel(
+  capture: CaptureRecord,
+  diagnostics: DiagnosticsSummary,
+  isFixtureRecord: boolean,
+  goldenCandidate: boolean,
+): string {
+  if (isFixtureRecord) return "Fixture 판독";
+  if (goldenCandidate) return "Golden 후보";
+  if (capture.status === "completed" && diagnostics.needsReview === false && diagnostics.flagCount === 0) {
+    return "보존 가능";
+  }
+  if (capture.status === "completed" && diagnostics.needsReview === true) return "검수 필요";
+  if (capture.status === "completed" && diagnostics.flagCount && diagnostics.flagCount > 0) return "플래그 확인";
+  if (capture.status === "failed") return "실패 판정";
+  if (capture.status === "processing") return "렌더링 중";
+  return "접수 대기";
+}
+
+function getProofDecisionTone(
+  capture: CaptureRecord,
+  diagnostics: DiagnosticsSummary,
+  isFixtureRecord: boolean,
+  goldenCandidate: boolean,
+): "ready" | "warning" | "muted" {
+  if (isFixtureRecord || goldenCandidate) return "ready";
+  if (capture.status === "failed" || diagnostics.needsReview === true || (diagnostics.flagCount ?? 0) > 0) {
+    return "warning";
+  }
+  if (capture.status === "completed" && diagnostics.needsReview === false) return "ready";
+  return "muted";
+}
+
+function getProofDecisionDetail(
+  capture: CaptureRecord,
+  diagnostics: DiagnosticsSummary,
+  isFixtureRecord: boolean,
+  goldenCandidate: boolean,
+): string {
+  if (isFixtureRecord) return "샘플 데이터 판독용이며 실제 캡처 실행이나 저장소 변경은 없습니다.";
+  if (goldenCandidate) return "진단 플래그 없이 기준 점수를 통과해 보존 후보로 표시됩니다.";
+  if (capture.status === "completed" && diagnostics.needsReview === false) {
+    return "진단 기준상 추가 검수 없이 보존 가능한 완료 항목입니다.";
+  }
+  if (capture.status === "completed" && diagnostics.needsReview === true) {
+    return "보존 전에 픽셀, CTA, 소재 비율을 다시 확인해야 합니다.";
+  }
+  if (capture.status === "failed") return "실패 사유와 재요청 가능성을 먼저 확인해야 합니다.";
+  if (capture.status === "processing") return "브라우저 렌더링 결과가 도착하면 진단 요약이 갱신됩니다.";
+  return "작업 큐에 올라가기 전 입력과 지면 조건을 확인하는 상태입니다.";
+}
+
 function isGoldenCandidate(capture: CaptureRecord): boolean {
   if (capture.status !== "completed" || !capture.placement_image_url) return false;
   const diagnostics = capture.metadata?.diagnostics as Record<string, unknown> | undefined;
@@ -1246,6 +1328,64 @@ function CaptureDetailModal({
   const activeUrl = activeOutput.url;
   const activeStoragePath = activeOutput.storagePath;
   const activeReferenceUrl = activeOutput.referenceUrl;
+  const proofDecisionLabel = getProofDecisionLabel(
+    capture,
+    diagnosticsSummary,
+    isFixtureRecord,
+    goldenCandidate,
+  );
+  const proofDecisionTone = getProofDecisionTone(
+    capture,
+    diagnosticsSummary,
+    isFixtureRecord,
+    goldenCandidate,
+  );
+  const proofDecisionDetail = getProofDecisionDetail(
+    capture,
+    diagnosticsSummary,
+    isFixtureRecord,
+    goldenCandidate,
+  );
+  const creativeDimensionLabel = getDimensionLabel(metadata?.creativeDimensions);
+  const targetAdSizeLabel = getTargetAdSizeLabel(metadata);
+  const proofIntegrityRows = [
+    {
+      label: "출력",
+      value: getOutputCoverageLabel(capture),
+      detail: activeUrl ? `${activeOutput.label} URL 확보` : "검수 이미지 생성 전",
+      tone: activeUrl ? "ready" : "warning",
+    },
+    {
+      label: "품질",
+      value: qualityFlagCountLabel ?? (diagnosticsSummary.hasDiagnostics ? "진단 데이터 있음" : "진단 대기"),
+      detail:
+        diagnosticsSummary.score !== null
+          ? `내부 점수 ${diagnosticsSummary.score}`
+          : diagnosticsSummary.topIssue ?? "플래그와 점수 없음",
+      tone:
+        diagnosticsSummary.needsReview === true || (diagnosticsSummary.flagCount ?? 0) > 0
+          ? "warning"
+          : diagnosticsSummary.hasDiagnostics
+            ? "ready"
+            : "muted",
+    },
+    {
+      label: "지면",
+      value: productLabel ?? metadataSurfaceCode ?? getCaptureChannelLabel(capture),
+      detail: metadataSurfaceCode ?? "채널 기준",
+      tone: "muted",
+    },
+    {
+      label: "규격",
+      value: creativeDimensionLabel ?? targetAdSizeLabel ?? "미기록",
+      detail: creativeDimensionLabel
+        ? "소재 natural size"
+        : targetAdSizeLabel
+          ? "대상 슬롯 size"
+          : "metadata에 규격 없음",
+      tone: creativeDimensionLabel || targetAdSizeLabel ? "ready" : "muted",
+    },
+  ] as const;
   const selectedZoomLabel =
     zoomMode === "fit" ? "맞춤" : zoomMode === "100" ? "100%" : zoomMode === "150" ? "150%" : "200%";
   const openActionLabel = isFixtureRecord ? "샘플 열기" : "원본 열기";
@@ -1431,6 +1571,23 @@ function CaptureDetailModal({
             <p className="mt-1 text-xs leading-5 text-[var(--color-text-secondary)]">{capture.error_message}</p>
           </div>
         )}
+      </section>
+
+      <section className="lens-inspector-section space-y-3">
+        <div className={`lens-proof-integrity-panel ${proofDecisionTone}`}>
+          <span>Proof integrity</span>
+          <strong>{proofDecisionLabel}</strong>
+          <p>{proofDecisionDetail}</p>
+        </div>
+        <div className="lens-proof-integrity-grid" aria-label="증빙 신뢰 요약">
+          {proofIntegrityRows.map((row) => (
+            <div className={`lens-proof-integrity-cell ${row.tone}`} key={row.label}>
+              <span>{row.label}</span>
+              <strong>{row.value}</strong>
+              <em>{row.detail}</em>
+            </div>
+          ))}
+        </div>
       </section>
 
       <section className="lens-inspector-section space-y-2">
