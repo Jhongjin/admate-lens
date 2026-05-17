@@ -1554,6 +1554,13 @@ function CaptureDetailModal({
       decision: visualInspectionDecision.label,
       detail: visualInspectionDecision.detail,
       goldenCandidate,
+      viewerOriginalPixels: naturalImageSize
+        ? {
+            width: naturalImageSize.width,
+            height: naturalImageSize.height,
+            label: naturalImageSizeLabel,
+          }
+        : null,
     },
   };
   const evidenceBundleText = JSON.stringify(evidenceBundle, null, 2);
@@ -1575,6 +1582,12 @@ function CaptureDetailModal({
       value: getHostnameLabel(activeReferenceUrl) ?? "참조 없음",
       detail: capture.creative_url ? `소재 ${getHostnameLabel(capture.creative_url) ?? "URL"}` : "소재 URL 없음",
       tone: activeReferenceUrl ? "ready" : "muted",
+    },
+    {
+      label: "원본 픽셀",
+      value: naturalImageSizeLabel,
+      detail: naturalImageSize ? "viewer 판독값" : "이미지 로드 후 표시",
+      tone: naturalImageSize ? "ready" : "muted",
     },
     {
       label: "보존",

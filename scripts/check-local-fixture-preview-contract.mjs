@@ -114,6 +114,8 @@ for (const needle of [
   'naturalImageSize',
   '원본 픽셀',
   'viewer 원본 픽셀',
+  'viewerOriginalPixels',
+  'viewer 판독값',
   'sanitizeEvidenceBundleUrl',
   'evidenceBundleRows',
   'Evidence bundle',
