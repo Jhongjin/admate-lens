@@ -8,6 +8,8 @@ const files = {
   captures: 'src/app/api/captures/route.ts',
   execute: 'src/app/api/captures/execute/route.ts',
   upload: 'src/app/api/upload/route.ts',
+  captureList: 'src/app/components/CaptureList.tsx',
+  globals: 'src/app/globals.css',
   doc: 'docs/tasks/2026-05-15_lens_local_preview_unblock_audit_v1.md',
   packageJson: 'package.json',
 }
@@ -54,6 +56,8 @@ const fixtureText = read(files.fixtures)
 const capturesText = read(files.captures)
 const executeText = read(files.execute)
 const uploadText = read(files.upload)
+const captureListText = read(files.captureList)
+const globalsText = read(files.globals)
 const docText = read(files.doc)
 const packageJson = JSON.parse(read(files.packageJson) || '{}')
 
@@ -103,6 +107,26 @@ assertRouteGuard(capturesText, 'captures route', 'Local fixture mode blocks capt
 assertRouteGuard(executeText, 'execute route', 'Local fixture mode blocks real capture execution.')
 assertRouteGuard(uploadText, 'upload route', 'Local fixture mode blocks storage uploads.')
 assertOrder(uploadText, 'canUseLocalLensFixtureMode()', 'request.formData()', 'upload form-data boundary')
+
+for (const needle of [
+  'getVisualInspectionDecision',
+  'visualInspectionRows',
+  '시각 검수 게이트',
+  'Visual QA gate',
+  'Fixture read-only',
+  '재촬영 검토',
+  '렌더 결과 대기',
+]) {
+  assertIncludes(captureListText, needle, 'capture detail visual QA gate')
+}
+
+for (const needle of [
+  '.lens-visual-qa-gate',
+  '.lens-visual-qa-grid',
+  '.lens-visual-qa-cell',
+]) {
+  assertIncludes(globalsText, needle, 'visual QA gate styles')
+}
 
 for (const needle of [
   'Use the local-only fixture mode',

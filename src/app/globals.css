@@ -3190,7 +3190,8 @@ button.lens-action-card {
   padding: 10px 12px;
 }
 
-.lens-proof-integrity-panel {
+.lens-proof-integrity-panel,
+.lens-visual-qa-gate {
   border: 1px solid rgba(214, 204, 185, 0.88);
   border-radius: 8px;
   background:
@@ -3199,14 +3200,16 @@ button.lens-action-card {
   padding: 11px 12px;
 }
 
-.lens-proof-integrity-panel.ready {
+.lens-proof-integrity-panel.ready,
+.lens-visual-qa-gate.ready {
   border-color: rgba(15, 118, 110, 0.32);
   background:
     linear-gradient(90deg, rgba(15, 118, 110, 0.13), transparent 64%),
     #f2fbf8;
 }
 
-.lens-proof-integrity-panel.warning {
+.lens-proof-integrity-panel.warning,
+.lens-visual-qa-gate.warning {
   border-color: rgba(185, 83, 61, 0.34);
   background:
     linear-gradient(90deg, rgba(185, 83, 61, 0.12), transparent 64%),
@@ -3215,12 +3218,17 @@ button.lens-action-card {
 
 .lens-proof-integrity-panel span,
 .lens-proof-integrity-panel strong,
-.lens-proof-integrity-panel p {
+.lens-proof-integrity-panel p,
+.lens-visual-qa-gate span,
+.lens-visual-qa-gate strong,
+.lens-visual-qa-gate p {
   display: block;
 }
 
 .lens-proof-integrity-panel span,
-.lens-proof-integrity-cell span {
+.lens-proof-integrity-cell span,
+.lens-visual-qa-gate span,
+.lens-visual-qa-cell span {
   color: #7f735f;
   font-family: var(--font-geist-mono), ui-monospace, SFMono-Regular, monospace;
   font-size: 10px;
@@ -3230,23 +3238,29 @@ button.lens-action-card {
 }
 
 .lens-proof-integrity-panel.ready span,
-.lens-proof-integrity-cell.ready span {
+.lens-proof-integrity-cell.ready span,
+.lens-visual-qa-gate.ready span,
+.lens-visual-qa-cell.ready span {
   color: var(--lens-teal, #0f766e);
 }
 
 .lens-proof-integrity-panel.warning span,
-.lens-proof-integrity-cell.warning span {
+.lens-proof-integrity-cell.warning span,
+.lens-visual-qa-gate.warning span,
+.lens-visual-qa-cell.warning span {
   color: var(--lens-clay, #b9533d);
 }
 
-.lens-proof-integrity-panel strong {
+.lens-proof-integrity-panel strong,
+.lens-visual-qa-gate strong {
   margin-top: 5px;
   color: var(--lens-ink, #17211f);
   font-size: 14px;
   font-weight: 950;
 }
 
-.lens-proof-integrity-panel p {
+.lens-proof-integrity-panel p,
+.lens-visual-qa-gate p {
   margin-top: 4px;
   color: var(--lens-muted, #746a5b);
   font-size: 11px;
@@ -3254,13 +3268,15 @@ button.lens-action-card {
   line-height: 1.55;
 }
 
-.lens-proof-integrity-grid {
+.lens-proof-integrity-grid,
+.lens-visual-qa-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 7px;
 }
 
-.lens-proof-integrity-cell {
+.lens-proof-integrity-cell,
+.lens-visual-qa-cell {
   min-width: 0;
   border: 1px solid rgba(214, 204, 185, 0.76);
   border-radius: 7px;
@@ -3268,24 +3284,35 @@ button.lens-action-card {
   padding: 9px 10px;
 }
 
-.lens-proof-integrity-cell.ready {
+.lens-visual-qa-gate {
+  background:
+    linear-gradient(90deg, rgba(217, 154, 32, 0.13), rgba(15, 118, 110, 0.07) 58%, transparent),
+    #fffaf0;
+}
+
+.lens-proof-integrity-cell.ready,
+.lens-visual-qa-cell.ready {
   border-color: rgba(15, 118, 110, 0.22);
   background: rgba(232, 248, 244, 0.62);
 }
 
-.lens-proof-integrity-cell.warning {
+.lens-proof-integrity-cell.warning,
+.lens-visual-qa-cell.warning {
   border-color: rgba(217, 154, 32, 0.34);
   background: rgba(255, 243, 214, 0.66);
 }
 
 .lens-proof-integrity-cell strong,
-.lens-proof-integrity-cell em {
+.lens-proof-integrity-cell em,
+.lens-visual-qa-cell strong,
+.lens-visual-qa-cell em {
   display: block;
   min-width: 0;
   overflow-wrap: anywhere;
 }
 
-.lens-proof-integrity-cell strong {
+.lens-proof-integrity-cell strong,
+.lens-visual-qa-cell strong {
   margin-top: 6px;
   color: var(--lens-ink, #17211f);
   font-size: 12px;
@@ -3293,7 +3320,8 @@ button.lens-action-card {
   line-height: 1.25;
 }
 
-.lens-proof-integrity-cell em {
+.lens-proof-integrity-cell em,
+.lens-visual-qa-cell em {
   margin-top: 4px;
   color: #746a5b;
   font-size: 10px;
@@ -3324,7 +3352,8 @@ button.lens-action-card {
     border-bottom: 0;
   }
 
-  .lens-proof-integrity-grid {
+  .lens-proof-integrity-grid,
+  .lens-visual-qa-grid {
     grid-template-columns: 1fr;
   }
 }

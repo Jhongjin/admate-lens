@@ -467,6 +467,55 @@ function getProofDecisionDetail(
   return "작업 큐에 올라가기 전 입력과 지면 조건을 확인하는 상태입니다.";
 }
 
+function getVisualInspectionDecision(
+  capture: CaptureRecord,
+  diagnostics: DiagnosticsSummary,
+  hasActiveImage: boolean,
+  isFixtureRecord: boolean,
+  goldenCandidate: boolean,
+): { label: string; detail: string; tone: "ready" | "warning" | "muted" } {
+  if (isFixtureRecord) {
+    return {
+      label: "Fixture read-only",
+      detail: "읽기 전용 샘플 판독이며 실제 저장소 변경이나 캡처 재실행은 없습니다.",
+      tone: "ready",
+    };
+  }
+  if (capture.status === "failed") {
+    return {
+      label: "실패 재요청",
+      detail: "실패 사유와 참조 URL을 확인한 뒤 동일 조건으로 재요청할 수 있습니다.",
+      tone: "warning",
+    };
+  }
+  if (!hasActiveImage) {
+    return {
+      label: "렌더 결과 대기",
+      detail: "viewer에 표시할 원본 이미지가 도착해야 픽셀 검수와 보존 판단이 가능합니다.",
+      tone: capture.status === "pending" || capture.status === "processing" ? "muted" : "warning",
+    };
+  }
+  if (diagnostics.needsReview === true || (diagnostics.flagCount ?? 0) > 0) {
+    return {
+      label: "재촬영 검토",
+      detail: "픽셀, CTA, 슬롯 크기 또는 랜딩 증빙을 확인하고 필요하면 같은 조건으로 다시 캡처합니다.",
+      tone: "warning",
+    };
+  }
+  if (goldenCandidate || (capture.status === "completed" && diagnostics.needsReview === false)) {
+    return {
+      label: "보존 가능",
+      detail: "현재 이미지와 진단 요약 기준으로 운영 증빙 보존 후보로 볼 수 있습니다.",
+      tone: "ready",
+    };
+  }
+  return {
+    label: "시각 검수 대기",
+    detail: "원본 이미지는 있으나 진단 플래그 또는 기준 점수 판정이 아직 충분하지 않습니다.",
+    tone: "muted",
+  };
+}
+
 function isGoldenCandidate(capture: CaptureRecord): boolean {
   if (capture.status !== "completed" || !capture.placement_image_url) return false;
   const diagnostics = capture.metadata?.diagnostics as Record<string, unknown> | undefined;
@@ -1346,6 +1395,13 @@ function CaptureDetailModal({
     isFixtureRecord,
     goldenCandidate,
   );
+  const visualInspectionDecision = getVisualInspectionDecision(
+    capture,
+    diagnosticsSummary,
+    Boolean(activeUrl),
+    isFixtureRecord,
+    goldenCandidate,
+  );
   const creativeDimensionLabel = getDimensionLabel(metadata?.creativeDimensions);
   const targetAdSizeLabel = getTargetAdSizeLabel(metadata);
   const proofIntegrityRows = [
@@ -1384,6 +1440,49 @@ function CaptureDetailModal({
           ? "대상 슬롯 size"
           : "metadata에 규격 없음",
       tone: creativeDimensionLabel || targetAdSizeLabel ? "ready" : "muted",
+    },
+  ] as const;
+  const pixelInspectionValue = goldenCandidate
+    ? "기준 통과"
+    : diagnosticsSummary.needsReview === true
+      ? "재검수"
+      : (diagnosticsSummary.flagCount ?? 0) > 0
+        ? "플래그 확인"
+        : diagnosticsSummary.needsReview === false
+          ? "진단 통과"
+          : "판정 대기";
+  const visualInspectionRows = [
+    {
+      label: "이미지 판독",
+      value: activeUrl ? `${activeOutput.label} 확보` : "이미지 없음",
+      detail: activeUrl ? "원본 viewer 연결" : "렌더 결과 대기",
+      tone: activeUrl ? "ready" : "warning",
+    },
+    {
+      label: "픽셀 검수",
+      value: pixelInspectionValue,
+      detail:
+        diagnosticsSummary.score !== null
+          ? `검수 점수 ${diagnosticsSummary.score}`
+          : diagnosticsSummary.topIssue ?? "golden pixel 기준 아님",
+      tone:
+        goldenCandidate || diagnosticsSummary.needsReview === false
+          ? "ready"
+          : diagnosticsSummary.needsReview === true || (diagnosticsSummary.flagCount ?? 0) > 0
+            ? "warning"
+            : "muted",
+    },
+    {
+      label: "저장 추적",
+      value: activeStoragePath ? "경로 확보" : isFixtureRecord ? "Fixture 경로" : "경로 대기",
+      detail: activeStoragePath ? "내부 저장 경로 복사 가능" : "저장소 변경 없음",
+      tone: activeStoragePath || isFixtureRecord ? "ready" : "muted",
+    },
+    {
+      label: "운영 액션",
+      value: visualInspectionDecision.label,
+      detail: visualInspectionDecision.detail,
+      tone: visualInspectionDecision.tone,
     },
   ] as const;
   const selectedZoomLabel =
@@ -1582,6 +1681,23 @@ function CaptureDetailModal({
         <div className="lens-proof-integrity-grid" aria-label="증빙 신뢰 요약">
           {proofIntegrityRows.map((row) => (
             <div className={`lens-proof-integrity-cell ${row.tone}`} key={row.label}>
+              <span>{row.label}</span>
+              <strong>{row.value}</strong>
+              <em>{row.detail}</em>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="lens-inspector-section space-y-3">
+        <div className={`lens-visual-qa-gate ${visualInspectionDecision.tone}`}>
+          <span>Visual QA gate</span>
+          <strong>시각 검수 게이트 · {visualInspectionDecision.label}</strong>
+          <p>{visualInspectionDecision.detail}</p>
+        </div>
+        <div className="lens-visual-qa-grid" aria-label="시각 검수 게이트 요약">
+          {visualInspectionRows.map((row) => (
+            <div className={`lens-visual-qa-cell ${row.tone}`} key={row.label}>
               <span>{row.label}</span>
               <strong>{row.value}</strong>
               <em>{row.detail}</em>
