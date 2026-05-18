@@ -15,32 +15,32 @@ type LoginResponse = {
 
 const loginProofLanes = [
   {
-    label: "원본",
-    title: "원본 접수",
-    detail: "소재 URL과 랜딩을 보호된 세션에서만 엽니다.",
+    label: "소재",
+    title: "소재 등록",
+    detail: "광고 소재와 랜딩 정보를 로그인한 계정으로만 확인합니다.",
   },
   {
-    label: "렌더",
-    title: "렌더 증빙",
-    detail: "매체 화면에 맞춘 렌더 결과를 로그인 후 확인합니다.",
+    label: "화면",
+    title: "화면 미리보기",
+    detail: "매체 화면에 맞춘 캡처 결과를 로그인 후 확인합니다.",
   },
   {
-    label: "QA",
-    title: "QA 게이트",
-    detail: "품질 플래그와 실패 사유는 계정 권한으로 조회합니다.",
+    label: "검수",
+    title: "검수 결과",
+    detail: "품질 확인 항목과 실패 사유는 계정 권한으로 조회합니다.",
   },
   {
-    label: "보존",
-    title: "보존 이력",
-    detail: "승인된 결과만 감사 추적과 재요청 근거로 남깁니다.",
+    label: "기록",
+    title: "작업 기록",
+    detail: "완료된 결과는 재확인과 재요청에 사용할 수 있도록 남깁니다.",
   },
 ] as const;
 
 const loginGateChecks = [
-  "원본 접수 권한",
-  "렌더 증빙 조회",
-  "QA 판정 기록",
-  "보존 이력 접근",
+  "소재 등록 권한",
+  "화면 미리보기",
+  "검수 결과 확인",
+  "작업 기록 접근",
 ] as const;
 
 const loginMetrics = [
@@ -57,25 +57,41 @@ const loginOpsLanes = [
   },
   {
     code: "YT",
-    title: "YouTube 노출 증빙",
-    detail: "재생 위치와 지면 맥락을 맞춘 뒤 QA 증빙으로 보존합니다.",
+    title: "YouTube 노출 화면",
+    detail: "재생 위치와 지면 맥락을 맞춘 뒤 검수 기록으로 남깁니다.",
   },
   {
-    code: "QA",
-    title: "판정 대기열",
-    detail: "진행, 실패, 보존 이력은 계정 세션 안에서만 열립니다.",
+    code: "검수",
+    title: "검수 대기 목록",
+    detail: "진행, 실패, 작업 기록은 계정 세션 안에서만 열립니다.",
   },
 ] as const;
 
 export default function LoginShell({ nextPath }: LoginShellProps) {
   const router = useRouter();
-  const [email, setEmail] = useState("");
+  const [emailLocalPart, setEmailLocalPart] = useState("");
   const [password, setPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const normalizeEmailLocalPart = (value: string) =>
+    value
+      .trim()
+      .replace(/\s/g, "")
+      .replace(/@nasmedia\.co\.kr$/i, "")
+      .replace(/@.*$/g, "");
+
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    const normalizedEmailLocalPart = normalizeEmailLocalPart(emailLocalPart);
+
+    if (!normalizedEmailLocalPart) {
+      setError("나스미디어 이메일 아이디를 입력해주세요.");
+      return;
+    }
+
+    const email = `${normalizedEmailLocalPart}@nasmedia.co.kr`;
+    setEmailLocalPart(normalizedEmailLocalPart);
     setIsSubmitting(true);
     setError(null);
 
@@ -114,12 +130,12 @@ export default function LoginShell({ nextPath }: LoginShellProps) {
         <section className="grid w-full gap-6 lg:grid-cols-[minmax(0,1.1fr)_420px]">
           <div className="lens-login-brief rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-secondary)] p-8 lg:p-10">
             <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--color-text-muted)]">
-              lens.admate.ai.kr · 증빙 게이트
+              lens.admate.ai.kr · 캡처 기록 로그인
             </p>
-            <h1 className="mt-4 text-3xl font-semibold tracking-normal">AdMate Lens 증빙 데스크</h1>
+            <h1 className="mt-4 text-3xl font-semibold tracking-normal">AdMate Lens 캡처 기록</h1>
             <p className="mt-3 max-w-xl text-sm leading-6 text-[var(--color-text-secondary)]">
-              광고 캡처 원본, 렌더 결과, QA 판정, 보존 기록은 보호된 운영 증거입니다.
-              AdMate 계정으로 로그인한 뒤 지면별 증빙 워크벤치로 이동합니다.
+              광고 소재, 화면 미리보기, 검수 결과, 작업 기록은 로그인한 사용자만 확인할 수 있습니다.
+              AdMate 계정으로 로그인한 뒤 지면별 캡처 작업 화면으로 이동합니다.
             </p>
             <p className="mt-2 text-sm leading-6 text-[var(--color-text-muted)]">
               로그인 후 현재 보려던 Lens 화면으로 돌아갑니다. 세션 없이 캡처 API나 결과 목록은 호출하지 않습니다.
@@ -148,7 +164,7 @@ export default function LoginShell({ nextPath }: LoginShellProps) {
                     캡처 운영 콘솔
                   </p>
                   <p className="mt-1 text-[11px] leading-5 text-[var(--color-text-muted)]">
-                    로그인 후 GDN/YouTube 장기 캡처의 접수, 진행, QA 핸드오프를 한 화면에서 확인합니다.
+                    로그인 후 GDN/YouTube 장기 캡처의 접수, 진행, 검수 결과를 한 화면에서 확인합니다.
                   </p>
                 </div>
                 <span className="shrink-0 rounded-md border border-[var(--color-border)] bg-[var(--color-bg-secondary)] px-2 py-1 text-[11px] font-semibold text-[var(--color-text-secondary)]">
@@ -181,7 +197,7 @@ export default function LoginShell({ nextPath }: LoginShellProps) {
               ))}
             </div>
 
-            <div className="lens-login-audit-strip" aria-label="로그인 후 열리는 Lens 증빙 권한 범위">
+            <div className="lens-login-audit-strip" aria-label="로그인 후 열리는 Lens 작업 권한 범위">
               {loginGateChecks.map((check, index) => (
                 <span key={check}>
                   <em>{String(index + 1).padStart(2, "0")}</em>
@@ -194,13 +210,13 @@ export default function LoginShell({ nextPath }: LoginShellProps) {
           <div className="lens-login-card rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-secondary)] p-6 lg:p-8">
             <div className="mb-6">
               <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--color-text-muted)]">
-                증빙 게이트
+                캡처 기록 로그인
               </p>
               <h2 className="mt-2 text-xl font-semibold text-[var(--color-text-primary)]">
-                증빙 큐 열기
+                Lens 작업 목록 열기
               </h2>
               <p className="mt-2 text-xs leading-5 text-[var(--color-text-muted)]">
-                인증된 계정만 원본 접수, 렌더 증빙, QA 게이트, 보존 이력 확인을 진행할 수 있습니다.
+                나스미디어 계정으로 로그인한 사용자만 소재 등록, 화면 미리보기, 검수 결과, 작업 기록을 확인할 수 있습니다.
               </p>
             </div>
 
@@ -209,16 +225,23 @@ export default function LoginShell({ nextPath }: LoginShellProps) {
                 <label className="mb-2 block text-sm font-medium text-[var(--color-text-secondary)]" htmlFor="email">
                   이메일
                 </label>
-                <input
-                  id="email"
-                  type="email"
-                  autoComplete="email"
-                  required
-                  value={email}
-                  onChange={(event) => setEmail(event.target.value)}
-                  className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-primary)] px-3 py-2.5 text-sm text-[var(--color-text-primary)] outline-none transition-colors focus:border-[var(--color-accent)]"
-                  placeholder="name@company.com"
-                />
+                <div className="lens-login-email-field">
+                  <input
+                    id="email"
+                    type="text"
+                    inputMode="email"
+                    autoComplete="username"
+                    required
+                    value={emailLocalPart}
+                    onChange={(event) => setEmailLocalPart(normalizeEmailLocalPart(event.target.value))}
+                    className="min-w-0 flex-1 bg-transparent px-3 py-2.5 text-sm text-[var(--color-text-primary)] outline-none"
+                    placeholder="name"
+                    aria-describedby="email-domain"
+                  />
+                  <span id="email-domain" aria-label="고정 이메일 도메인">
+                    @nasmedia.co.kr
+                  </span>
+                </div>
               </div>
 
               <div>
@@ -248,16 +271,16 @@ export default function LoginShell({ nextPath }: LoginShellProps) {
                 disabled={isSubmitting}
                 className="inline-flex w-full items-center justify-center rounded-lg bg-[var(--color-text-primary)] px-4 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {isSubmitting ? "증빙 큐 확인 중..." : "증빙 데스크 입장"}
+                {isSubmitting ? "작업 목록 확인 중..." : "Lens 작업 목록 열기"}
               </button>
             </form>
 
             <div className="mt-6 space-y-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-primary)] p-4">
               <p className="text-sm font-medium text-[var(--color-text-primary)]">
-                접근 권한이 없다면 Sentinel 요청
+                접근 권한이 없다면 AdMate 가입 요청
               </p>
               <p className="text-xs leading-5 text-[var(--color-text-secondary)]">
-                Lens 증빙 워크벤치 권한은 Sentinel access-request 흐름에서 관리합니다.
+                Lens 사용 권한은 AdMate 가입 요청을 통해 확인합니다.
               </p>
               <a
                 href="https://sentinel.admate.ai.kr/access-request"
@@ -265,7 +288,7 @@ export default function LoginShell({ nextPath }: LoginShellProps) {
                 rel="noreferrer"
                 className="inline-flex w-full items-center justify-center rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-secondary)] px-4 py-2.5 text-sm font-semibold text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-bg-tertiary)]"
               >
-                Sentinel 접근 요청
+                AdMate 가입 요청
               </a>
               <Link
                 href="/"

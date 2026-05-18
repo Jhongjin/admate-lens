@@ -1591,7 +1591,7 @@ button.lens-action-card {
 }
 
 .lens-home-copy::after {
-  content: "증빙 컨택트 시트";
+  content: "캡처 컨택트 시트";
   position: absolute;
   right: 18px;
   bottom: 16px;
@@ -3837,6 +3837,38 @@ button.lens-action-card {
   border-top: 4px solid var(--lens-teal, #0f766e);
 }
 
+.lens-login-email-field {
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-bg-primary);
+  transition:
+    border-color 220ms cubic-bezier(0.32, 0.72, 0, 1),
+    box-shadow 220ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+.lens-login-email-field:focus-within {
+  border-color: var(--color-accent);
+  box-shadow: var(--shadow-input-focus);
+}
+
+.lens-login-email-field input:focus-visible {
+  outline: 0;
+}
+
+.lens-login-email-field span {
+  flex-shrink: 0;
+  border-left: 1px solid var(--color-border);
+  background: rgba(15, 118, 110, 0.07);
+  padding: 0.625rem 0.75rem;
+  color: var(--color-text-secondary);
+  font-size: 0.875rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
 .lens-proof-queue {
   margin-bottom: 12px;
   border: 1px solid var(--lens-rule, #d6ccb9);
@@ -4272,5 +4304,17 @@ button.lens-action-card {
 
   .lens-proof-card:last-child {
     border-bottom: 0;
+  }
+}
+
+@media (max-width: 420px) {
+  .lens-login-email-field {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .lens-login-email-field span {
+    border-top: 1px solid var(--color-border);
+    border-left: 0;
   }
 }

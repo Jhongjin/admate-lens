@@ -12,21 +12,21 @@ type CaptureSummaryRecord = {
 };
 
 const primaryNav = [
-  { id: "home", label: "증빙", targetId: "lens-home" },
+  { id: "home", label: "홈", targetId: "lens-home" },
   { id: "studio", label: "접수", targetId: "capture-studio" },
   { id: "review", label: "검수", targetId: "result-review" },
   { id: "campaigns", label: "캠페인", targetId: "campaign-review" },
   { id: "assets", label: "소재", targetId: "asset-library" },
-  { id: "coverage", label: "보존", targetId: "coverage-matrix" },
+  { id: "coverage", label: "현황", targetId: "coverage-matrix" },
 ] satisfies Array<{ id: PrimaryNavId; label: string; targetId: string }>;
 
 const viewLabels: Record<PrimaryNavId, { title: string; status: string }> = {
-  home: { title: "AdMate Lens", status: "QA 큐" },
-  studio: { title: "원본 접수", status: "접수 대기" },
-  review: { title: "렌더 검수", status: "QA 판정" },
-  campaigns: { title: "캠페인 증빙", status: "증빙 묶음" },
-  assets: { title: "원본 소재", status: "소재 원본" },
-  coverage: { title: "지면 보존", status: "보존 범위" },
+  home: { title: "AdMate Lens", status: "검수 목록" },
+  studio: { title: "요청 접수", status: "접수 대기" },
+  review: { title: "화면 검수", status: "검수 결과" },
+  campaigns: { title: "캠페인 캡처", status: "결과 묶음" },
+  assets: { title: "소재 관리", status: "소재 원본" },
+  coverage: { title: "지면 현황", status: "운영 범위" },
 };
 
 const campaignReviewRows = [
@@ -84,7 +84,7 @@ const productGroups = [
     title: "Demand Gen",
     status: "신규 공개",
     tone: "info",
-    description: "Google Ads 상품 흐름에서 YouTube Feed/Shorts 증빙 생성",
+    description: "Google Ads 상품 흐름에서 YouTube Feed/Shorts 캡처 결과 생성",
     items: ["YouTube Feed", "YouTube Shorts", "metadata 분리"],
   },
   {
@@ -98,7 +98,7 @@ const productGroups = [
     title: "Naver / Kakao Mobile",
     status: "공개 구현",
     tone: "success",
-    description: "국내 모바일 주요 지면의 네이티브/배너 증빙 생성",
+    description: "국내 모바일 주요 지면의 네이티브/배너 캡처 결과 생성",
     items: ["Naver 4종", "Kakao 4종", "모바일 지면"],
   },
 ];
@@ -153,68 +153,68 @@ const studioSteps = [
   "상품 선택",
   "소재 입력",
   "지면 조건",
-  "QA 판정",
+  "검수 결과",
 ];
 
 const evidenceWorkflow = [
-  { code: "01", label: "원본", detail: "상품/소재 접수" },
-  { code: "02", label: "렌더", detail: "매체 지면 재현" },
-  { code: "03", label: "QA", detail: "픽셀/CTA 판정" },
-  { code: "04", label: "보존", detail: "증빙 이력 보존" },
+  { code: "01", label: "소재", detail: "상품/소재 접수" },
+  { code: "02", label: "화면", detail: "매체 지면 재현" },
+  { code: "03", label: "검수", detail: "픽셀/CTA 확인" },
+  { code: "04", label: "기록", detail: "작업 기록 보관" },
 ] as const;
 
 const contactSheetSlots = [
-  { code: "SRC", surface: "원본", ratio: "URL", status: "verified" },
-  { code: "YT", surface: "렌더", ratio: "16:9", status: "queued" },
+  { code: "SRC", surface: "소재", ratio: "URL", status: "verified" },
+  { code: "YT", surface: "화면", ratio: "16:9", status: "queued" },
   { code: "DG", surface: "Shorts", ratio: "9:16", status: "review" },
   { code: "GDN", surface: "슬롯", ratio: "300x250", status: "verified" },
-  { code: "MO", surface: "MO", ratio: "QA", status: "hold" },
-  { code: "ARC", surface: "보존", ratio: "Audit", status: "verified" },
+  { code: "MO", surface: "MO", ratio: "검수", status: "hold" },
+  { code: "ARC", surface: "기록", ratio: "저장", status: "verified" },
 ] as const;
 
 const proofQueueRows = [
   {
-    lane: "SRC",
-    title: "소재 원본 접수",
-    status: "01 원본 접수",
-    detail: "이미지, 영상, 로고, 랜딩 URL을 캡처 요청의 증거 원본으로 확인합니다.",
+    lane: "소재",
+    title: "소재 정보 접수",
+    status: "01 소재 확인",
+    detail: "이미지, 영상, 로고, 랜딩 URL을 캡처 요청 정보로 확인합니다.",
     tone: "ready",
   },
   {
-    lane: "RDR",
-    title: "지면 렌더 대기",
-    status: "02 렌더 증빙",
-    detail: "상품과 surface metadata 기준으로 실제 매체 레이아웃에 맞춰 렌더링합니다.",
+    lane: "화면",
+    title: "지면 화면 준비",
+    status: "02 화면 생성",
+    detail: "상품과 지면 정보 기준으로 실제 매체 레이아웃에 맞춰 화면을 만듭니다.",
     tone: "queued",
   },
   {
-    lane: "QA",
-    title: "보존 전 QA 판정",
-    status: "03 QA 게이트",
-    detail: "보존 전에 픽셀 매칭, CTA 노출, 소재 비율, 실패 플래그를 한 번 더 대조합니다.",
+    lane: "검수",
+    title: "검수 전 확인",
+    status: "03 검수 단계",
+    detail: "기록에 남기기 전에 픽셀 매칭, CTA 노출, 소재 비율, 실패 항목을 한 번 더 대조합니다.",
     tone: "check",
   },
   {
-    lane: "ARC",
-    title: "증빙 보존",
-    status: "04 보존 이력",
-    detail: "삭제보다 보존과 재요청을 우선해 결과 이력을 감사 추적으로 남깁니다.",
+    lane: "기록",
+    title: "작업 기록",
+    status: "04 기록 보관",
+    detail: "삭제보다 기록과 재요청을 우선해 결과 이력을 남깁니다.",
     tone: "lock",
   },
 ] as const;
 
 const archiveTrailRows = [
-  { step: "접수", label: "원본 접수", detail: "URL, 소재, 랜딩 문안" },
-  { step: "렌더", label: "렌더 증빙", detail: "지면 비율과 화면 상태" },
-  { step: "판정", label: "QA 게이트", detail: "픽셀, CTA, 실패 플래그" },
-  { step: "보존", label: "보존 이력", detail: "감사 추적과 재요청 근거" },
+  { step: "접수", label: "소재 접수", detail: "URL, 소재, 랜딩 문안" },
+  { step: "화면", label: "화면 생성", detail: "지면 비율과 화면 상태" },
+  { step: "검수", label: "검수 단계", detail: "픽셀, CTA, 실패 항목" },
+  { step: "기록", label: "작업 기록", detail: "재확인과 재요청 근거" },
 ] as const;
 
 const inspectionMarkers = [
   { code: "PX", label: "픽셀 매칭", detail: "지면 비율과 소재 경계선" },
   { code: "CTA", label: "CTA 노출", detail: "버튼, 랜딩, 문구 가시성" },
   { code: "SURF", label: "지면 기준", detail: "YouTube/GDN/국내 MO 규격" },
-  { code: "RETRY", label: "재요청 경로", detail: "실패 사유와 보존 이력" },
+  { code: "RETRY", label: "재요청 경로", detail: "실패 사유와 작업 기록" },
 ] as const;
 
 const kpiCards = [
@@ -226,26 +226,26 @@ const kpiCards = [
 
 const homeActionCards = [
   {
-    title: "원본 접수",
-    description: "상품, 지면, 소재 URL을 새 증빙 큐에 올립니다.",
+    title: "소재 접수",
+    description: "상품, 지면, 소재 URL을 새 캡처 작업에 등록합니다.",
     targetId: "capture-studio",
     tone: "primary",
   },
   {
-    title: "렌더 검수",
-    description: "완료, 실패, 처리중 렌더를 보존 전 기준으로 확인합니다.",
+    title: "화면 검수",
+    description: "완료, 실패, 처리 중 화면을 기준에 맞춰 확인합니다.",
     targetId: "result-review",
     tone: "default",
   },
   {
-    title: "QA 판정 대기",
-    description: "보존 전 플래그와 실패 사유를 먼저 판정합니다.",
+    title: "검수 대기",
+    description: "문제 항목과 실패 사유를 먼저 확인합니다.",
     targetId: "result-review",
     tone: "warning",
   },
   {
-    title: "지면 보존",
-    description: "공개/제외 지면과 증빙 보존 범위를 대조합니다.",
+    title: "지면 현황",
+    description: "공개/제외 지면과 캡처 가능 범위를 대조합니다.",
     targetId: "coverage-matrix",
     tone: "default",
   },
@@ -253,9 +253,9 @@ const homeActionCards = [
 
 const externalLinks = [
   {
-    title: "Sentinel 요청",
+    title: "AdMate 가입 요청",
     href: "https://sentinel.admate.ai.kr/access-request",
-    description: "권한과 운영 콘솔 접근은 Sentinel에서 요청합니다.",
+    description: "Lens 사용 권한은 AdMate 가입 요청으로 확인합니다.",
   },
   {
     title: "AdMate 홈",
@@ -376,7 +376,7 @@ export default function Home() {
                 AdMate Lens
               </h1>
               <p className="text-xs leading-tight text-[var(--color-text-muted)]">
-                증빙 QA 데스크
+                캡처 검수 화면
               </p>
             </div>
           </div>
@@ -396,18 +396,18 @@ export default function Home() {
           </nav>
 
           <div className="studio-sidebar-panel">
-            <p className="studio-eyebrow">QA 기준</p>
+            <p className="studio-eyebrow">검수 기준</p>
             <div className="studio-sidebar-metric">
               <span>큐</span>
               <strong>검수 필요 우선</strong>
             </div>
             <div className="studio-sidebar-metric">
-              <span>증빙</span>
-              <strong>원본/렌더 대조</strong>
+              <span>캡처</span>
+              <strong>소재/화면 대조</strong>
             </div>
             <div className="studio-sidebar-metric">
-              <span>보존</span>
-              <strong>삭제보다 보존</strong>
+              <span>기록</span>
+              <strong>완료 결과 보관</strong>
             </div>
           </div>
         </div>
@@ -428,7 +428,7 @@ export default function Home() {
             <div className="flex items-center gap-2">
               <span className="badge badge-completed">
                 <span className="w-1.5 h-1.5 rounded-full bg-[var(--color-success)]" />
-                렌더 정상
+                화면 정상
               </span>
               <span className="badge badge-processing">{viewLabels[activeNav].status}</span>
               <button
@@ -448,17 +448,17 @@ export default function Home() {
             <div className="lens-home-copy">
               <div className="lens-home-copy-grid">
                 <div>
-                  <p className="ops-kicker">lens.admate.ai.kr · 증빙 QA 데스크</p>
+                  <p className="ops-kicker">lens.admate.ai.kr · 캡처 검수 화면</p>
                   <h2>AdMate Lens</h2>
                   <p>
-                    원본, 렌더, QA 판정, 보존 이력을 한 화면에서 대조하는 광고 증빙 QA 워크벤치입니다.
-                    캡처 요청은 큐에 올리고, 운영자는 품질 플래그와 보존 공백을 먼저 판정합니다.
+                    소재 정보, 매체 화면, 검수 결과, 작업 기록을 한 화면에서 확인하는 광고 캡처 작업 화면입니다.
+                    캡처 요청은 작업 목록에 올리고, 담당자는 문제 항목과 누락된 결과를 먼저 확인합니다.
                   </p>
                 </div>
 
                 <div className="lens-hero-stamp" aria-label="현재 운영 모드">
-                  <span>증빙 데스크</span>
-                  <strong>QA 게이트</strong>
+                  <span>캡처 기록</span>
+                  <strong>검수 단계</strong>
                 </div>
               </div>
 
@@ -483,7 +483,7 @@ export default function Home() {
                 ))}
               </div>
 
-              <div className="lens-evidence-flow" aria-label="증빙 처리 흐름">
+              <div className="lens-evidence-flow" aria-label="캡처 처리 흐름">
                 {evidenceWorkflow.map((step) => (
                   <article key={step.code}>
                     <span>{step.code}</span>
@@ -493,7 +493,7 @@ export default function Home() {
                 ))}
               </div>
 
-              <div className="lens-archive-trail" aria-label="원본 접수부터 보존 이력까지의 증거선">
+              <div className="lens-archive-trail" aria-label="소재 접수부터 작업 기록까지의 처리 흐름">
                 {archiveTrailRows.map((row) => (
                   <article key={row.step}>
                     <span>{row.step}</span>
@@ -509,22 +509,22 @@ export default function Home() {
                   className="lens-home-button primary"
                   onClick={() => scrollToSection("capture-studio", "studio")}
                 >
-                  원본 접수
+                  소재 접수
                 </button>
                 <button
                   type="button"
                   className="lens-home-button"
                   onClick={() => scrollToSection("result-review", "review")}
                 >
-                  렌더 검수 보기
+                  화면 검수 보기
                 </button>
               </div>
             </div>
 
             <div className="lens-home-status" aria-label="운영 상태 요약">
               <div className="lens-status-header">
-                <p className="studio-eyebrow">QA 레일</p>
-                <strong>최근 30건 QA 큐</strong>
+                <p className="studio-eyebrow">검수 목록</p>
+                <strong>최근 30건 검수 목록</strong>
               </div>
               <article>
                 <span>지면 커버리지</span>
@@ -537,25 +537,25 @@ export default function Home() {
                 <em>요청/처리/완료 이력</em>
               </article>
               <article>
-                <span>렌더 QA 통과 / 실패</span>
+                <span>화면 생성 완료 / 실패</span>
                 <strong>{dashboardStats.completed} / {dashboardStats.failed}</strong>
-                <em>보존 전 판정 상태</em>
+                <em>검수 상태</em>
               </article>
               <article>
-                <span>QA 우선순위</span>
+                <span>검수 우선순위</span>
                 <strong>{dashboardStats.reviewNeeded}</strong>
                 <em>플래그, 실패, 재요청 후보</em>
               </article>
             </div>
           </section>
 
-          <section className="lens-proof-queue" aria-label="Lens 증빙 처리 큐">
+          <section className="lens-proof-queue" aria-label="Lens 캡처 처리 목록">
             <div className="lens-proof-queue-header">
               <div>
-                <p className="studio-eyebrow">증빙 큐</p>
-                <h3>원본에서 보존까지 같은 증거선으로 검수</h3>
+                <p className="studio-eyebrow">작업 목록</p>
+                <h3>소재 등록부터 작업 기록까지 한 흐름으로 검수</h3>
               </div>
-              <span>원본-보존</span>
+              <span>소재-기록</span>
             </div>
             <div className="lens-proof-queue-grid">
               {proofQueueRows.map((row) => (
@@ -571,12 +571,12 @@ export default function Home() {
             </div>
           </section>
 
-          <section className="lens-inspection-strip" aria-label="AdMate Lens 증빙 운영 레일">
+          <section className="lens-inspection-strip" aria-label="AdMate Lens 캡처 운영 흐름">
             <div>
-              <p className="studio-eyebrow">원본 / 렌더 / QA / 보존</p>
-              <strong>생성된 이미지를 보존하기 전에 지면 재현, 소재 비율, CTA 노출을 먼저 판정합니다.</strong>
+              <p className="studio-eyebrow">소재 / 화면 / 검수 / 기록</p>
+              <strong>생성된 이미지를 기록에 남기기 전에 지면 재현, 소재 비율, CTA 노출을 먼저 확인합니다.</strong>
             </div>
-            <div className="lens-inspection-board" aria-label="QA 판정 항목">
+            <div className="lens-inspection-board" aria-label="검수 항목">
               <div className="lens-strip-rail" aria-hidden="true">
                 <span />
                 <span />
@@ -633,7 +633,7 @@ export default function Home() {
 
           <section className="lens-quality-panel" aria-label="AdMate Lens 품질 기준">
             <div>
-              <p className="studio-eyebrow">QA 기준</p>
+              <p className="studio-eyebrow">검수 기준</p>
               <h3>캡처 결과물과 운영자 UI의 경계</h3>
             </div>
             <ul>
@@ -645,14 +645,14 @@ export default function Home() {
 
           <section id="capture-studio" className="studio-hero">
             <div>
-              <p className="ops-kicker">원본 접수 · 증빙 생성</p>
+              <p className="ops-kicker">소재 접수 · 캡처 생성</p>
               <h2 className="studio-title">
-                원본 접수 및 렌더 검수 워크벤치
+                소재 접수 및 화면 검수 작업 공간
               </h2>
               <p className="studio-subtitle">
                 상품, 지면, 소재 정보를 접수한 뒤 실제 매체 화면과 맞는지 확인하는
-                증빙 큐 흐름으로 배치했습니다. 생성 폼은 그대로 유지하고, 주변 정보는
-                운영자가 렌더 품질과 보존 범위를 먼저 판단하도록 구성합니다.
+                캡처 작업 흐름으로 배치했습니다. 생성 폼은 그대로 유지하고, 주변 정보는
+                담당자가 화면 품질과 기록 범위를 먼저 판단하도록 구성합니다.
               </p>
             </div>
             <div className="studio-hero-actions" aria-label="작업 상태">
@@ -684,8 +684,8 @@ export default function Home() {
           <section className="studio-workbench-grid" aria-label="캡처 워크벤치">
             <aside className="studio-panel studio-left-panel">
               <div className="studio-panel-header">
-                <p className="studio-eyebrow">지면 보존</p>
-                <h3>상품별 증빙 커버리지</h3>
+                <p className="studio-eyebrow">지면 현황</p>
+                <h3>상품별 캡처 범위</h3>
               </div>
 
               <div className="studio-product-stack">
@@ -714,7 +714,7 @@ export default function Home() {
               <div className="studio-panel-header horizontal">
                 <div>
                   <p className="studio-eyebrow">원본 접수</p>
-                  <h3>증빙 원본 요청 생성</h3>
+                  <h3>캡처 요청 생성</h3>
                 </div>
                 <div className="studio-stepper" aria-label="캡처 생성 단계">
                   {studioSteps.map((step, index) => (
@@ -730,8 +730,8 @@ export default function Home() {
 
             <aside className="studio-panel studio-right-panel">
               <div className="studio-panel-header">
-                <p className="studio-eyebrow">QA 기준</p>
-                <h3>검수 가드레일</h3>
+                <p className="studio-eyebrow">검수 기준</p>
+                <h3>검수 기준표</h3>
               </div>
 
               <ul className="studio-check-list">
@@ -747,7 +747,7 @@ export default function Home() {
 
               <div className="studio-panel-header compact">
                 <p className="studio-eyebrow">제외 지면</p>
-                <h3>보존 제외</h3>
+                <h3>캡처 제외</h3>
               </div>
               <div className="studio-chip-row">
                 <span className="studio-chip muted">Audio</span>
@@ -761,12 +761,12 @@ export default function Home() {
           <section id="result-review" className="studio-results-panel">
             <div className="studio-panel-header horizontal">
               <div>
-                <p className="studio-eyebrow">렌더 QA</p>
-                <h3>최근 렌더 결과 검수</h3>
+                <p className="studio-eyebrow">화면 검수</p>
+                <h3>최근 화면 결과 검수</h3>
               </div>
               <p className="studio-panel-note">
-                렌더 상태와 실패 사유를 확인합니다. 운영 UI에서는 삭제 대신
-                보존 전 QA 판정과 재요청을 우선합니다.
+                화면 상태와 실패 사유를 확인합니다. 운영 UI에서는 삭제 대신
+                기록 전 검수와 재요청을 우선합니다.
               </p>
             </div>
             <CaptureList refreshTrigger={refreshTrigger} />
@@ -775,8 +775,8 @@ export default function Home() {
           <section id="campaign-review" className="studio-samples-panel" aria-label="캠페인 기능 검토">
             <div className="studio-panel-header horizontal">
               <div>
-                <p className="studio-eyebrow">캠페인 증빙</p>
-                <h3>캠페인 증빙 묶음 검토</h3>
+                <p className="studio-eyebrow">캠페인 캡처</p>
+                <h3>캠페인 결과 묶음 검토</h3>
               </div>
               <p className="studio-panel-note">
                 DB schema 변경 없이 현재 캡처 metadata와 campaign_id 활용 가능 범위를 먼저 확인합니다.
@@ -839,8 +839,8 @@ export default function Home() {
           <section id="coverage-matrix" className="studio-samples-panel" aria-label="캡처 커버리지 매트릭스">
             <div className="studio-panel-header horizontal">
               <div>
-                <p className="studio-eyebrow">지면 보존</p>
-                <h3>증빙 지면 보존 상태</h3>
+                <p className="studio-eyebrow">지면 현황</p>
+                <h3>캡처 지면 운영 상태</h3>
               </div>
               <p className="studio-panel-note">
                 공개 구현, 신규 공개, 제외 상태를 운영자가 한눈에 확인합니다.

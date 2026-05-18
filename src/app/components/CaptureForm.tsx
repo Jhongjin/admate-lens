@@ -1198,9 +1198,9 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
           : "인피드";
   const infeedSurfaceHint =
     form.youtubeAdType === "infeed-home"
-      ? "PC 홈 지면은 YouTube 데스크톱 홈 추천 피드 안에 네이티브 광고 카드를 렌더링합니다."
+      ? "PC 홈 지면은 YouTube 데스크톱 홈 추천 피드 안에 네이티브 광고 카드를 만듭니다."
       : form.youtubeAdType === "mobile-infeed-home"
-        ? "모바일 홈 지면은 합성 피드로 안정적인 모바일 카드 화면을 렌더링합니다."
+        ? "모바일 홈 지면은 합성 피드로 안정적인 모바일 카드 화면을 만듭니다."
       : form.youtubeAdType === "infeed-search"
         ? "검색 지면은 검색어 기준 결과 목록에 광고 카드를 삽입합니다."
         : form.youtubeAdType === "infeed-watch-next"
@@ -1218,10 +1218,10 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
   const captureOpsExpectation =
     form.channel === "gdn"
       ? "외부 매체 페이지 로딩과 광고 슬롯 탐색 때문에 지연될 수 있습니다."
-      : "YouTube 지면은 재생 상태와 노출 지점을 맞춘 뒤 증빙을 생성합니다.";
+      : "YouTube 지면은 재생 상태와 노출 지점을 맞춘 뒤 캡처 결과를 만듭니다.";
   const captureOpsNextAction = isSubmitting
-    ? "QA 이력에 진행 행이 생기면 행 또는 상세 패널에서 상태와 중단 요청 위치를 확인합니다."
-    : "요청 전 지면, 소재, 랜딩을 확인하고 시작 후에는 QA 이력에서 진행 상태를 추적합니다.";
+    ? "검수 목록에 진행 행이 생기면 행 또는 상세 패널에서 상태와 중단 요청 위치를 확인합니다."
+    : "요청 전 지면, 소재, 랜딩을 확인하고 시작 후에는 검수 목록에서 진행 상태를 추적합니다.";
   const gdnAdSizeCatalog = useMemo(
     () => (isGdnMobileSurface ? GDN_AD_SIZES_MOBILE : GDN_AD_SIZES),
     [isGdnMobileSurface],
@@ -1247,7 +1247,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
         ? "접수 준비됨"
         : "입력 확인 필요";
   const captureOpsStageIndex = isSubmitting ? 1 : 0;
-  const captureOpsModeLabel = form.channel === "gdn" ? "매체 지면 탐색" : "영상 지면 증빙";
+  const captureOpsModeLabel = form.channel === "gdn" ? "매체 지면 탐색" : "영상 지면 캡처";
   const captureOpsGuardrailLabel = form.channel === "gdn" ? "외부 로딩 감시" : "재생 지점 확인";
   const captureOpsStages = [
     {
@@ -1259,14 +1259,14 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
       detail: "캡처 작업을 큐에 올리고 이력 생성을 기다립니다.",
     },
     {
-      label: form.channel === "gdn" ? "지면 렌더링" : "노출 지점 맞춤",
+      label: form.channel === "gdn" ? "지면 화면 생성" : "노출 지점 맞춤",
       detail:
         form.channel === "gdn"
           ? "외부 페이지 로딩과 광고 슬롯 탐색을 진행합니다."
-          : "재생 상태와 게재 위치를 맞춘 뒤 증빙을 생성합니다.",
+          : "재생 상태와 게재 위치를 맞춘 뒤 캡처 결과를 만듭니다.",
     },
     {
-      label: "QA 이력 핸드오프",
+      label: "검수 목록 확인",
       detail: "진행 행에서 상태와 중단 요청 위치를 확인합니다.",
     },
   ];
@@ -1285,12 +1285,12 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
     : form.creativeUrl.trim() || form.infeedVideoUrl.trim() || form.instreamVideoUrl.trim()
       ? "외부 URL 소재"
       : "소재 대기";
-  const captureOpsProofLabel = form.captureLanding ? "게재면 + 랜딩 증빙" : "게재면 증빙";
+  const captureOpsProofLabel = form.captureLanding ? "게재면 + 랜딩 캡처" : "게재면 캡처";
   const captureOpsManifest = [
     { label: "대상 지면", value: captureOpsTargetLabel },
     { label: "소재 입력", value: captureOpsCreativeLabel },
-    { label: "증빙 산출", value: captureOpsProofLabel },
-    { label: "검수 위치", value: "QA 이력" },
+    { label: "캡처 결과", value: captureOpsProofLabel },
+    { label: "검수 위치", value: "검수 목록" },
   ];
 
   /** 폼 제출 */
@@ -1610,7 +1610,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
               className="ops-section-title"
               style={{ color: "var(--color-text-primary)" }}
             >
-              새 증빙 캡처 접수
+              새 캡처 요청 접수
             </h2>
             <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
               매체 지면, 소재, 캡처 조건을 한 번에 대조하세요
@@ -1656,13 +1656,13 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                   </dd>
                 </div>
                 <div>
-                  <dt className="text-[10px] font-semibold text-[var(--color-text-muted)]">핸드오프</dt>
-                  <dd className="mt-1 text-xs font-semibold text-[var(--color-text-primary)]">QA 이력</dd>
+                  <dt className="text-[10px] font-semibold text-[var(--color-text-muted)]">검수 위치</dt>
+                  <dd className="mt-1 text-xs font-semibold text-[var(--color-text-primary)]">검수 목록</dd>
                 </div>
                 <div className="col-span-2 border-t border-[var(--color-border)] pt-2">
                   <dt className="text-[10px] font-semibold text-[var(--color-text-muted)]">운영 메모</dt>
                   <dd className="mt-1 text-[11px] leading-5 text-[var(--color-text-secondary)]">
-                    캡처 실행 후 중단 요청은 QA 이력의 진행 행에서 확인합니다.
+                    캡처 실행 후 중단 요청은 검수 목록의 진행 행에서 확인합니다.
                   </dd>
                 </div>
               </dl>
@@ -2191,8 +2191,8 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
             <p className="form-helper mt-1.5">
               {isDemandGenProduct &&
                 (form.demandGenSurface === "youtube-shorts"
-                  ? "Demand Gen 1차는 Google Ads 상품 흐름에서 YouTube Shorts 증빙 화면을 생성합니다."
-                  : "Demand Gen 1차는 Google Ads 상품 흐름에서 YouTube Feed 증빙 화면을 생성합니다.")}
+                  ? "Demand Gen 1차는 Google Ads 상품 흐름에서 YouTube Shorts 캡처 화면을 생성합니다."
+                  : "Demand Gen 1차는 Google Ads 상품 흐름에서 YouTube Feed 캡처 화면을 생성합니다.")}
               {form.youtubeAdType === "bumper" &&
                 "범퍼는 6초 이하 non-skippable 인스트림으로 처리되며 캡처 시점은 0~5초로 제한됩니다."}
               {form.youtubeAdType === "mobile-bumper-aos" &&
@@ -2204,9 +2204,9 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
               {form.youtubeAdType === "mobile-preroll-ios" &&
                 "모바일 인스트림은 iPhone 15 뷰포트 기준으로 캡처됩니다."}
               {!isDemandGenProduct && isYoutubeShorts &&
-                "Shorts 피드는 9:16 모바일 화면에서 광고 소재, 스폰서 정보, CTA를 합성 렌더링합니다."}
+                "Shorts 피드는 9:16 모바일 화면에서 광고 소재, 스폰서 정보, CTA를 합성해 보여줍니다."}
               {isYoutubeMasthead &&
-                "Masthead 홈은 YouTube 홈 최상단 대형 예약형 지면으로 합성 렌더링합니다."}
+                "Masthead 홈은 YouTube 홈 최상단 대형 예약형 지면으로 합성해 보여줍니다."}
               {!isDemandGenProduct && isYoutubeInfeed &&
                 infeedSurfaceHint}
             </p>
@@ -2787,9 +2787,9 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                 >
                   지면 안내:{" "}
                   {isYoutubeShorts
-                    ? "Shorts 모바일 피드 화면으로 합성 렌더링합니다."
+                    ? "Shorts 모바일 피드 화면으로 합성해 보여줍니다."
                     : isYoutubeMasthead
-                      ? "YouTube 홈 상단의 대형 Masthead 지면으로 합성 렌더링합니다."
+                      ? "YouTube 홈 상단의 대형 Masthead 지면으로 합성해 보여줍니다."
                       : infeedSurfaceHint}
                 </p>
                 <div className="space-y-3">
@@ -3163,7 +3163,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                 </span>
               </div>
               <p className="form-helper mb-3">
-                모바일 자동 합성 지면은 선택한 상품 surface에 맞춰 업로드 소재를 렌더링합니다.
+                모바일 자동 합성 지면은 선택한 상품 surface에 맞춰 업로드 소재를 화면에 배치합니다.
                 제목·스폰서·CTA는 비워도 기본값으로 캡처됩니다.
               </p>
               <div className="space-y-3">
@@ -3305,7 +3305,7 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                 >
                   {isMobileNativeChannel ? (
                     <>
-                      모바일 상품은 선택한 매체의 네이티브 모바일 화면으로 합성 렌더링합니다.
+                      모바일 상품은 선택한 매체의 네이티브 모바일 화면으로 합성해 보여줍니다.
                       별도 게재면 URL 선택 없이 소재 이미지와 광고 정보만 사용합니다.
                     </>
                   ) : isYoutubeInfeed ? (
@@ -4535,13 +4535,13 @@ export default function CaptureForm({ onCaptureCreated }: CaptureFormProps) {
                   {captureOpsSurfaceLabel} 운영 상태
                 </span>
                 <span className="shrink-0 font-medium">
-                  {isSubmitting ? "요청 접수 중" : "긴 렌더링 대비"}
+                  {isSubmitting ? "요청 접수 중" : "긴 화면 생성 대비"}
                 </span>
               </div>
               <p className="mt-1">
                 {isSubmitting
-                  ? "캡처 요청이 수락되면 QA 이력에 진행 행이 생깁니다. 중단은 해당 행이나 상세 패널의 중단 버튼에서 요청할 수 있습니다."
-                  : `${captureOpsExpectation} 시작 후 진행 상태와 중단 요청 위치는 QA 이력에서 확인합니다.`}
+                  ? "캡처 요청이 수락되면 검수 목록에 진행 행이 생깁니다. 중단은 해당 행이나 상세 패널의 중단 버튼에서 요청할 수 있습니다."
+                  : `${captureOpsExpectation} 시작 후 진행 상태와 중단 요청 위치는 검수 목록에서 확인합니다.`}
               </p>
             </div>
           )}

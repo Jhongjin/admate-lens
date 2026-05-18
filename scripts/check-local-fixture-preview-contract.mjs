@@ -118,13 +118,13 @@ for (const needle of [
   'viewer 판독값',
   'sanitizeEvidenceBundleUrl',
   'evidenceBundleRows',
-  'Evidence bundle',
-  '증빙 패키지',
-  '시각 검수 게이트',
-  'Visual QA gate',
+  'Capture bundle',
+  '캡처 묶음',
+  '시각 검수 단계',
+  'Visual review',
   'Fixture read-only',
   '재촬영 검토',
-  '렌더 결과 대기',
+  '화면 결과 대기',
 ]) {
   assertIncludes(captureListText, needle, 'capture detail visual QA gate')
 }

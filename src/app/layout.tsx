@@ -3,7 +3,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "AdMate Lens",
-  description: "광고 게재 화면과 보고서 증빙을 자동 생성하는 캡처 자동화 솔루션",
+  description: "광고 게재 화면과 보고서용 캡처 기록을 자동 생성하는 캡처 자동화 솔루션",
   icons: {
     icon: [
       {

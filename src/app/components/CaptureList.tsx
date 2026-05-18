@@ -51,7 +51,7 @@ const STATUS_LABELS: Record<CaptureDisplayStatus, StatusDescriptor> = {
   failed: { label: "실패", class: "badge-failed", icon: "•" },
 };
 
-const CAPTURE_EVIDENCE_RAIL = ["원본 접수", "렌더 증빙", "QA 게이트", "보존 이력"] as const;
+const CAPTURE_EVIDENCE_RAIL = ["소재 접수", "화면 생성", "검수 단계", "작업 기록"] as const;
 
 /** 채널 라벨 */
 const CHANNEL_LABELS: Record<string, string> = {
@@ -452,12 +452,12 @@ function getProofDecisionLabel(
   if (isFixtureRecord) return "Fixture 판독";
   if (goldenCandidate) return "Golden 후보";
   if (capture.status === "completed" && diagnostics.needsReview === false && diagnostics.flagCount === 0) {
-    return "보존 가능";
+    return "기록 가능";
   }
   if (capture.status === "completed" && diagnostics.needsReview === true) return "검수 필요";
   if (capture.status === "completed" && diagnostics.flagCount && diagnostics.flagCount > 0) return "플래그 확인";
   if (capture.status === "failed") return "실패 판정";
-  if (capture.status === "processing") return "렌더링 중";
+  if (capture.status === "processing") return "화면 생성 중";
   return "접수 대기";
 }
 
@@ -482,15 +482,15 @@ function getProofDecisionDetail(
   goldenCandidate: boolean,
 ): string {
   if (isFixtureRecord) return "샘플 데이터 판독용이며 실제 캡처 실행이나 저장소 변경은 없습니다.";
-  if (goldenCandidate) return "진단 플래그 없이 기준 점수를 통과해 보존 후보로 표시됩니다.";
+  if (goldenCandidate) return "진단 플래그 없이 기준 점수를 통과해 기록 후보로 표시됩니다.";
   if (capture.status === "completed" && diagnostics.needsReview === false) {
-    return "진단 기준상 추가 검수 없이 보존 가능한 완료 항목입니다.";
+    return "진단 기준상 추가 검수 없이 기록 가능한 완료 항목입니다.";
   }
   if (capture.status === "completed" && diagnostics.needsReview === true) {
-    return "보존 전에 픽셀, CTA, 소재 비율을 다시 확인해야 합니다.";
+    return "기록 전에 픽셀, CTA, 소재 비율을 다시 확인해야 합니다.";
   }
   if (capture.status === "failed") return "실패 사유와 재요청 가능성을 먼저 확인해야 합니다.";
-  if (capture.status === "processing") return "브라우저 렌더링 결과가 도착하면 진단 요약이 갱신됩니다.";
+  if (capture.status === "processing") return "브라우저 화면 결과가 도착하면 진단 요약이 갱신됩니다.";
   return "작업 큐에 올라가기 전 입력과 지면 조건을 확인하는 상태입니다.";
 }
 
@@ -517,22 +517,22 @@ function getVisualInspectionDecision(
   }
   if (!hasActiveImage) {
     return {
-      label: "렌더 결과 대기",
-      detail: "viewer에 표시할 원본 이미지가 도착해야 픽셀 검수와 보존 판단이 가능합니다.",
+      label: "화면 결과 대기",
+      detail: "viewer에 표시할 원본 이미지가 도착해야 픽셀 검수와 기록 판단이 가능합니다.",
       tone: capture.status === "pending" || capture.status === "processing" ? "muted" : "warning",
     };
   }
   if (diagnostics.needsReview === true || (diagnostics.flagCount ?? 0) > 0) {
     return {
       label: "재촬영 검토",
-      detail: "픽셀, CTA, 슬롯 크기 또는 랜딩 증빙을 확인하고 필요하면 같은 조건으로 다시 캡처합니다.",
+      detail: "픽셀, CTA, 슬롯 크기 또는 랜딩 화면을 확인하고 필요하면 같은 조건으로 다시 캡처합니다.",
       tone: "warning",
     };
   }
   if (goldenCandidate || (capture.status === "completed" && diagnostics.needsReview === false)) {
     return {
-      label: "보존 가능",
-      detail: "현재 이미지와 진단 요약 기준으로 운영 증빙 보존 후보로 볼 수 있습니다.",
+      label: "기록 가능",
+      detail: "현재 이미지와 진단 요약 기준으로 운영 기록 후보로 볼 수 있습니다.",
       tone: "ready",
     };
   }
@@ -568,7 +568,7 @@ function getGoldenCandidateReason(capture: CaptureRecord): string {
   const diagnostics = getDiagnosticsSummary(capture.metadata);
   if (diagnostics.score !== null) return `내부 점수 ${diagnostics.score}`;
   if (diagnostics.hasDiagnostics) return "진단 플래그 없음";
-  return "완료 이미지 보존 가능";
+  return "완료 이미지 기록 가능";
 }
 
 function DetailInfoRow({
@@ -850,9 +850,9 @@ export default function CaptureList({ refreshTrigger }: CaptureListProps) {
       {/* 헤더 + 필터 */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4">
         <div className="flex items-center gap-3">
-          <div className="ops-icon-tile">QA</div>
+          <div className="ops-icon-tile">검수</div>
           <div>
-            <h2 className="ops-section-title">렌더 증빙 QA 이력</h2>
+            <h2 className="ops-section-title">캡처 결과 검수 목록</h2>
             <p className="text-xs text-[var(--color-text-muted)]">
               {isLocalFixtureMode ? `Fixture sample ${fixtureSampleCount}건` : `총 ${statusCounts.all || 0}건`}
               {!isLocalFixtureMode && captures.some((c) => c.status === "processing") && (
@@ -864,7 +864,7 @@ export default function CaptureList({ refreshTrigger }: CaptureListProps) {
             </p>
             <p className="mt-1 text-[11px] leading-5 text-[var(--color-text-muted)]">
               최근 30개 전체 이력입니다. 같은 매체가 보여도 현재 배치 중복으로 단정하지 않습니다.
-              원본 접수, 렌더 증빙, QA 게이트 이력을 같은 증거선으로 봅니다.
+              소재 접수, 화면 생성, 검수 결과를 같은 흐름으로 봅니다.
             </p>
           </div>
         </div>
@@ -937,11 +937,11 @@ export default function CaptureList({ refreshTrigger }: CaptureListProps) {
       {isLocalFixtureMode && (
         <div className="lens-fixture-mode-strip mb-3" role="status" aria-live="polite">
           <div>
-            <span>Local fixture QA</span>
+            <span>Local fixture 검수</span>
             <strong>읽기 전용 샘플 모드</strong>
             <p>
               DB 저장, Storage 업로드, 실제 브라우저 캡처, 중단 요청은 API에서 차단됩니다.
-              현재 화면은 디자인 QA와 증빙 검수 흐름 확인용 fixture 이력만 보여줍니다.
+              현재 화면은 디자인 검수와 캡처 결과 확인 흐름의 fixture 이력만 보여줍니다.
             </p>
           </div>
           <div className="lens-fixture-mode-strip__cells" aria-label="fixture 보호 경계">
@@ -972,7 +972,7 @@ export default function CaptureList({ refreshTrigger }: CaptureListProps) {
 
       <div
         className={`lens-capture-stage-rail ${activeCount > 0 ? "lens-capture-stage-rail--active" : ""}`}
-        aria-label="렌더 증빙 처리 단계"
+        aria-label="캡처 결과 처리 단계"
       >
         {CAPTURE_EVIDENCE_RAIL.map((stage, index) => (
           <span key={stage} className={index === activeStageIndex ? "active" : undefined}>
@@ -982,21 +982,21 @@ export default function CaptureList({ refreshTrigger }: CaptureListProps) {
         ))}
       </div>
 
-      {/* 렌더링 현황 + 최신 결과 */}
+      {/* 화면 생성 현황 + 최신 결과 */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
         <div className="glass-card-static lens-capture-summary-card p-4 md:col-span-1">
           <p className="text-xs text-[var(--color-text-muted)] mb-1">
-            {isLocalFixtureMode ? "Fixture samples" : "진행 중 렌더"}
+            {isLocalFixtureMode ? "Fixture samples" : "진행 중 화면"}
           </p>
           <p className="text-2xl font-bold text-[var(--color-text-primary)]">
             {isLocalFixtureMode ? fixtureSampleCount : activeCount}
           </p>
           <p className="text-xs text-[var(--color-text-secondary)] mt-1">
             {isLocalFixtureMode
-              ? "읽기 전용 QA 이력입니다"
+              ? "읽기 전용 검수 목록입니다"
               : activeCount > 0
-                ? "렌더 증빙이 생성 중입니다"
-                : "대기/진행 렌더 없음"}
+                ? "캡처 화면이 생성 중입니다"
+                : "대기/진행 화면 없음"}
           </p>
           <p className="mt-2 text-[11px] leading-5 text-[var(--color-text-muted)]">
             {isLocalFixtureMode ? "실제 캡처 작업으로 집계하지 않습니다." : "새 배치와 이전 이력이 함께 표시됩니다."}
@@ -1005,7 +1005,7 @@ export default function CaptureList({ refreshTrigger }: CaptureListProps) {
         <div className="glass-card-static lens-capture-summary-card p-4 md:col-span-2">
           <div className="mb-2 flex flex-wrap items-center gap-2">
             <p className="text-xs text-[var(--color-text-muted)]">
-              {featuredProofIsGolden ? "보존 후보 증빙" : "최신 렌더 증빙"}
+              {featuredProofIsGolden ? "기록 후보 화면" : "최신 캡처 화면"}
             </p>
             {featuredProofIsGolden && <span className="lens-golden-candidate-badge">Golden 후보</span>}
           </div>
@@ -1013,7 +1013,7 @@ export default function CaptureList({ refreshTrigger }: CaptureListProps) {
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
               <img
                 src={featuredProof.placement_image_url}
-                alt={featuredProofIsGolden ? "보존 후보 렌더 증빙 이미지" : "최신 렌더 증빙 이미지"}
+                alt={featuredProofIsGolden ? "기록 후보 캡처 이미지" : "최신 캡처 이미지"}
                 className="h-20 w-full rounded-lg border border-[var(--color-border)] object-cover sm:h-16 sm:w-24"
               />
               <div className="min-w-0 flex-1">
@@ -1025,7 +1025,7 @@ export default function CaptureList({ refreshTrigger }: CaptureListProps) {
                 </p>
                 {featuredProofIsGolden && (
                   <p className="mt-1 text-[11px] leading-5 text-[var(--color-text-muted)]">
-                    최신 순서보다 QA 판정과 보존 가능성을 우선해 노출합니다.
+                    최신 순서보다 검수 결과와 기록 가능성을 우선해 노출합니다.
                   </p>
                 )}
               </div>
@@ -1038,7 +1038,7 @@ export default function CaptureList({ refreshTrigger }: CaptureListProps) {
               </a>
             </div>
           ) : (
-            <p className="text-xs text-[var(--color-text-muted)]">아직 완료된 증빙 이미지가 없습니다.</p>
+            <p className="text-xs text-[var(--color-text-muted)]">아직 완료된 캡처 이미지가 없습니다.</p>
           )}
         </div>
       </div>
@@ -1066,8 +1066,8 @@ export default function CaptureList({ refreshTrigger }: CaptureListProps) {
               <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
               <circle cx="12" cy="13" r="4" />
             </svg>
-            <p className="text-base font-medium mb-1">아직 보존할 증빙 이력이 없습니다</p>
-            <p className="text-sm">원본 접수 후 렌더 증빙과 QA 판정이 이곳에 쌓입니다.</p>
+            <p className="text-base font-medium mb-1">아직 기록할 캡처 이력이 없습니다</p>
+            <p className="text-sm">소재 접수 후 화면 생성과 검수 결과가 이곳에 쌓입니다.</p>
           </div>
         ) : (
           /* 캡처 리스트 */
@@ -1490,7 +1490,7 @@ function CaptureDetailModal({
     {
       label: "이미지 판독",
       value: activeUrl ? `${activeOutput.label} 확보` : "이미지 없음",
-      detail: activeUrl ? `원본 픽셀 ${naturalImageSizeLabel}` : "렌더 결과 대기",
+      detail: activeUrl ? `원본 픽셀 ${naturalImageSizeLabel}` : "화면 결과 대기",
       tone: activeUrl ? "ready" : "warning",
     },
     {
@@ -1566,7 +1566,7 @@ function CaptureDetailModal({
   const evidenceBundleText = JSON.stringify(evidenceBundle, null, 2);
   const evidenceBundleRows = [
     {
-      label: "증빙 ID",
+      label: "캡처 ID",
       value: capture.id,
       detail: status.label,
       tone: "ready",
@@ -1590,7 +1590,7 @@ function CaptureDetailModal({
       tone: naturalImageSize ? "ready" : "muted",
     },
     {
-      label: "보존",
+      label: "기록",
       value: activeStoragePath ? "저장 경로" : isFixtureRecord ? "Fixture" : "미기록",
       detail: isFixtureRecord ? "Fixture read-only" : activeStoragePath ? "경로 기록됨" : "저장 추적 대기",
       tone: activeStoragePath || isFixtureRecord ? "ready" : "muted",
@@ -1768,12 +1768,12 @@ function CaptureDetailModal({
           <div className="lens-golden-candidate-panel">
             <span>Golden 후보</span>
             <strong>{getGoldenCandidateReason(capture)}</strong>
-            <p>게재면 이미지, 진단 플래그, 검수 필요 여부를 기준으로 보존 후보로 표시합니다.</p>
+            <p>게재면 이미지, 진단 플래그, 검수 필요 여부를 기준으로 기록 후보로 표시합니다.</p>
           </div>
         )}
         {isFixtureRecord && (
           <div className="lens-fixture-detail-panel">
-            <span>Local fixture QA</span>
+            <span>Local fixture 검수</span>
             <strong>읽기 전용 샘플</strong>
             <p>이 상세 화면은 fixture 데이터 판독용입니다. 실제 캡처 실행, 중단, 저장소 변경은 수행하지 않습니다.</p>
             <p>샘플 열기, 저장, URL 복사는 fixture 검수용 동작이며 기록 변경을 만들지 않습니다.</p>
@@ -1801,7 +1801,7 @@ function CaptureDetailModal({
           <strong>{proofDecisionLabel}</strong>
           <p>{proofDecisionDetail}</p>
         </div>
-        <div className="lens-proof-integrity-grid" aria-label="증빙 신뢰 요약">
+        <div className="lens-proof-integrity-grid" aria-label="캡처 신뢰 요약">
           {proofIntegrityRows.map((row) => (
             <div className={`lens-proof-integrity-cell ${row.tone}`} key={row.label}>
               <span>{row.label}</span>
@@ -1814,11 +1814,11 @@ function CaptureDetailModal({
 
       <section className="lens-inspector-section space-y-3">
         <div className={`lens-visual-qa-gate ${visualInspectionDecision.tone}`}>
-          <span>Visual QA gate</span>
-          <strong>시각 검수 게이트 · {visualInspectionDecision.label}</strong>
+          <span>Visual review</span>
+          <strong>시각 검수 단계 · {visualInspectionDecision.label}</strong>
           <p>{visualInspectionDecision.detail}</p>
         </div>
-        <div className="lens-visual-qa-grid" aria-label="시각 검수 게이트 요약">
+        <div className="lens-visual-qa-grid" aria-label="시각 검수 단계 요약">
           {visualInspectionRows.map((row) => (
             <div className={`lens-visual-qa-cell ${row.tone}`} key={row.label}>
               <span>{row.label}</span>
@@ -1833,18 +1833,18 @@ function CaptureDetailModal({
         <div className="lens-evidence-bundle">
           <div className="lens-evidence-bundle__head">
             <div>
-              <span>Evidence bundle</span>
-              <strong>증빙 패키지</strong>
+              <span>Capture bundle</span>
+              <strong>캡처 묶음</strong>
             </div>
             <button
               type="button"
-              onClick={() => copyText(evidenceBundleText, "증빙 패키지")}
+              onClick={() => copyText(evidenceBundleText, "캡처 묶음")}
               className="lens-evidence-bundle__copy"
             >
               복사
             </button>
           </div>
-          <div className="lens-evidence-bundle__grid" aria-label="증빙 패키지 요약">
+          <div className="lens-evidence-bundle__grid" aria-label="캡처 묶음 요약">
             {evidenceBundleRows.map((row) => (
               <div className={`lens-evidence-bundle__cell ${row.tone}`} key={row.label}>
                 <span>{row.label}</span>
