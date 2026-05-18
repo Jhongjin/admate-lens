@@ -33,10 +33,10 @@ const campaignReviewRows = [
   {
     title: "캠페인 식별자",
     status: "부분 연결",
-    description: "DB row의 campaign_id 컬럼은 존재하지만 요청 폼에서 캠페인 선택 UI는 아직 없습니다.",
+    description: "결과에는 캠페인 식별 정보를 남길 수 있지만, 요청 단계의 캠페인 선택 화면은 아직 준비 중입니다.",
   },
   {
-    title: "상품/지면 metadata",
+    title: "상품/지면 정보",
     status: "연결됨",
     description: "productFamily, productSurface 기준으로 YouTube, Demand Gen, Naver, Kakao 결과를 구분합니다.",
   },
@@ -51,17 +51,17 @@ const assetReviewRows = [
   {
     title: "소재 입력",
     status: "연결됨",
-    description: "이미지 URL, 영상 URL, companion, avatar, logo 입력은 현재 캡처 요청에 반영됩니다.",
+    description: "이미지, 영상, 로고, 보조 소재 입력은 현재 캡처 요청에 반영됩니다.",
   },
   {
-    title: "업로드 API",
+    title: "소재 업로드",
     status: "연결됨",
-    description: "소재 업로드 후 URL을 캡처 요청에 사용하는 흐름은 유지됩니다.",
+    description: "소재를 업로드한 뒤 캡처 요청에 연결하는 흐름은 유지됩니다.",
   },
   {
     title: "소재 라이브러리 저장소",
     status: "다음 작업",
-    description: "별도 asset table/schema 없이 운영 UI만 먼저 열어두고, 영구 저장은 추후 설계가 필요합니다.",
+    description: "소재를 장기 보관하고 다시 쓰는 화면은 추후 설계가 필요합니다.",
   },
 ];
 
@@ -85,7 +85,7 @@ const productGroups = [
     status: "신규 공개",
     tone: "info",
     description: "Google Ads 상품 흐름에서 YouTube Feed/Shorts 캡처 결과 생성",
-    items: ["YouTube Feed", "YouTube Shorts", "metadata 분리"],
+    items: ["YouTube Feed", "YouTube Shorts", "상품 정보 분리"],
   },
   {
     title: "GDN Display",
@@ -106,8 +106,8 @@ const productGroups = [
 const validationRules = [
   "실제 매체 화면과의 유사도를 최우선으로 검수합니다.",
   "픽셀, 레이아웃, CTA, 캡처 시점이 지면 기준과 맞는지 확인합니다.",
-  "캡처 결과물 UI와 광고 미리보기는 AdMate 테마로 임의 변경하지 않습니다.",
-  "AdMate/Openclaw 톤 적용은 운영자 UI와 작업 허브에만 한정합니다.",
+  "캡처 결과 화면과 광고 미리보기는 AdMate 테마로 임의 변경하지 않습니다.",
+  "AdMate 톤 적용은 운영자 화면과 작업 허브에만 한정합니다.",
 ];
 
 const coverageRows = [
@@ -127,7 +127,7 @@ const coverageRows = [
     product: "Demand Gen",
     surface: "Google Ads · YouTube Feed / Shorts",
     status: "공개 구현",
-    note: "Google Ads 상품 흐름으로 metadata 분리",
+    note: "Google Ads 상품 흐름으로 상품 정보 분리",
   },
   {
     product: "GDN Display",
@@ -143,9 +143,9 @@ const coverageRows = [
   },
   {
     product: "YouTube Display / Overlay",
-    surface: "Legacy 제외",
+    surface: "이전 형식 제외",
     status: "제외",
-    note: "최신 YouTube UI 재구현 전 공개 금지",
+    note: "최신 YouTube 화면 재구현 전 공개하지 않음",
   },
 ];
 
@@ -221,7 +221,7 @@ const kpiCards = [
   { label: "캡처 타입", value: "27", meta: "YouTube, Demand Gen, GDN, Naver, Kakao" },
   { label: "MO 지면", value: "8", meta: "Naver 4종 + Kakao 4종" },
   { label: "제외 지면", value: "2", meta: "Display, Overlay" },
-  { label: "삭제 잠금", value: "Off", meta: "UI 기본 비활성" },
+  { label: "삭제 잠금", value: "기본", meta: "삭제 버튼 숨김" },
 ];
 
 const homeActionCards = [
@@ -634,7 +634,7 @@ export default function Home() {
           <section className="lens-quality-panel" aria-label="AdMate Lens 품질 기준">
             <div>
               <p className="studio-eyebrow">검수 기준</p>
-              <h3>캡처 결과물과 운영자 UI의 경계</h3>
+              <h3>캡처 결과물과 운영 화면의 경계</h3>
             </div>
             <ul>
               {validationRules.map((rule) => (
@@ -765,7 +765,7 @@ export default function Home() {
                 <h3>최근 화면 결과 검수</h3>
               </div>
               <p className="studio-panel-note">
-                화면 상태와 실패 사유를 확인합니다. 운영 UI에서는 삭제 대신
+                화면 상태와 실패 사유를 확인합니다. 운영 화면에서는 삭제 대신
                 기록 전 검수와 재요청을 우선합니다.
               </p>
             </div>
@@ -779,7 +779,7 @@ export default function Home() {
                 <h3>캠페인 결과 묶음 검토</h3>
               </div>
               <p className="studio-panel-note">
-                DB schema 변경 없이 현재 캡처 metadata와 campaign_id 활용 가능 범위를 먼저 확인합니다.
+                저장 구조를 바꾸기 전에 현재 캡처 정보와 캠페인 식별 정보의 활용 범위를 먼저 확인합니다.
               </p>
             </div>
 
@@ -813,7 +813,7 @@ export default function Home() {
                 <h3>소재 원본 라이브러리 검토</h3>
               </div>
               <p className="studio-panel-note">
-                실제 소재 파일과 URL은 캡처 결과 픽셀 매칭에 직접 영향을 주므로 저장/재사용 정책을 분리합니다.
+                실제 소재 파일과 주소는 캡처 결과 픽셀 매칭에 직접 영향을 주므로 저장/재사용 정책을 분리합니다.
               </p>
             </div>
 
