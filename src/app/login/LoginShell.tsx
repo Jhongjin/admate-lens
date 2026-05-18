@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
@@ -290,12 +289,14 @@ export default function LoginShell({ nextPath }: LoginShellProps) {
               >
                 AdMate 가입 요청
               </a>
-              <Link
-                href="/"
+              <a
+                href="https://home.admate.ai.kr"
+                target="_blank"
+                rel="noreferrer"
                 className="inline-flex w-full items-center justify-center rounded-lg px-4 py-2 text-sm font-medium text-[var(--color-text-muted)] transition-colors hover:text-[var(--color-text-primary)]"
               >
-                Lens 홈으로 돌아가기
-              </Link>
+                AdMate 홈페이지로 이동
+              </a>
             </div>
           </div>
         </section>
